@@ -1,0 +1,693 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------
+// CORE ORGANIZATION MODULE
+// ---------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  timezone  String   @default("Asia/Dhaka")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  businessUnits             BusinessUnit[]
+  branches                  Branch[]
+  departments               Department[]
+  projects                  Project[]
+  users                     User[]
+  roles                     Role[]
+  chartsOfAccounts          ChartOfAccounts[]
+  fiscalPeriods             FiscalPeriod[]
+  journalEntries            JournalEntry[]
+  documentSequences         DocumentSequence[]
+  sales                     Sale[]
+  auditLogs                 AuditLog[]
+  customers                 Customer[]
+  suppliers                 Supplier[]
+  categories                Category[]
+  units                     Unit[]
+  products                  Product[]
+  warehouses                Warehouse[]
+  inventoryMovements        InventoryMovement[]
+  stockBalances             StockBalance[]
+  outboxEvents              OutboxEvent[]
+  financeIntegrationConfigs FinanceIntegrationConfig[]
+}
+
+model BusinessUnit {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String // e.g., Shop, Agro, Studio, Printing
+  type           String // Metadata-driven: RETAIL, AGRICULTURE, SERVICE, etc. Not a hard-coded enum.
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  branches     Branch[]
+  journalLines JournalLine[]
+
+  @@unique([organizationId, name])
+}
+
+model Branch {
+  id             String   @id @default(uuid())
+  organizationId String
+  businessUnitId String? // Optional: branch can belong directly to org without a business unit
+  code           String?
+  name           String
+  location       String?
+  phone          String?
+  email          String?
+  timezone       String? // Optional override for branch-specific closures
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  journalLines JournalLine[]
+  warehouses   Warehouse[]
+  sales        Sale[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, code])
+}
+
+model Warehouse {
+  id             String   @id @default(uuid())
+  organizationId String
+  branchId       String
+  name           String
+  code           String?
+  address        String?
+  isActive       Boolean  @default(true)
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  branch             Branch              @relation(fields: [branchId], references: [id])
+  inventoryMovements InventoryMovement[]
+  stockBalances      StockBalance[]
+  sales              Sale[]
+
+  @@unique([organizationId, code])
+  @@index([branchId])
+}
+
+model Department {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  journalLines JournalLine[]
+
+  @@unique([organizationId, name])
+}
+
+model Project {
+  id             String   @id @default(uuid())
+  organizationId String
+  businessUnitId String? // Optional link to owning business unit
+  name           String // e.g., "Tomato Crop 2027", "Store Renovation"
+  status         String   @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  journalLines JournalLine[]
+
+  @@unique([organizationId, name])
+}
+
+// ---------------------------------------------------------
+// IDENTITY & ACCESS MANAGEMENT (IAM) MODULE
+// ---------------------------------------------------------
+
+model User {
+  id             String   @id @default(uuid())
+  organizationId String
+  email          String   @unique
+  password       String // Stored as bcrypt/argon2 hash, never plaintext
+  firstName      String
+  lastName       String
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization          Organization        @relation(fields: [organizationId], references: [id])
+  userRoles             UserRole[]
+  auditLogs             AuditLog[]
+  createdJournalEntries JournalEntry[]      @relation("CreatedByUser")
+  postedJournalEntries  JournalEntry[]      @relation("PostedByUser")
+  inventoryMovements    InventoryMovement[]
+  sales                 Sale[]
+}
+
+model Role {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String // e.g., "Cashier", "Manager", "Accountant"
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  permissions  RolePermission[]
+  userRoles    UserRole[]
+
+  @@unique([organizationId, name])
+}
+
+/// Permissions are global system-defined action strings.
+/// They are NOT organization-scoped because they represent system capabilities,
+/// not business data. Organizations customize access by assigning permissions to roles.
+model Permission {
+  id          String   @id @default(uuid())
+  action      String   @unique // e.g., "finance.journal.create", "pos.sale.create"
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+// ---------------------------------------------------------
+// FINANCE MODULE (THE LEDGER ENGINE)
+//
+// Core principles enforced by this schema:
+// 1. Every posted JournalEntry must satisfy SUM(debits) = SUM(credits).
+// 2. Posted entries are immutable — corrections use reversal entries.
+// 3. JournalLines are insert-only — no updates, no deletes.
+// 4. Money uses NUMERIC(19,4) — no floating point.
+// 5. Idempotency keys prevent duplicate financial postings.
+// 6. Fiscal period locking prevents posting to closed periods.
+// ---------------------------------------------------------
+
+model ChartOfAccounts {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String // e.g., "Standard COA"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  accounts     Account[]
+
+  @@unique([organizationId, name])
+}
+
+model Account {
+  id                String      @id @default(uuid())
+  chartOfAccountsId String
+  code              String // Unique within COA, not globally. e.g., "1000", "2100"
+  name              String // e.g., "Cash in BDT", "Accounts Receivable", "Sales Revenue"
+  type              AccountType
+  isActive          Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  chartOfAccounts ChartOfAccounts @relation(fields: [chartOfAccountsId], references: [id])
+  journalLines    JournalLine[]
+
+  @@unique([chartOfAccountsId, code])
+  @@index([chartOfAccountsId, type])
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+model FiscalPeriod {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String // e.g., "January 2027", "FY 2027"
+  startDate      DateTime
+  endDate        DateTime
+  status         PeriodStatus @default(OPEN)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  journalEntries JournalEntry[]
+  sales          Sale[]
+
+  @@unique([organizationId, name])
+  @@unique([organizationId, startDate])
+}
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
+}
+
+model JournalEntry {
+  id              String      @id @default(uuid())
+  organizationId  String
+  fiscalPeriodId  String?
+  accountingDate  DateTime
+  referenceType   String? // Source operation type: "POS_SALE", "MANUAL", "PAYROLL", "REFUND", etc.
+  referenceId     String? // ID of the source record in the operational module
+  idempotencyKey  String?
+  status          EntryStatus @default(DRAFT)
+  description     String?
+  reversalOfId    String? // If this is a reversal, links to the original entry
+  createdByUserId String?
+  postedByUserId  String?
+  postedAt        DateTime? // When the entry was finalized (DRAFT -> POSTED)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt // Only reflects status transitions (DRAFT->POSTED->REVERSED), not content edits
+
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  fiscalPeriod FiscalPeriod?  @relation(fields: [fiscalPeriodId], references: [id])
+  reversalOf   JournalEntry?  @relation("JournalEntryReversal", fields: [reversalOfId], references: [id])
+  reversals    JournalEntry[] @relation("JournalEntryReversal")
+  createdBy    User?          @relation("CreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  postedBy     User?          @relation("PostedByUser", fields: [postedByUserId], references: [id], onDelete: SetNull)
+  lines        JournalLine[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, accountingDate])
+  @@index([organizationId, status])
+  @@index([referenceType, referenceId])
+}
+
+enum EntryStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+/// JournalLine is INSERT-ONLY. No updates, no deletes.
+/// Each line carries exactly one positive amount in debit OR credit, never both.
+/// This is enforced by:
+///   1. Application-layer validation in the Finance Service.
+///   2. A raw SQL CHECK constraint added in the initial migration:
+///      CHECK (debit >= 0 AND credit >= 0 AND (debit = 0 OR credit = 0) AND (debit + credit > 0))
+model JournalLine {
+  id             String @id @default(uuid())
+  journalEntryId String
+  accountId      String
+
+  // Money in exact numeric precision (BDT).
+  debit  Decimal @default(0) @db.Decimal(19, 4)
+  credit Decimal @default(0) @db.Decimal(19, 4)
+
+  // Business Dimensions (nullable — not every transaction uses every dimension)
+  businessUnitId String?
+  branchId       String?
+  departmentId   String?
+  projectId      String?
+
+  createdAt DateTime @default(now())
+  // No updatedAt — JournalLines are immutable after creation.
+
+  journalEntry JournalEntry  @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  account      Account       @relation(fields: [accountId], references: [id])
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  branch       Branch?       @relation(fields: [branchId], references: [id])
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  project      Project?      @relation(fields: [projectId], references: [id])
+
+  @@index([accountId, journalEntryId])
+  @@index([businessUnitId])
+  @@index([branchId])
+  @@index([departmentId])
+  @@index([projectId])
+}
+
+// ---------------------------------------------------------
+// AUDIT MODULE
+//
+// AuditLog records are IMMUTABLE. No updates, no deletes (hard or soft).
+// ---------------------------------------------------------
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String?
+  entityType     String // e.g., "JournalEntry", "Account", "User"
+  entityId       String
+  action         String // CREATE, UPDATE, DELETE
+  oldData        Json? // Snapshot of entity state before change
+  newData        Json? // Snapshot of entity state after change
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+  // No updatedAt — AuditLogs are immutable.
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, userId])
+  @@index([organizationId, createdAt])
+}
+
+// ---------------------------------------------------------
+// BUSINESS CORE (MASTER DATA)
+// ---------------------------------------------------------
+
+model Customer {
+  id             String   @id @default(uuid())
+  organizationId String
+  code           String? // Optional unique customer number/code
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  status         String   @default("ACTIVE") // ACTIVE, INACTIVE
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  sales        Sale[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+}
+
+model Supplier {
+  id             String   @id @default(uuid())
+  organizationId String
+  code           String?
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  status         String   @default("ACTIVE")
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+}
+
+model Unit {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String // e.g., "Piece", "kg", "Liter"
+  abbreviation   String? // e.g., "pcs", "kg", "L"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  products     Product[]
+
+  @@unique([organizationId, name])
+}
+
+model Category {
+  id             String   @id @default(uuid())
+  organizationId String
+  parentId       String?
+  name           String
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  parent       Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     Category[]   @relation("CategoryHierarchy")
+  products     Product[]
+
+  @@unique([organizationId, name])
+}
+
+enum ProductType {
+  PRODUCT
+  SERVICE
+}
+
+model Product {
+  id             String      @id @default(uuid())
+  organizationId String
+  categoryId     String?
+  unitId         String?
+  type           ProductType @default(PRODUCT)
+  code           String? // SKU or internal code
+  name           String
+  description    String?
+  sellingPrice   Decimal     @default(0) @db.Decimal(19, 4)
+  costPrice      Decimal?    @db.Decimal(19, 4)
+  isActive       Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  category           Category?           @relation(fields: [categoryId], references: [id])
+  unit               Unit?               @relation(fields: [unitId], references: [id])
+  inventoryMovements InventoryMovement[]
+  stockBalances      StockBalance[]
+  saleLines          SaleLine[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, isActive])
+  @@index([organizationId, categoryId])
+}
+
+// ---------------------------------------------------------
+// SYSTEM INFRASTRUCTURE (OUTBOX)
+// ---------------------------------------------------------
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model OutboxEvent {
+  id                  String       @id @default(uuid())
+  organizationId      String
+  eventType           String
+  aggregateType       String
+  aggregateId         String
+  payload             Json
+  status              OutboxStatus @default(PENDING)
+  attempts            Int          @default(0)
+  availableAt         DateTime     @default(now())
+  processingStartedAt DateTime?
+  processedAt         DateTime?
+  lastError           String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([status, availableAt])
+  @@index([organizationId, aggregateType, aggregateId])
+  @@index([organizationId, eventType])
+}
+
+// ---------------------------------------------------------
+// FINANCE INTEGRATION CONFIGURATION
+// ---------------------------------------------------------
+
+model FinanceIntegrationConfig {
+  organizationId              String  @id
+  cashAccountId               String?
+  bankAccountId               String?
+  mobileBankingAccountId      String?
+  salesRevenueAccountId       String?
+  serviceRevenueAccountId     String?
+  accountsReceivableAccountId String?
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+// ---------------------------------------------------------
+// INVENTORY & STOCK MODULE
+// ---------------------------------------------------------
+
+enum MovementType {
+  RECEIPT
+  ISSUE
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+/// The authoritative source of truth for inventory. Immutable.
+model InventoryMovement {
+  id             String       @id @default(uuid())
+  organizationId String
+  warehouseId    String
+  productId      String
+  type           MovementType
+  quantity       Decimal      @db.Decimal(19, 4) // Always positive
+  movementDate   DateTime     @default(now())
+
+  referenceType   String? // e.g., 'MANUAL_ADJUSTMENT', 'TRANSFER'
+  referenceId     String?
+  idempotencyKey  String? // Safe replay prevention
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  product      Product      @relation(fields: [productId], references: [id])
+  createdBy    User?        @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, warehouseId, productId])
+  @@index([organizationId, movementDate])
+  @@index([referenceType, referenceId])
+}
+
+/// Derived projection of current stock. Updated strictly via movements.
+model StockBalance {
+  id             String   @id @default(uuid())
+  organizationId String
+  warehouseId    String
+  productId      String
+  quantity       Decimal  @default(0) @db.Decimal(19, 4)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@unique([organizationId, warehouseId, productId])
+}
+
+// ---------------------------------------------------------
+// SALES & POS MODULE
+// ---------------------------------------------------------
+
+model DocumentSequence {
+  id             String   @id @default(uuid())
+  organizationId String
+  prefix         String // e.g., 'SALE'
+  year           Int // e.g., 2026
+  nextSequence   Int      @default(1)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, prefix, year])
+}
+
+enum SaleStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
+enum PaymentMethod {
+  CASH
+  BANK
+  MOBILE_BANKING
+  OTHER
+}
+
+model Sale {
+  id             String        @id @default(uuid())
+  organizationId String
+  branchId       String
+  warehouseId    String
+  customerId     String?
+  status         SaleStatus    @default(DRAFT)
+  paymentStatus  PaymentStatus @default(UNPAID)
+  saleNumber     String? // Generated on completion
+
+  subtotal Decimal @default(0) @db.Decimal(19, 4)
+  discount Decimal @default(0) @db.Decimal(19, 4)
+  total    Decimal @default(0) @db.Decimal(19, 4)
+
+  saleDate       DateTime @default(now())
+  idempotencyKey String?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch       Branch       @relation(fields: [branchId], references: [id])
+  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
+  customer     Customer?    @relation(fields: [customerId], references: [id])
+  createdBy    User?        @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  lines          SaleLine[]
+  payments       SalePayment[]
+  fiscalPeriod   FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id])
+  fiscalPeriodId String?
+
+  @@unique([organizationId, saleNumber])
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, saleDate])
+  @@index([organizationId, customerId])
+  @@index([organizationId, status])
+}
+
+model SaleLine {
+  id           String  @id @default(uuid())
+  saleId       String
+  productId    String
+  quantity     Decimal @db.Decimal(19, 4)
+  unitPrice    Decimal @db.Decimal(19, 4)
+  discount     Decimal @default(0) @db.Decimal(19, 4)
+  lineSubtotal Decimal @db.Decimal(19, 4)
+  lineTotal    Decimal @db.Decimal(19, 4)
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model SalePayment {
+  id          String        @id @default(uuid())
+  saleId      String
+  amount      Decimal       @db.Decimal(19, 4)
+  method      PaymentMethod
+  reference   String?
+  paymentDate DateTime      @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+}

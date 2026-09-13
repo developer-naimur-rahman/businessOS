@@ -1,0 +1,16 @@
+{
+  "name": "admin-dashboard",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "admin-dashboard/src",
+  "projectType": "application",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project admin-dashboard --web",
+  "targets": {
+    "dev": {
+      "command": "next dev -p 3000",
+      "options": {
+        "cwd": "admin-dashboard"
+      }
+    }
+  }
+}
