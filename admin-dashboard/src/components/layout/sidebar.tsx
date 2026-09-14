@@ -1,124 +1,95 @@
 "use client"
+
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "../../lib/utils"
 import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Users, 
-  Package, 
-  Tags, 
-  Truck, 
-  Box, 
-  Store, 
-  ArrowRightLeft, 
-  Banknote, 
-  CreditCard, 
-  Link as LinkIcon, 
-  Building2, 
-  Settings 
+  LayoutDashboard, ShoppingCart, Users, Settings, 
+  Package, Boxes, Store, Factory, ArrowRightLeft,
+  TerminalSquare
 } from "lucide-react"
-
-const navigation = [
-  {
-    title: "Overview",
-    items: [
-      { name: "Dashboard", href: "/", icon: LayoutDashboard, exact: true },
-    ],
-  },
-  {
-    title: "Sales",
-    items: [
-      { name: "POS / Sales", href: "/sales", icon: ShoppingCart },
-      { name: "Customers", href: "/customers", icon: Users },
-    ],
-  },
-  {
-    title: "Catalog",
-    items: [
-      { name: "Products", href: "/products", icon: Package },
-      { name: "Categories", href: "/categories", icon: Tags },
-      { name: "Suppliers", href: "/suppliers", icon: Truck },
-    ],
-  },
-  {
-    title: "Inventory",
-    items: [
-      { name: "Stock", href: "/inventory", icon: Box, exact: true },
-      { name: "Warehouses", href: "/warehouses", icon: Store },
-      { name: "Movements", href: "/inventory/movements", icon: ArrowRightLeft },
-    ],
-  },
-  {
-    title: "Finance",
-    items: [
-      { name: "Accounts", href: "/finance/accounts", icon: Banknote },
-      { name: "Transactions", href: "/finance/transactions", icon: CreditCard },
-      { name: "Integration", href: "/finance/integration", icon: LinkIcon },
-    ],
-  },
-  {
-    title: "Operations",
-    items: [
-      { name: "Branches", href: "/branches", icon: Building2 },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      { name: "Settings", href: "/settings", icon: Settings },
-    ],
-  },
-]
 
 export function Sidebar() {
   const pathname = usePathname()
 
+  const groups = [
+    {
+      label: "Workspace",
+      items: [
+        { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+        { name: "Point of Sale", href: "/admin/pos", icon: TerminalSquare },
+      ]
+    },
+    {
+      label: "Sales & Fulfillment",
+      items: [
+        { name: "Sales History", href: "/admin/sales", icon: ShoppingCart },
+        { name: "Customers", href: "/admin/customers", icon: Users },
+      ]
+    },
+    {
+      label: "Inventory & Supply",
+      items: [
+        { name: "Products", href: "/admin/products", icon: Package },
+        { name: "Stock Levels", href: "/admin/inventory", icon: Boxes },
+        { name: "Suppliers", href: "/admin/suppliers", icon: Factory },
+      ]
+    },
+    {
+      label: "Finance",
+      items: [
+        { name: "Accounts", href: "/admin/finance/accounts", icon: Store },
+        { name: "Journal", href: "/admin/finance/transactions", icon: ArrowRightLeft },
+      ]
+    }
+  ]
+
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card">
-      <div className="flex h-16 shrink-0 items-center px-6 border-b">
-        <span className="text-lg font-bold tracking-tight text-primary">My Business OS</span>
+    <aside className="w-64 flex-shrink-0 flex flex-col h-full bg-slate-50/50">
+      <div className="h-14 flex items-center px-6 border-b border-transparent">
+        <div className="w-6 h-6 bg-slate-900 rounded-md flex items-center justify-center mr-3 shadow-sm">
+          <span className="text-white font-bold text-[10px]">OS</span>
+        </div>
+        <span className="font-semibold text-sm tracking-tight text-slate-900">My Business OS</span>
       </div>
-      <div className="flex-1 overflow-y-auto py-4">
-        <nav className="space-y-6 px-4">
-          {navigation.map((group) => (
-            <div key={group.title}>
-              <h4 className="mb-2 px-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                {group.title}
-              </h4>
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const isActive = item.exact
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href)
-                  
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={cn(
-                        "group flex items-center rounded-md px-2 py-2 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      <item.icon
-                        className={cn(
-                          "mr-3 h-4 w-4 shrink-0",
-                          isActive ? "text-primary" : "text-muted-foreground group-hover:text-accent-foreground"
-                        )}
-                      />
-                      {item.name}
-                    </Link>
-                  )
-                })}
-              </div>
+      
+      <div className="flex-1 overflow-y-auto custom-scrollbar py-6 px-3 space-y-6">
+        {groups.map((group) => (
+          <div key={group.label}>
+            <h3 className="px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              {group.label}
+            </h3>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/admin")
+                const Icon = item.icon
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    data-active={isActive}
+                    className="sidebar-item"
+                  >
+                    <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-slate-900' : 'text-slate-400'}`} strokeWidth={isActive ? 2.5 : 2} />
+                    {item.name}
+                  </Link>
+                )
+              })}
             </div>
-          ))}
-        </nav>
+          </div>
+        ))}
       </div>
-    </div>
+      
+      <div className="p-3 border-t border-slate-200/60">
+        <Link 
+          href="/admin/settings"
+          data-active={pathname.startsWith("/admin/settings")}
+          className="sidebar-item"
+        >
+          <Settings className={`w-[18px] h-[18px] ${pathname.startsWith("/admin/settings") ? 'text-slate-900' : 'text-slate-400'}`} strokeWidth={2} />
+          System Settings
+        </Link>
+      </div>
+    </aside>
   )
 }

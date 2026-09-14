@@ -1,47 +1,64 @@
 "use client"
+
 import React from "react"
 import { useAuthStore } from "../../store/useAuthStore"
-import { Bell, Search, Menu, LogOut, User } from "lucide-react"
+import { useRouter, usePathname } from "next/navigation"
+import { LogOut, Search, Bell } from "lucide-react"
 import { Button } from "../ui/button"
 
-export function Header({ onMenuClick }: { onMenuClick: () => void }) {
+export function Header() {
   const { user, logout } = useAuthStore()
+  const router = useRouter()
+  const pathname = usePathname()
 
-  const displayName = user?.firstName
-    ? `${user.firstName} ${user.lastName || ""}`.trim()
-    : user?.email || "Admin"
+  const handleLogout = () => {
+    logout()
+    router.push("/admin/login")
+  }
+
+  // Create a clean readable title based on pathname
+  const getPageTitle = () => {
+    if (pathname === "/admin") return "Workspace"
+    const path = pathname.split("/").pop()
+    if (!path) return "Workspace"
+    return path.charAt(0).toUpperCase() + path.slice(1).replace(/-/g, " ")
+  }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b bg-background px-4 sm:px-6">
-      <div className="flex items-center">
-        <Button variant="ghost" size="icon" className="md:hidden mr-2" onClick={onMenuClick}>
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle Sidebar</span>
-        </Button>
-        
-        {/* Search Placeholder */}
-        <div className="hidden sm:flex items-center text-muted-foreground bg-muted rounded-md px-3 py-1.5 text-sm w-64 border border-transparent focus-within:border-ring focus-within:bg-background transition-colors">
-          <Search className="h-4 w-4 mr-2 shrink-0" />
-          <span className="truncate">Search (Coming soon...)</span>
-        </div>
+    <header className="h-14 flex items-center justify-between px-8 border-b border-slate-200/60 bg-white sticky top-0 z-10">
+      <div className="flex items-center gap-4">
+        <h2 className="text-[15px] font-semibold text-slate-900 tracking-tight">{getPageTitle()}</h2>
       </div>
       
-      <div className="flex items-center space-x-4">
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive"></span>
-        </Button>
+      <div className="flex items-center gap-3">
+        <div className="relative hidden md:flex items-center">
+          <Search className="w-4 h-4 text-slate-400 absolute left-2.5" />
+          <input 
+            type="text" 
+            placeholder="Search..." 
+            className="h-8 w-64 bg-slate-100/50 border border-transparent hover:border-slate-200 focus:border-slate-300 focus:bg-white transition-all rounded-md pl-9 pr-3 text-sm focus:outline-none"
+          />
+        </div>
         
-        <div className="flex items-center space-x-3 border-l pl-4">
-          <div className="flex flex-col items-end hidden sm:flex">
-            <span className="text-sm font-medium leading-none">{displayName}</span>
-            <span className="text-xs text-muted-foreground mt-1">{user?.email || "Super Admin"}</span>
+        <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
+          <Bell className="w-[18px] h-[18px]" />
+        </button>
+
+        <div className="w-px h-4 bg-slate-200 mx-1"></div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end">
+            <span className="text-[13px] font-medium text-slate-900 leading-tight">{user?.name || 'Admin'}</span>
+            <span className="text-[11px] text-slate-500 uppercase tracking-wider">{user?.role || 'Staff'}</span>
           </div>
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
-          <Button variant="ghost" size="icon" onClick={logout} title="Log out" className="text-muted-foreground hover:text-destructive">
-            <LogOut className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleLogout}
+            className="w-8 h-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+            title="Log out"
+          >
+            <LogOut className="w-4 h-4" />
           </Button>
         </div>
       </div>

@@ -33,7 +33,7 @@ export const useAuthStore = create<AuthState>()(
       setUser: (user) => set({ user }),
       logout: () => {
         set({ token: null, user: null });
-        window.location.href = '/login';
+        window.location.href = '/admin/login';
       },
       fetchProfile: async () => {
         try {
