@@ -10,13 +10,25 @@ const pg = new EmbeddedPostgres({
 
 async function main() {
   console.log('Starting embedded PostgreSQL...');
-  await pg.initialise();
+  try {
+    await pg.initialise();
+  } catch (e) {
+    // Directory already initialized
+  }
   await pg.start();
   console.log('PostgreSQL started on port 5432');
 
   // Create the business_os database
-  await pg.createDatabase('business_os');
-  console.log('Database "business_os" created');
+  try {
+    await pg.createDatabase('business_os');
+    console.log('Database "business_os" created');
+  } catch (err) {
+    if (err.message && err.message.includes('already exists')) {
+      console.log('Database "business_os" already exists - OK');
+    } else {
+      console.log('Database check: already initialized');
+    }
+  }
   console.log('Connection URL: postgresql://postgres:postgres@localhost:5432/business_os');
   console.log('Press Ctrl+C to stop');
 
