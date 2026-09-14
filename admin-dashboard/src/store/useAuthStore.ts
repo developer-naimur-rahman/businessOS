@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import axios from 'axios';
 
 // Directly use the API_URL to avoid circular dependency with api-client
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333/api';
 
 export interface AuthenticatedUser {
   userId: string;

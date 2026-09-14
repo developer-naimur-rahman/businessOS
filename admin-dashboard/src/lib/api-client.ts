@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 
 // Next.js rewrites can be used later, but for now we'll assume the API is on the same host or use env
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3333/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333/api';
 
 export const api = axios.create({
   baseURL: API_URL,
