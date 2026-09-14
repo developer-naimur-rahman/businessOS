@@ -6,13 +6,15 @@ import { useRouter } from "next/navigation"
 export default function AdminLogin() {
   const [pin, setPin] = useState("")
   const [error, setError] = useState("")
-  const login = useAuthStore((state) => state.login)
+  const setUser = useAuthStore((state) => state.setUser)
+  const setToken = useAuthStore((state) => state.setToken)
   const router = useRouter()
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    if (pin === "5825825825") {
-      login({ id: "1", name: "Admin", role: "ADMIN" })
+    if (pin === "5825825825iW.") {
+      setUser({ userId: "1", organizationId: "1", roleIds: [], permissions: [] })
+      setToken("dummy_token")
       router.push("/admin")
     } else {
       setError("Invalid PIN")
