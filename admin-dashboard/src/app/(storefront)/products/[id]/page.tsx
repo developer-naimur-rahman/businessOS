@@ -1,0 +1,160 @@
+"use client"
+import React, { useEffect, useState } from "react"
+import { api } from "../../../../lib/api-client"
+import Link from "next/link"
+import { ArrowLeft, Check, Truck, ShieldCheck, Plus, Minus } from "lucide-react"
+import { MediaImage } from "../../../../components/ui/media-image"
+import { useParams } from "next/navigation"
+
+export default function ProductDetailPage() {
+  const params = useParams()
+  const [product, setProduct] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [quantity, setQuantity] = useState(1)
+
+  useEffect(() => {
+    async function fetchProduct() {
+      try {
+        // Find product from catalog array since we don't have a single-product public API endpoint verified yet
+        const res = await api.get('/public/catalog/products')
+        const found = res.data.find((p: any) => p.id === params.id)
+        setProduct(found || null)
+      } catch (err) {
+        console.error("Failed to load product", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (params.id) {
+      fetchProduct()
+    }
+  }, [params.id])
+
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] mx-auto px-6 py-12 animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-16">
+          <div className="bg-slate-100 aspect-square rounded-3xl"></div>
+          <div className="space-y-6 py-8">
+            <div className="h-4 bg-slate-100 rounded w-1/4"></div>
+            <div className="h-10 bg-slate-100 rounded w-3/4"></div>
+            <div className="h-6 bg-slate-100 rounded w-1/3"></div>
+            <div className="h-24 bg-slate-100 rounded w-full mt-8"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!product) {
+    return (
+      <div className="max-w-[1400px] mx-auto px-6 py-32 text-center">
+        <h1 className="text-3xl font-semibold text-slate-900 mb-4">Product not found</h1>
+        <p className="text-slate-500 mb-8">The product you're looking for doesn't exist or is currently unavailable.</p>
+        <Link href="/products" className="control-button-primary rounded-full px-8 h-12 inline-flex items-center">
+          Back to Catalog
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-[1400px] mx-auto px-6 py-12 md:py-20 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      
+      <Link href="/products" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors mb-8">
+        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Products
+      </Link>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
+        
+        {/* Product Image Gallery (Demo) */}
+        <div className="space-y-4">
+          <div className="bg-slate-100 aspect-square rounded-3xl overflow-hidden border border-slate-200/50 shadow-sm relative group">
+            <MediaImage 
+              asset={null} 
+              fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=1200&auto=format&fit=crop" 
+              className="w-full h-full object-cover mix-blend-multiply transition-transform duration-700 group-hover:scale-[1.02]" 
+            />
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="aspect-square bg-slate-50 rounded-xl border border-slate-200 overflow-hidden cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
+                <MediaImage 
+                  asset={null} 
+                  fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=200&auto=format&fit=crop" 
+                  className="w-full h-full object-cover mix-blend-multiply" 
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Product Info */}
+        <div className="flex flex-col pt-4 lg:pt-8">
+          <div className="mb-8 border-b border-slate-100 pb-8">
+            <div className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">
+              {product.category?.name || 'Essential'}
+            </div>
+            <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-slate-900 mb-4 leading-tight">
+              {product.name}
+            </h1>
+            <div className="text-3xl font-medium text-slate-900 tabular-nums">
+              ৳{Number(product.sellingPrice).toLocaleString()}
+            </div>
+          </div>
+
+          <div className="prose prose-slate max-w-none mb-10">
+            <p className="text-lg text-slate-600 leading-relaxed">
+              {product.description || "Premium quality product designed for modern business environments. Excellent build quality with reliable performance."}
+            </p>
+          </div>
+
+          <div className="space-y-6 mb-10">
+            {/* Quantity Selector */}
+            <div>
+              <p className="text-sm font-medium text-slate-900 mb-3">Quantity</p>
+              <div className="flex items-center w-32 border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden h-12">
+                <button 
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="flex-1 h-full flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className="flex-1 text-center font-medium text-slate-900 tabular-nums">
+                  {quantity}
+                </span>
+                <button 
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="flex-1 h-full flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button className="control-button-primary h-14 rounded-full text-base flex-1 shadow-md hover:shadow-lg interactive-item">
+                Add to Cart — ৳{(Number(product.sellingPrice) * quantity).toLocaleString()}
+              </button>
+            </div>
+          </div>
+
+          {/* Trust indicators */}
+          <div className="bg-slate-50 rounded-2xl p-6 space-y-4 border border-slate-100 mt-auto">
+            <div className="flex items-center gap-3 text-sm font-medium text-slate-700">
+              <Check className="w-5 h-5 text-emerald-500" /> In stock and ready to ship
+            </div>
+            <div className="flex items-center gap-3 text-sm font-medium text-slate-700">
+              <Truck className="w-5 h-5 text-slate-400" /> Free local delivery on orders over ৳5000
+            </div>
+            <div className="flex items-center gap-3 text-sm font-medium text-slate-700">
+              <ShieldCheck className="w-5 h-5 text-slate-400" /> 1-year authentic business warranty
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -31,15 +31,17 @@ export function Sidebar() {
       label: "Inventory & Supply",
       items: [
         { name: "Products", href: "/admin/products", icon: Package },
+        { name: "Categories", href: "/admin/categories", icon: Package },
+        { name: "Units", href: "/admin/units", icon: Package },
         { name: "Stock Levels", href: "/admin/inventory", icon: Boxes },
         { name: "Suppliers", href: "/admin/suppliers", icon: Factory },
       ]
     },
     {
-      label: "Finance",
+      label: "Platform",
       items: [
-        { name: "Accounts", href: "/admin/finance/accounts", icon: Store },
-        { name: "Journal", href: "/admin/finance/transactions", icon: ArrowRightLeft },
+        { name: "Media Library", href: "/admin/media", icon: Store },
+        { name: "Finance Sync", href: "/admin/finance", icon: ArrowRightLeft },
       ]
     }
   ]

@@ -1,170 +1,138 @@
-"use client";
+"use client"
+import React, { useEffect, useState } from "react"
+import { api } from "../../../lib/api-client"
+import { Plus, Search, Filter, MoreHorizontal, Package } from "lucide-react"
+import { MediaImage } from "../../../components/ui/media-image"
 
-import React, { useEffect, useState } from "react";
-import { PageHeader } from "../../../components/layout/page-header";
-import { DataTable } from "../../../components/ui/data-table";
-import { api } from "../../../lib/api-client";
-import { toast } from "sonner";
-import { Modal } from "../../../components/ui/modal";
-
-interface Product {
-  id: string;
-  code: string | null;
-  name: string;
-  type: "PRODUCT" | "SERVICE";
-  sellingPrice: string | number;
-  isActive: boolean;
-}
-
-export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Form State
-  const [formData, setFormData] = useState({ name: '', code: '', type: 'PRODUCT', sellingPrice: 0, isActive: true });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+export default function AdminProductsPage() {
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/business-core/products");
-      setProducts(res.data);
-    } catch (error) {
-      toast.error("Failed to load products.");
-    } finally {
-      setLoading(false);
+    async function fetchProducts() {
+      try {
+        const res = await api.get('/business-core/products')
+        setProducts(res.data)
+      } catch (err) {
+        console.error("Failed to load products", err)
+      } finally {
+        setLoading(false)
+      }
     }
-  };
-
-  const handleCreateProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      setIsSubmitting(true);
-      await api.post("/business-core/products", { ...formData, sellingPrice: Number(formData.sellingPrice) });
-      toast.success("Product created successfully");
-      setIsModalOpen(false);
-      setFormData({ name: '', code: '', type: 'PRODUCT', sellingPrice: 0, isActive: true });
-      fetchProducts();
-    } catch (error) {
-      toast.error("Failed to create product");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const columns = [
-    { header: "Code", accessorKey: "code" as keyof Product },
-    { header: "Name", accessorKey: "name" as keyof Product },
-    { 
-      header: "Type", 
-      cell: (item: Product) => (
-        <span className={`px-2 py-0.5 text-[11px] uppercase tracking-wider rounded-md font-medium border ${item.type === 'PRODUCT' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
-          {item.type}
-        </span>
-      )
-    },
-    { 
-      header: "Price", 
-      align: "right" as const,
-      cell: (item: Product) => `৳${Number(item.sellingPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}` 
-    },
-    { 
-      header: "Status", 
-      cell: (item: Product) => (
-        <span className={`px-2 py-0.5 text-[11px] uppercase tracking-wider rounded-md font-medium border ${item.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}>
-          {item.isActive ? 'ACTIVE' : 'INACTIVE'}
-        </span>
-      )
-    }
-  ];
+    fetchProducts()
+  }, [])
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <PageHeader title="Products & Services" description="Manage your physical products and non-inventory services." />
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors"
-        >
-          Add Item
-        </button>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      
+      {/* Workspace Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200/80">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 mb-1">Products</h1>
+          <p className="text-slate-500">Manage your catalog, pricing, and classifications.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="control-button-primary shadow-sm h-10 px-4">
+            <Plus className="w-4 h-4 mr-2" /> New Product
+          </button>
+        </div>
       </div>
 
-      <DataTable 
-        data={products} 
-        columns={columns} 
-        isLoading={loading} 
-        emptyMessage="No products found. Click 'Add Item' to create one."
-      />
+      {/* Toolbar */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input 
+            type="text" 
+            placeholder="Search products..." 
+            className="control-input pl-9 h-10 w-full"
+          />
+        </div>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <button className="control-button-secondary h-10 px-3 w-full md:w-auto">
+            <Filter className="w-4 h-4 mr-2 text-slate-500" /> Filter
+          </button>
+        </div>
+      </div>
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => !isSubmitting && setIsModalOpen(false)} 
-        title="Add Product / Service"
-        footer={
-          <>
-            <button 
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              form="product-form"
-              disabled={isSubmitting || !formData.name}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              {isSubmitting ? 'Saving...' : 'Save Item'}
-            </button>
-          </>
-        }
-      >
-        <form id="product-form" onSubmit={handleCreateProduct} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Name <span className="text-destructive">*</span></label>
-              <input 
-                type="text" 
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary" 
-                placeholder="E.g. A4 Paper Rim" 
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Item Type</label>
-              <select 
-                value={formData.type}
-                onChange={(e) => setFormData({...formData, type: e.target.value as 'PRODUCT' | 'SERVICE'})}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary bg-white"
-              >
-                <option value="PRODUCT">Physical Product</option>
-                <option value="SERVICE">Service (No Inventory)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Selling Price</label>
-              <input 
-                type="number" 
-                min="0"
-                step="0.01"
-                value={formData.sellingPrice}
-                onChange={(e) => setFormData({...formData, sellingPrice: parseFloat(e.target.value)})}
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary tabular-nums" 
-              />
-            </div>
-          </div>
-        </form>
-      </Modal>
+      {/* Backend Limitation Notice (Rule #13) */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+        <Package className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+        <div>
+          <h4 className="text-sm font-semibold text-amber-900 mb-1">Backend Extension Required</h4>
+          <p className="text-xs text-amber-700 leading-relaxed font-medium">
+            The Product database model currently lacks an image field. Demo fallbacks are being displayed visually. To fully implement the MediaPicker architecture, the backend `Product` schema must be updated to store `MediaAsset` relationships or URLs.
+          </p>
+        </div>
+      </div>
+
+      {/* Products Table */}
+      <div className="surface-elevated overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-slate-50/50 border-b border-slate-200/70">
+              <tr>
+                <th className="font-medium text-slate-500 px-4 py-3 w-12"></th>
+                <th className="font-medium text-slate-500 px-4 py-3">Product Name</th>
+                <th className="font-medium text-slate-500 px-4 py-3">Category</th>
+                <th className="font-medium text-slate-500 px-4 py-3 text-right">Selling Price</th>
+                <th className="font-medium text-slate-500 px-4 py-3 text-center">Status</th>
+                <th className="font-medium text-slate-500 px-4 py-3 text-right w-16"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading catalog...</td></tr>
+              ) : products.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center">
+                    <Package className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500 font-medium">No products found</p>
+                    <p className="text-slate-400 text-sm">Create your first product to get started.</p>
+                  </td>
+                </tr>
+              ) : (
+                products.map((product: any) => (
+                  <tr key={product.id} className="table-row-refined group">
+                    <td className="px-4 py-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-200/50">
+                        <MediaImage 
+                          asset={null} 
+                          fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=100&auto=format&fit=crop" 
+                          className="w-full h-full object-cover mix-blend-multiply opacity-50"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-900">{product.name}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-0.5">{product.code || 'NO-SKU'}</p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 font-medium">{product.category?.name || 'Uncategorized'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-900">
+                      ৳{Number(product.sellingPrice).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        product.isActive 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                          : 'bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}>
+                        {product.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
     </div>
-  );
+  )
 }

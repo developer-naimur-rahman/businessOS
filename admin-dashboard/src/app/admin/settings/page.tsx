@@ -1,88 +1,125 @@
 "use client"
 import React, { useState } from "react"
-import { Button } from "../../../components/ui/button"
-import { Input } from "../../../components/ui/input"
-import { Building2, Save, MapPin, Phone, Globe, Shield } from "lucide-react"
+import { Building2, Store, Palette, Shield, CreditCard, Bell, UploadCloud } from "lucide-react"
 
-export default function SettingsPage() {
-  const [saving, setSaving] = useState(false)
+export default function AdminSettingsPage() {
+  const [activeTab, setActiveTab] = useState('general')
 
-  const handleSave = () => {
-    setSaving(true)
-    setTimeout(() => {
-      setSaving(false)
-    }, 1000)
-  }
+  const tabs = [
+    { id: 'general', label: 'General', icon: Building2 },
+    { id: 'storefront', label: 'Storefront', icon: Store },
+    { id: 'branding', label: 'Branding', icon: Palette },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'billing', label: 'Billing', icon: CreditCard },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+  ]
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">System Settings</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage organizational configurations and preferences</p>
-        </div>
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-[1200px] mx-auto">
+      
+      {/* Workspace Header */}
+      <div className="pb-6 border-b border-slate-200/80">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 mb-1">Settings</h1>
+        <p className="text-slate-500">Manage your organization preferences and platform configurations.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Settings Navigation Sidebar */}
-        <div className="md:col-span-1 space-y-2">
-          <Button variant="ghost" className="w-full justify-start bg-white shadow-sm border border-slate-200 interaction-bounce text-primary font-medium">
-            <Building2 className="w-4 h-4 mr-2" /> Organization
-          </Button>
-          <Button variant="ghost" className="w-full justify-start text-slate-600 hover:bg-slate-100 hover:text-slate-900 interaction-bounce">
-            <Shield className="w-4 h-4 mr-2" /> Security
-          </Button>
+      <div className="flex flex-col md:flex-row gap-12 items-start">
+        
+        {/* Navigation Sidebar */}
+        <div className="w-full md:w-64 shrink-0 space-y-1">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`w-full flex items-center px-4 h-11 rounded-xl text-sm font-medium transition-all ${
+                activeTab === tab.id 
+                  ? 'bg-slate-900 text-white shadow-md' 
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <tab.icon className={`w-4 h-4 mr-3 ${activeTab === tab.id ? 'text-white' : 'text-slate-400'}`} />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Settings Form Content */}
-        <div className="md:col-span-3 space-y-6">
-          <div className="solid-elevated rounded-2xl p-6">
-            <h2 className="text-lg font-bold text-slate-900 mb-6 pb-4 border-b border-slate-100">Organization Profile</h2>
-            
-            <div className="space-y-6">
-              <div className="grid gap-2">
-                <label className="text-sm font-semibold text-slate-700">Business Name</label>
-                <Input defaultValue="My Business Shop" className="bg-slate-50" />
-              </div>
-              
-              <div className="grid gap-2">
-                <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-slate-400" /> Primary Address
-                </label>
-                <textarea 
-                  className="flex w-full rounded-md border border-input bg-slate-50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[100px]"
-                  defaultValue="123 Business Avenue, Tech District, Dhaka"
-                />
+        {/* Content Area */}
+        <div className="flex-1 w-full bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+          
+          {/* General Settings */}
+          {activeTab === 'general' && (
+            <div className="p-8 md:p-12 space-y-10 animate-in fade-in">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900 mb-6">Organization Profile</h3>
+                <div className="space-y-6 max-w-2xl">
+                  <div className="flex items-center gap-6">
+                    <div className="w-20 h-20 bg-slate-100 rounded-full border border-slate-200 flex items-center justify-center shrink-0">
+                      <span className="text-2xl font-semibold text-slate-400">MB</span>
+                    </div>
+                    <div>
+                      <button className="control-button-secondary h-9 px-4 mb-2 flex items-center text-sm">
+                        <UploadCloud className="w-4 h-4 mr-2" /> Upload Logo
+                      </button>
+                      <p className="text-xs text-slate-500">Recommended size: 256x256px</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Business Name</label>
+                      <input type="text" defaultValue="My Business OS" className="control-input h-11 w-full" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Contact Email</label>
+                      <input type="email" defaultValue="admin@example.com" className="control-input h-11 w-full" />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Business Address</label>
+                      <input type="text" defaultValue="123 Commerce St, Suite 100" className="control-input h-11 w-full" />
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-slate-400" /> Phone Number
-                  </label>
-                  <Input defaultValue="+880 1234-567890" className="bg-slate-50" />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-slate-400" /> Website
-                  </label>
-                  <Input defaultValue="https://mybusiness.shop" className="bg-slate-50" />
+              <div className="pt-8 border-t border-slate-100">
+                <h3 className="text-xl font-semibold text-slate-900 mb-6">Localization</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Currency</label>
+                    <select className="control-input h-11 w-full appearance-none bg-white">
+                      <option value="BDT">BDT (৳)</option>
+                      <option value="USD">USD ($)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Timezone</label>
+                    <select className="control-input h-11 w-full appearance-none bg-white">
+                      <option value="Asia/Dhaka">Asia/Dhaka (GMT+6)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="glass-elevated p-6 rounded-2xl flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-slate-900">Unsaved Changes</h3>
-              <p className="text-sm text-slate-500">You have modified the organization profile.</p>
+              <div className="pt-8 border-t border-slate-100 flex justify-end">
+                <button className="control-button-primary h-11 px-8 rounded-full shadow-sm">
+                  Save Changes
+                </button>
+              </div>
             </div>
-            <Button className="bg-primary text-white hover:bg-primary/90 shadow-sm interaction-bounce" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : <><Save className="w-4 h-4 mr-2" /> Save Settings</>}
-            </Button>
-          </div>
+          )}
+
+          {/* Placeholder for other tabs */}
+          {activeTab !== 'general' && (
+            <div className="p-20 text-center flex flex-col items-center justify-center animate-in fade-in">
+              <Building2 className="w-12 h-12 text-slate-300 mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 mb-2">Configuration Area</h3>
+              <p className="text-slate-500">Settings for {activeTab} will appear here.</p>
+            </div>
+          )}
+
         </div>
       </div>
+      
     </div>
   )
 }
