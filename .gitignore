@@ -51,6 +51,7 @@ out
 # Environment variables (NEVER commit secrets)
 .env
 .env.local
+.env.production
 .env.*.local
 
 # Local database files

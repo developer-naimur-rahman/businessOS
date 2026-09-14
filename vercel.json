@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "nx build admin-dashboard",
+  "outputDirectory": "admin-dashboard/.next",
+  "framework": "nextjs"
+}
