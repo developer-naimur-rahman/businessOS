@@ -8,12 +8,20 @@ export default function AdminPOSPage() {
   const [cart, setCart] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [branchId, setBranchId] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchCatalog() {
       try {
-        const res = await api.get('/business-core/products')
-        setProducts(res.data.filter((p: any) => p.isActive))
+        const [productsRes, branchesRes] = await Promise.all([
+          api.get('/business-core/products'),
+          api.get('/operational-structure/branches')
+        ])
+        setProducts(productsRes.data.filter((p: any) => p.isActive))
+        if (branchesRes.data.length > 0) {
+          setBranchId(branchesRes.data[0].id)
+        }
       } catch (err) {
         console.error("Failed to load catalog", err)
       } finally {
@@ -55,6 +63,29 @@ export default function AdminPOSPage() {
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     (p.code && p.code.toLowerCase().includes(searchQuery.toLowerCase()))
   )
+
+  const handleCheckout = async (paymentMethod: 'CASH' | 'CARD') => {
+    if (cart.length === 0 || !branchId) return;
+    setIsProcessing(true)
+    try {
+      await api.post('/sales/complete-direct', {
+        branchId,
+        items: cart.map(item => ({
+          productId: item.id,
+          quantity: item.quantity,
+          unitPrice: Number(item.sellingPrice)
+        })),
+        paymentMethod,
+        paymentAmount: total
+      })
+      alert("Sale completed successfully!")
+      setCart([])
+    } catch (err) {
+      alert("Failed to process sale")
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
@@ -184,12 +215,20 @@ export default function AdminPOSPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <button className="h-14 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors flex flex-col items-center justify-center">
+            <button 
+              onClick={() => handleCheckout('CARD')} 
+              disabled={isProcessing || cart.length === 0} 
+              className="h-14 bg-white border border-slate-200 rounded-xl font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 transition-colors flex flex-col items-center justify-center"
+            >
               <CreditCard className="w-5 h-5 mb-1" />
               <span className="text-[11px] uppercase tracking-wider">Card</span>
             </button>
-            <button className="h-14 bg-emerald-600 text-white rounded-xl font-semibold shadow-md hover:bg-emerald-700 transition-colors flex flex-col items-center justify-center">
-              <span className="text-lg leading-none mb-0.5">Pay</span>
+            <button 
+              onClick={() => handleCheckout('CASH')} 
+              disabled={isProcessing || cart.length === 0}
+              className="h-14 bg-emerald-600 text-white rounded-xl font-semibold shadow-md hover:bg-emerald-700 disabled:opacity-50 transition-colors flex flex-col items-center justify-center"
+            >
+              <span className="text-lg leading-none mb-0.5">{isProcessing ? "..." : "Pay"}</span>
               <span className="text-[10px] uppercase tracking-wider opacity-80">Cash</span>
             </button>
           </div>

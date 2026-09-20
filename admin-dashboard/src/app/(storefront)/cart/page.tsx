@@ -3,43 +3,17 @@ import React, { useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
 import { MediaImage } from "../../../components/ui/media-image"
+import { useCartStore } from "../../../store/useCartStore"
 
 export default function CartPage() {
-  // Demo cart state until global cart store is implemented
-  const [items, setItems] = useState([
-    {
-      id: "1",
-      name: "Premium Ergonomic Keyboard",
-      price: 12500,
-      quantity: 1,
-      image: { url: "https://images.unsplash.com/photo-1595225476474-87563907a212?q=80&w=800&auto=format&fit=crop", sourceType: "external" as const }
-    },
-    {
-      id: "2",
-      name: "Business Card Printing (500pcs)",
-      price: 1500,
-      quantity: 2,
-      image: { url: "https://images.unsplash.com/photo-1562564055-71e051d33c19?q=80&w=800&auto=format&fit=crop", sourceType: "external" as const }
-    }
-  ])
+  const items = useCartStore((state) => state.items)
+  const removeItem = useCartStore((state) => state.removeItem)
+  const updateQuantity = useCartStore((state) => state.updateQuantity)
 
-  const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+  const subtotal = useCartStore((state) => state.totalPrice())
   const tax = subtotal * 0.05 // 5% demo tax
   const total = subtotal + tax
 
-  const updateQuantity = (id: string, delta: number) => {
-    setItems(items.map(item => {
-      if (item.id === id) {
-        const newQ = Math.max(1, item.quantity + delta)
-        return { ...item, quantity: newQ }
-      }
-      return item
-    }))
-  }
-
-  const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id))
-  }
 
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-12 md:py-20 animate-in fade-in duration-500">
@@ -71,12 +45,12 @@ export default function CartPage() {
 
             <div className="space-y-6 md:space-y-0 md:divide-y md:divide-slate-100">
               {items.map(item => (
-                <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-6 items-center">
+                <div key={item.productId} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-6 items-center">
                   
                   {/* Product Info */}
                   <div className="col-span-1 md:col-span-6 flex items-center gap-4">
                     <div className="w-24 h-24 bg-slate-100 rounded-xl overflow-hidden shrink-0 border border-slate-200/50">
-                      <MediaImage asset={item.image} className="w-full h-full object-cover mix-blend-multiply" />
+                      <MediaImage asset={null} fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=800&auto=format&fit=crop" className="w-full h-full object-cover mix-blend-multiply" />
                     </div>
                     <div>
                       <h3 className="font-medium text-slate-900 text-lg leading-tight mb-1">{item.name}</h3>
@@ -88,7 +62,7 @@ export default function CartPage() {
                   <div className="col-span-1 md:col-span-3 flex items-center md:justify-center mt-4 md:mt-0">
                     <div className="flex items-center border border-slate-200 rounded-lg bg-white">
                       <button 
-                        onClick={() => updateQuantity(item.id, -1)}
+                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
                         className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
                       >
                         <Minus className="w-4 h-4" />
@@ -97,7 +71,7 @@ export default function CartPage() {
                         {item.quantity}
                       </span>
                       <button 
-                        onClick={() => updateQuantity(item.id, 1)}
+                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                         className="w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
                       >
                         <Plus className="w-4 h-4" />
@@ -114,7 +88,7 @@ export default function CartPage() {
                       ৳{(item.price * item.quantity).toLocaleString()}
                     </p>
                     <button 
-                      onClick={() => removeItem(item.id)}
+                      onClick={() => removeItem(item.productId)}
                       className="w-10 h-10 flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all md:ml-4 shrink-0"
                       title="Remove item"
                     >

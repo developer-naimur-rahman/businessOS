@@ -16,6 +16,8 @@ import { ProductsController } from './controllers/products.controller';
 import { CategoriesController } from './controllers/categories.controller';
 import { UnitsController } from './controllers/units.controller';
 import { PublicCatalogController } from './controllers/public-catalog.controller';
+import { PriceListController } from './controllers/price-list.controller';
+import { PriceListService } from './services/price-list.service';
 
 @Module({
   imports: [PrismaModule],
@@ -26,6 +28,7 @@ import { PublicCatalogController } from './controllers/public-catalog.controller
     CategoriesController,
     UnitsController,
     PublicCatalogController,
+    PriceListController,
   ],
   providers: [
     CustomersRepository,
@@ -38,6 +41,7 @@ import { PublicCatalogController } from './controllers/public-catalog.controller
     ProductsService,
     CategoriesService,
     UnitsService,
+    PriceListService,
   ],
   exports: [
     CustomersService,

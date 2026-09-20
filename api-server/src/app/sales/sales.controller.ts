@@ -4,11 +4,15 @@ import { RequirePermissions } from '../common/decorators/require-permissions.dec
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrganizationContextGuard } from '../common/guards/organization-context.guard';
 import { PermissionsGuard } from '../iam/guards/permissions.guard';
+import { FinanceIntegrationService } from '../finance-integration/finance-integration.service';
 
 @Controller('sales')
 @UseGuards(JwtAuthGuard, OrganizationContextGuard, PermissionsGuard)
 export class SalesController {
-  constructor(private readonly salesService: SalesService) {}
+  constructor(
+    private readonly salesService: SalesService,
+    private readonly financeIntegrationService: FinanceIntegrationService
+  ) {}
 
   @Get()
   @RequirePermissions('sales.view')
@@ -25,6 +29,12 @@ export class SalesController {
   @Post('complete-direct')
   @RequirePermissions('sales.create')
   async createDirectSale(@Request() req, @Body() data: CreateSaleDto) {
-    return this.salesService.createDirectSale(req.user.organizationId, data, req.user.id);
+    const sale = await this.salesService.createDirectSale(req.user.organizationId, data, req.user.id);
+    
+    // Trigger async processing of finance outbox events
+    this.financeIntegrationService.processPendingOutboxEvents(req.user.organizationId)
+      .catch(err => console.error("Failed to process finance outbox events:", err));
+
+    return sale;
   }
 }

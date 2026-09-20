@@ -20,6 +20,7 @@ export default function BranchesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   
   // Form State
   const [formData, setFormData] = useState({ name: '', code: '', location: '', phone: '', isActive: true });
@@ -41,17 +42,38 @@ export default function BranchesPage() {
     }
   };
 
+  const handleOpenModal = (branch: Branch | null = null) => {
+    if (branch) {
+      setEditingBranch(branch);
+      setFormData({
+        name: branch.name,
+        code: branch.code || '',
+        location: branch.location || '',
+        phone: branch.phone || '',
+        isActive: branch.isActive
+      });
+    } else {
+      setEditingBranch(null);
+      setFormData({ name: '', code: '', location: '', phone: '', isActive: true });
+    }
+    setIsModalOpen(true);
+  };
+
   const handleCreateBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsSubmitting(true);
-      await api.post("/operational-structure/branches", formData);
-      toast.success("Branch created successfully");
+      if (editingBranch) {
+        await api.put(`/operational-structure/branches/${editingBranch.id}`, formData);
+        toast.success("Branch updated successfully");
+      } else {
+        await api.post("/operational-structure/branches", formData);
+        toast.success("Branch created successfully");
+      }
       setIsModalOpen(false);
-      setFormData({ name: '', code: '', location: '', phone: '', isActive: true });
       fetchBranches();
     } catch (error) {
-      toast.error("Failed to create branch");
+      toast.error("Failed to save branch");
     } finally {
       setIsSubmitting(false);
     }
@@ -68,6 +90,12 @@ export default function BranchesPage() {
           {item.isActive ? 'ACTIVE' : 'INACTIVE'}
         </span>
       )
+    },
+    {
+      header: "Actions",
+      cell: (item: Branch) => (
+        <button onClick={() => handleOpenModal(item)} className="text-blue-600 hover:underline text-xs font-medium">Edit</button>
+      )
     }
   ];
 
@@ -76,7 +104,7 @@ export default function BranchesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <PageHeader title="Branches" description="Manage your organization's physical or logical branches." />
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => handleOpenModal()}
           className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors"
         >
           Add Branch
@@ -93,7 +121,7 @@ export default function BranchesPage() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => !isSubmitting && setIsModalOpen(false)} 
-        title="Add Branch"
+        title={editingBranch ? "Edit Branch" : "Add Branch"}
         footer={
           <>
             <button 
@@ -155,6 +183,16 @@ export default function BranchesPage() {
                 onChange={(e) => setFormData({...formData, location: e.target.value})}
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary" 
               />
+            </div>
+            <div className="col-span-2 flex items-center gap-2 mt-2">
+              <input 
+                type="checkbox" 
+                id="isActive"
+                checked={formData.isActive}
+                onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+                className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" 
+              />
+              <label htmlFor="isActive" className="text-sm font-medium text-slate-700">Active (Branch is operational)</label>
             </div>
           </div>
         </form>

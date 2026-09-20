@@ -40,4 +40,13 @@ export class CustomersRepository {
       data,
     });
   }
+
+  async findByEmail(organizationId: string, email: string) {
+    return this.prisma.customer.findFirst({
+      where: {
+        organizationId,
+        email,
+      },
+    });
+  }
 }

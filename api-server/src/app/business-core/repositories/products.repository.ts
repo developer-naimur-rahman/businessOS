@@ -6,10 +6,22 @@ import { Prisma } from '@prisma/client';
 export class ProductsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(organizationId: string, data: Omit<Prisma.ProductCreateInput, 'organization'>) {
+  async create(organizationId: string, data: any) {
+    const createData: any = { ...data };
+    
+    if (createData.categoryId) {
+      createData.category = { connect: { id: createData.categoryId } };
+      delete createData.categoryId;
+    }
+    
+    if (createData.unitId) {
+      createData.unit = { connect: { id: createData.unitId } };
+      delete createData.unitId;
+    }
+
     return this.prisma.product.create({
       data: {
-        ...data,
+        ...createData,
         organization: { connect: { id: organizationId } },
       },
     });

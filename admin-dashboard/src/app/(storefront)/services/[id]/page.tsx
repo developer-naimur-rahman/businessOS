@@ -3,19 +3,41 @@ import React, { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowLeft, CheckCircle2, Clock, Calendar } from "lucide-react"
 import { MediaImage } from "../../../../components/ui/media-image"
-import { demoContent } from "../../../../config/demo-content"
 import { useParams } from "next/navigation"
+import { api } from "../../../../lib/api-client"
 
 export default function ServiceDetailPage() {
   const params = useParams()
   const [service, setService] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Find service from demo config since we don't have a public API endpoint for services yet
-    const slug = `/services/${params.id}`
-    const found = demoContent.featuredServices.find((s) => s.link === slug)
-    setService(found || null)
+    async function fetchService() {
+      try {
+        const res = await api.get(`/public/catalog/products/${params.id}`)
+        if (res.data && res.data.type === 'SERVICE') {
+          setService(res.data)
+        } else {
+          setService(null) // Only allow viewing services on this page
+        }
+      } catch (err) {
+        console.error("Failed to load service", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (params.id) {
+      fetchService()
+    }
   }, [params.id])
+
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] mx-auto px-6 py-12 animate-pulse">
+        <div className="h-[40vh] bg-slate-100 rounded-3xl mb-12"></div>
+      </div>
+    )
+  }
 
   if (!service) {
     return (
@@ -44,10 +66,10 @@ export default function ServiceDetailPage() {
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Services
           </Link>
           <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-white mb-4">
-            {service.title}
+            {service.name}
           </h1>
           <p className="text-xl text-slate-300 max-w-2xl leading-relaxed">
-            {service.description}
+            {service.description || "Professional service delivered with highest quality standards."}
           </p>
         </div>
       </div>
@@ -60,7 +82,7 @@ export default function ServiceDetailPage() {
             <h2 className="text-2xl font-semibold text-slate-900 mb-6">What to expect</h2>
             <div className="prose prose-slate max-w-none mb-12">
               <p className="text-lg text-slate-600 leading-relaxed">
-                Our professional {service.title.toLowerCase()} service is designed to deliver exceptional results with maximum convenience. We use state-of-the-art equipment and follow industry best practices to ensure your complete satisfaction.
+                Our professional {service.name.toLowerCase()} service is designed to deliver exceptional results with maximum convenience. We use state-of-the-art equipment and follow industry best practices to ensure your complete satisfaction.
               </p>
               <p className="text-lg text-slate-600 leading-relaxed">
                 Whether you need a quick turnaround for an urgent project or a comprehensive solution for a large-scale requirement, our team is equipped to handle it with precision.
@@ -84,7 +106,7 @@ export default function ServiceDetailPage() {
             <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200/60 sticky top-28">
               <h3 className="text-xl font-semibold text-slate-900 mb-2">Service Details</h3>
               <div className="text-3xl font-medium text-slate-900 mb-8 pb-8 border-b border-slate-200/80">
-                {service.priceText}
+                From ৳{Number(service.sellingPrice).toLocaleString()}
               </div>
 
               <div className="space-y-6 mb-8">

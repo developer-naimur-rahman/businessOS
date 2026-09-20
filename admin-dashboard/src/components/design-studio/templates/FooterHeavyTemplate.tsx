@@ -1,0 +1,21 @@
+import React from 'react';
+import { DesignState } from '../types';
+import { TextBlock, LogoBlock, ServiceList } from '../primitives';
+
+export function FooterHeavyTemplate({ state }: { state: DesignState }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{ flex: 1, padding: state.layout.padding }}>
+         <TextBlock state={state} text={state.content.mainHeading} type="heading" />
+         <ServiceList state={state} />
+      </div>
+      <div style={{ backgroundColor: state.colors.accent, padding: state.layout.padding, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+         <div>
+           <TextBlock state={state} text={state.content.businessName} type="heading" customColor="#fff" />
+           <TextBlock state={state} text={state.content.address} customColor="#fff" />
+         </div>
+         <LogoBlock state={state} />
+      </div>
+    </div>
+  );
+}

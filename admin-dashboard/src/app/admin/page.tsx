@@ -8,27 +8,34 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>({
     sales: [],
     customersCount: 0,
-    revenue: 0
+    revenue: 0,
+    lowStockCount: 0
   })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchDashboardMetrics() {
       try {
-        const [salesRes, customersRes] = await Promise.all([
+        const [salesRes, customersRes, inventoryRes] = await Promise.all([
           api.get('/sales').catch(() => null),
-          api.get('/business-core/customers').catch(() => null)
+          api.get('/business-core/customers').catch(() => null),
+          api.get('/inventory/balances').catch(() => null)
         ]);
         const sales = salesRes?.data || [];
         const customers = customersRes?.data || [];
+        const inventory = inventoryRes?.data || [];
         
         let totalRevenue = 0;
         sales.forEach((s: any) => { totalRevenue += Number(s.totalAmount || 0); });
 
+        // Calculate low stock (quantity <= 5 for demo)
+        const lowStockCount = inventory.filter((item: any) => Number(item.quantity) <= 5).length;
+
         setData({
           sales: sales.slice(0, 5), // Recent 5 sales
           revenue: totalRevenue,
-          customersCount: customers.length
+          customersCount: customers.length,
+          lowStockCount
         });
       } catch (err) {
         console.error("Failed to load dashboard metrics");
@@ -153,12 +160,23 @@ export default function DashboardPage() {
           {/* Operational Alerts */}
           <div>
             <h3 className="text-meta mb-4 text-slate-500">Alerts</h3>
-            <div className="surface-elevated p-4 border-l-2 border-l-amber-500">
-              <h4 className="text-sm font-semibold text-slate-900 mb-1">Low Stock Warning</h4>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                You have items that are below their minimum threshold. Please check the inventory dashboard.
-              </p>
-            </div>
+            {loading ? (
+              <div className="surface-elevated p-4 animate-pulse"><div className="h-10 bg-slate-100 rounded"></div></div>
+            ) : data.lowStockCount > 0 ? (
+              <div className="surface-elevated p-4 border-l-2 border-l-amber-500">
+                <h4 className="text-sm font-semibold text-slate-900 mb-1">Low Stock Warning</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  You have {data.lowStockCount} items that are at or below the minimum threshold (5 units). Please check the inventory dashboard.
+                </p>
+              </div>
+            ) : (
+              <div className="surface-elevated p-4 border-l-2 border-l-emerald-500">
+                <h4 className="text-sm font-semibold text-slate-900 mb-1">Stock Levels OK</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  All items are well stocked at the moment.
+                </p>
+              </div>
+            )}
           </div>
 
         </div>

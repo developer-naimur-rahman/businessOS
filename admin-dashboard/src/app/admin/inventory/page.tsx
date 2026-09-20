@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
 import { Search, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, Package, History } from "lucide-react"
+import { Modal } from "../../../components/ui/modal"
 
 export default function AdminInventoryPage() {
   const [balances, setBalances] = useState<any[]>([])
@@ -9,23 +10,82 @@ export default function AdminInventoryPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'balances' | 'movements'>('balances')
 
-  useEffect(() => {
-    async function fetchInventory() {
-      try {
-        const [balRes, movRes] = await Promise.all([
-          api.get('/inventory/balances'),
-          api.get('/inventory/movements')
-        ])
-        setBalances(balRes.data)
-        setMovements(movRes.data)
-      } catch (err) {
-        console.error("Failed to load inventory data", err)
-      } finally {
-        setLoading(false)
-      }
+  const [products, setProducts] = useState<any[]>([])
+  const [warehouses, setWarehouses] = useState<any[]>([])
+
+  const [modalType, setModalType] = useState<'receive' | 'issue' | 'transfer' | null>(null)
+  const [formData, setFormData] = useState({
+    warehouseId: '',
+    productId: '',
+    quantity: '',
+    notes: '',
+    destinationWarehouseId: '' // For transfers
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const fetchInventory = async () => {
+    try {
+      const [balRes, movRes, prodRes, whRes] = await Promise.all([
+        api.get('/inventory/balances'),
+        api.get('/inventory/movements'),
+        api.get('/business-core/products'),
+        api.get('/operational-structure/warehouses')
+      ])
+      setBalances(balRes.data)
+      setMovements(movRes.data)
+      setProducts(prodRes.data)
+      setWarehouses(whRes.data)
+    } catch (err) {
+      console.error("Failed to load inventory data", err)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchInventory()
   }, [])
+
+  const handleOpenModal = (type: 'receive' | 'issue' | 'transfer') => {
+    setModalType(type)
+    setFormData({
+      warehouseId: warehouses.length > 0 ? warehouses[0].id : '',
+      productId: products.length > 0 ? products[0].id : '',
+      quantity: '',
+      notes: '',
+      destinationWarehouseId: warehouses.length > 1 ? warehouses[1].id : ''
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    try {
+      if (modalType === 'transfer') {
+        await api.post('/inventory/transfers', {
+          sourceWarehouseId: formData.warehouseId,
+          destinationWarehouseId: formData.destinationWarehouseId,
+          productId: formData.productId,
+          quantity: Number(formData.quantity),
+          notes: formData.notes
+        })
+      } else {
+        await api.post('/inventory/adjustments', {
+          warehouseId: formData.warehouseId,
+          productId: formData.productId,
+          quantity: Number(formData.quantity),
+          type: modalType === 'receive' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT',
+          notes: formData.notes
+        })
+      }
+      setModalType(null)
+      fetchInventory()
+    } catch (err) {
+      alert("Operation failed")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -39,13 +99,13 @@ export default function AdminInventoryPage() {
         
         {/* Operational Actions */}
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
-          <button className="control-button-secondary bg-white h-10 px-4 flex items-center shadow-sm">
+          <button onClick={() => handleOpenModal('receive')} className="control-button-secondary bg-white h-10 px-4 flex items-center shadow-sm">
             <ArrowDownToLine className="w-4 h-4 mr-2 text-emerald-600" /> Receive Stock
           </button>
-          <button className="control-button-secondary bg-white h-10 px-4 flex items-center shadow-sm">
+          <button onClick={() => handleOpenModal('issue')} className="control-button-secondary bg-white h-10 px-4 flex items-center shadow-sm">
             <ArrowUpFromLine className="w-4 h-4 mr-2 text-rose-600" /> Issue Stock
           </button>
-          <button className="control-button-secondary bg-white h-10 px-4 flex items-center shadow-sm">
+          <button onClick={() => handleOpenModal('transfer')} className="control-button-secondary bg-white h-10 px-4 flex items-center shadow-sm">
             <ArrowRightLeft className="w-4 h-4 mr-2 text-blue-600" /> Transfer
           </button>
         </div>
@@ -184,7 +244,75 @@ export default function AdminInventoryPage() {
           </div>
         )}
       </div>
-      
+
+      <Modal
+        isOpen={!!modalType}
+        onClose={() => !isSubmitting && setModalType(null)}
+        title={
+          modalType === 'receive' ? "Receive Stock" : 
+          modalType === 'issue' ? "Issue Stock" : "Transfer Stock"
+        }
+        footer={
+          <>
+            <button onClick={() => setModalType(null)} disabled={isSubmitting} className="control-button-secondary h-10 px-4">Cancel</button>
+            <button onClick={handleSubmit} disabled={isSubmitting} className="control-button-primary h-10 px-6">
+              {isSubmitting ? "Processing..." : "Confirm"}
+            </button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Product</label>
+            <select required value={formData.productId} onChange={e => setFormData({...formData, productId: e.target.value})} className="control-input w-full h-10 mt-1">
+              <option value="" disabled>Select Product</option>
+              {products.filter(p => p.type === 'PRODUCT').map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.code || 'NO SKU'})</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">
+                {modalType === 'transfer' ? 'Source Warehouse' : 'Warehouse'}
+              </label>
+              <select required value={formData.warehouseId} onChange={e => setFormData({...formData, warehouseId: e.target.value})} className="control-input w-full h-10 mt-1">
+                <option value="" disabled>Select Location</option>
+                {warehouses.map(w => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+            {modalType === 'transfer' ? (
+              <div>
+                <label className="text-xs font-semibold text-slate-700 uppercase">Destination Warehouse</label>
+                <select required value={formData.destinationWarehouseId} onChange={e => setFormData({...formData, destinationWarehouseId: e.target.value})} className="control-input w-full h-10 mt-1">
+                  <option value="" disabled>Select Destination</option>
+                  {warehouses.filter(w => w.id !== formData.warehouseId).map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-semibold text-slate-700 uppercase">Quantity</label>
+                <input required type="number" min="1" step="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="control-input w-full h-10 mt-1" placeholder="0" />
+              </div>
+            )}
+          </div>
+          {modalType === 'transfer' && (
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Quantity</label>
+              <input required type="number" min="1" step="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="control-input w-full h-10 mt-1" placeholder="0" />
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Notes (Optional)</label>
+            <textarea value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="control-input w-full h-20 mt-1 py-2 resize-none" placeholder="Reason for adjustment..." />
+          </div>
+        </form>
+      </Modal>
+
     </div>
   )
 }

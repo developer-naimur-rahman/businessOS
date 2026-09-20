@@ -5,20 +5,24 @@ import Link from "next/link"
 import { ArrowLeft, Check, Truck, ShieldCheck, Plus, Minus } from "lucide-react"
 import { MediaImage } from "../../../../components/ui/media-image"
 import { useParams } from "next/navigation"
+import { useCartStore } from "../../../../store/useCartStore"
 
 export default function ProductDetailPage() {
   const params = useParams()
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
+  const addItem = useCartStore((state) => state.addItem)
 
   useEffect(() => {
     async function fetchProduct() {
       try {
-        // Find product from catalog array since we don't have a single-product public API endpoint verified yet
-        const res = await api.get('/public/catalog/products')
-        const found = res.data.find((p: any) => p.id === params.id)
-        setProduct(found || null)
+        const res = await api.get(`/public/catalog/products/${params.id}`)
+        if (res.data && res.data.type === 'PRODUCT') {
+          setProduct(res.data)
+        } else {
+          setProduct(null) // Only allow viewing products on this page
+        }
       } catch (err) {
         console.error("Failed to load product", err)
       } finally {
@@ -134,7 +138,18 @@ export default function ProductDetailPage() {
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="control-button-primary h-14 rounded-full text-base flex-1 shadow-md hover:shadow-lg interactive-item">
+              <button 
+                onClick={() => {
+                  addItem({
+                    productId: product.id,
+                    name: product.name,
+                    price: Number(product.sellingPrice),
+                    quantity: quantity,
+                    type: product.type
+                  })
+                }}
+                className="control-button-primary h-14 rounded-full text-base flex-1 shadow-md hover:shadow-lg interactive-item"
+              >
                 Add to Cart — ৳{(Number(product.sellingPrice) * quantity).toLocaleString()}
               </button>
             </div>

@@ -1,26 +1,72 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
-import { Plus, Search, Filter, MoreHorizontal, Package } from "lucide-react"
+import { Plus, Search, Filter, MoreHorizontal, Package, Edit, Trash2 } from "lucide-react"
 import { MediaImage } from "../../../components/ui/media-image"
+import { Modal } from "../../../components/ui/modal"
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<any>(null)
+  const [formData, setFormData] = useState({
+    name: '', code: '', description: '', type: 'PRODUCT', 
+    costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: ''
+  })
+
+  const fetchProducts = async () => {
+    try {
+      const res = await api.get('/business-core/products')
+      setProducts(res.data)
+    } catch (err) {
+      console.error("Failed to load products", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const res = await api.get('/business-core/products')
-        setProducts(res.data)
-      } catch (err) {
-        console.error("Failed to load products", err)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchProducts()
   }, [])
+
+  const handleOpenModal = (product: any = null) => {
+    if (product) {
+      setEditingProduct(product)
+      setFormData({
+        name: product.name,
+        code: product.code || '',
+        description: product.description || '',
+        type: product.type,
+        costPrice: Number(product.costPrice),
+        sellingPrice: Number(product.sellingPrice),
+        isActive: product.isActive,
+        imageUrl: product.imageUrl || ''
+      })
+    } else {
+      setEditingProduct(null)
+      setFormData({
+        name: '', code: '', description: '', type: 'PRODUCT', 
+        costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: ''
+      })
+    }
+    setIsModalOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (editingProduct) {
+        await api.put(`/business-core/products/${editingProduct.id}`, formData)
+      } else {
+        await api.post('/business-core/products', formData)
+      }
+      setIsModalOpen(false)
+      fetchProducts()
+    } catch (err) {
+      alert("Failed to save product")
+    }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -32,7 +78,7 @@ export default function AdminProductsPage() {
           <p className="text-slate-500">Manage your catalog, pricing, and classifications.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="control-button-primary shadow-sm h-10 px-4">
+          <button onClick={() => handleOpenModal()} className="control-button-primary shadow-sm h-10 px-4">
             <Plus className="w-4 h-4 mr-2" /> New Product
           </button>
         </div>
@@ -55,16 +101,7 @@ export default function AdminProductsPage() {
         </div>
       </div>
 
-      {/* Backend Limitation Notice (Rule #13) */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-        <Package className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-        <div>
-          <h4 className="text-sm font-semibold text-amber-900 mb-1">Backend Extension Required</h4>
-          <p className="text-xs text-amber-700 leading-relaxed font-medium">
-            The Product database model currently lacks an image field. Demo fallbacks are being displayed visually. To fully implement the MediaPicker architecture, the backend `Product` schema must be updated to store `MediaAsset` relationships or URLs.
-          </p>
-        </div>
-      </div>
+
 
       {/* Products Table */}
       <div className="surface-elevated overflow-hidden">
@@ -98,7 +135,7 @@ export default function AdminProductsPage() {
                       <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-200/50">
                         <MediaImage 
                           asset={null} 
-                          fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=100&auto=format&fit=crop" 
+                          fallbackUrl={product.imageUrl || "https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=100&auto=format&fit=crop"} 
                           className="w-full h-full object-cover mix-blend-multiply opacity-50"
                         />
                       </div>
@@ -121,9 +158,11 @@ export default function AdminProductsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleOpenModal(product)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -133,6 +172,60 @@ export default function AdminProductsPage() {
         </div>
       </div>
       
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingProduct ? "Edit Product" : "New Product"}
+        footer={
+          <>
+            <button onClick={() => setIsModalOpen(false)} className="control-button-secondary h-10 px-4">Cancel</button>
+            <button onClick={handleSubmit} className="control-button-primary h-10 px-6">Save</button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Product Name</label>
+            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="control-input w-full h-10 mt-1" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">SKU / Code</label>
+              <input value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} type="text" className="control-input w-full h-10 mt-1" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Image URL</label>
+              <input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} type="text" className="control-input w-full h-10 mt-1" placeholder="https://..." />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Type</label>
+            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="control-input w-full h-10 mt-1">
+              <option value="PRODUCT">Product (Physical)</option>
+              <option value="SERVICE">Service</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Cost Price</label>
+              <input required type="number" min="0" step="0.01" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: parseFloat(e.target.value) || 0})} className="control-input w-full h-10 mt-1" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Selling Price</label>
+              <input required type="number" min="0" step="0.01" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: parseFloat(e.target.value) || 0})} className="control-input w-full h-10 mt-1" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Description</label>
+            <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="control-input w-full h-24 mt-1 py-2 resize-none" />
+          </div>
+          <div className="flex items-center gap-2 mt-4">
+            <input type="checkbox" id="isActive" checked={formData.isActive} onChange={e => setFormData({...formData, isActive: e.target.checked})} className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" />
+            <label htmlFor="isActive" className="text-sm font-medium text-slate-700">Active (Visible in Catalog)</label>
+          </div>
+        </form>
+      </Modal>
+
     </div>
   )
 }

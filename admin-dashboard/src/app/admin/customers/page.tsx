@@ -1,25 +1,63 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
-import { Plus, Search, Filter, MoreHorizontal, UserCircle2, Phone, Mail } from "lucide-react"
+import { Plus, Search, Filter, MoreHorizontal, UserCircle2, Phone, Mail, Edit } from "lucide-react"
+import { Modal } from "../../../components/ui/modal"
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<any>(null)
+  const [formData, setFormData] = useState({ name: '', code: '', phone: '', email: '', address: '', status: 'ACTIVE' })
+
+  const fetchCustomers = async () => {
+    try {
+      const res = await api.get('/business-core/customers')
+      setCustomers(res.data)
+    } catch (err) {
+      console.error("Failed to load customers", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchCustomers() {
-      try {
-        const res = await api.get('/business-core/customers')
-        setCustomers(res.data)
-      } catch (err) {
-        console.error("Failed to load customers", err)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchCustomers()
   }, [])
+
+  const handleOpenModal = (customer: any = null) => {
+    if (customer) {
+      setEditingCustomer(customer)
+      setFormData({
+        name: customer.name,
+        code: customer.code || '',
+        phone: customer.phone || '',
+        email: customer.email || '',
+        address: customer.address || '',
+        status: customer.status || 'ACTIVE'
+      })
+    } else {
+      setEditingCustomer(null)
+      setFormData({ name: '', code: '', phone: '', email: '', address: '', status: 'ACTIVE' })
+    }
+    setIsModalOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (editingCustomer) {
+        await api.put(`/business-core/customers/${editingCustomer.id}`, formData)
+      } else {
+        await api.post('/business-core/customers', formData)
+      }
+      setIsModalOpen(false)
+      fetchCustomers()
+    } catch (err) {
+      alert("Failed to save customer")
+    }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -31,7 +69,7 @@ export default function AdminCustomersPage() {
           <p className="text-slate-500">Manage client relationships and contact information.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="control-button-primary shadow-sm h-10 px-4">
+          <button onClick={() => handleOpenModal()} className="control-button-primary shadow-sm h-10 px-4">
             <Plus className="w-4 h-4 mr-2" /> New Customer
           </button>
         </div>
@@ -124,9 +162,11 @@ export default function AdminCustomersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleOpenModal(customer)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -135,7 +175,51 @@ export default function AdminCustomersPage() {
           </table>
         </div>
       </div>
-      
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingCustomer ? "Edit Customer" : "New Customer"}
+        footer={
+          <>
+            <button onClick={() => setIsModalOpen(false)} className="control-button-secondary h-10 px-4">Cancel</button>
+            <button onClick={handleSubmit} className="control-button-primary h-10 px-6">Save</button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Name</label>
+              <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="control-input w-full h-10 mt-1" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Customer ID / Code</label>
+              <input value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} type="text" className="control-input w-full h-10 mt-1" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Phone</label>
+              <input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} type="tel" className="control-input w-full h-10 mt-1" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Email</label>
+              <input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} type="email" className="control-input w-full h-10 mt-1" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Address</label>
+            <textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} className="control-input w-full h-20 mt-1 py-2 resize-none" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Status</label>
+            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="control-input w-full h-10 mt-1">
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

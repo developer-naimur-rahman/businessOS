@@ -1,12 +1,25 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
-import { Search, Filter, Receipt, MoreHorizontal, FileText } from "lucide-react"
+import { Search, Filter, Receipt, MoreHorizontal, FileText, Eye } from "lucide-react"
 import Link from "next/link"
+import { Modal } from "../../../components/ui/modal"
 
 export default function AdminSalesHistoryPage() {
   const [sales, setSales] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedSale, setSelectedSale] = useState<any>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const handleViewSale = async (id: string) => {
+    try {
+      const res = await api.get(`/sales/${id}`)
+      setSelectedSale(res.data)
+      setIsModalOpen(true)
+    } catch (err) {
+      console.error("Failed to load sale details", err)
+    }
+  }
 
   useEffect(() => {
     async function fetchSales() {
@@ -115,8 +128,8 @@ export default function AdminSalesHistoryPage() {
                       ৳{Number(sale.totalAmount).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
+                      <button onClick={() => handleViewSale(sale.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                        <Eye className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
@@ -126,7 +139,52 @@ export default function AdminSalesHistoryPage() {
           </table>
         </div>
       </div>
-      
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={`Receipt ${selectedSale?.saleNumber || ''}`}
+        footer={
+          <button onClick={() => setIsModalOpen(false)} className="control-button-secondary h-10 px-4">Close</button>
+        }
+      >
+        {selectedSale && (
+          <div className="space-y-4 py-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Date</span>
+              <span className="font-medium">{new Date(selectedSale.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Customer</span>
+              <span className="font-medium">{selectedSale.customer ? selectedSale.customer.name : 'Walk-in'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Status</span>
+              <span className="font-medium">{selectedSale.paymentStatus}</span>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <h4 className="font-semibold text-slate-900 mb-2">Items</h4>
+              <div className="space-y-2">
+                {selectedSale.items?.map((item: any) => (
+                  <div key={item.id} className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium">{item.product?.name || 'Unknown'}</p>
+                      <p className="text-xs text-slate-500">{item.quantity} x ৳{Number(item.unitPrice).toLocaleString()}</p>
+                    </div>
+                    <span className="font-medium text-slate-900">৳{Number(item.subtotal).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <div className="flex justify-between items-end">
+                <span className="font-semibold text-slate-900">Total</span>
+                <span className="text-lg font-semibold text-slate-900 tabular-nums">৳{Number(selectedSale.totalAmount).toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

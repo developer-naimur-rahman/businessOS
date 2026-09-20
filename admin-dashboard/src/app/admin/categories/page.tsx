@@ -1,25 +1,59 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
-import { Plus, Search, MoreHorizontal, FolderTree } from "lucide-react"
+import { Plus, Search, MoreHorizontal, FolderTree, Edit } from "lucide-react"
+import { Modal } from "../../../components/ui/modal"
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<any>(null)
+  const [formData, setFormData] = useState({ name: '', description: '' })
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get('/business-core/categories')
+      setCategories(res.data)
+    } catch (err) {
+      console.error("Failed to load categories", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await api.get('/business-core/categories')
-        setCategories(res.data)
-      } catch (err) {
-        console.error("Failed to load categories", err)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchCategories()
   }, [])
+
+  const handleOpenModal = (category: any = null) => {
+    if (category) {
+      setEditingCategory(category)
+      setFormData({
+        name: category.name,
+        description: category.description || ''
+      })
+    } else {
+      setEditingCategory(null)
+      setFormData({ name: '', description: '' })
+    }
+    setIsModalOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (editingCategory) {
+        await api.put(`/business-core/categories/${editingCategory.id}`, formData)
+      } else {
+        await api.post('/business-core/categories', formData)
+      }
+      setIsModalOpen(false)
+      fetchCategories()
+    } catch (err) {
+      alert("Failed to save category")
+    }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -31,7 +65,7 @@ export default function AdminCategoriesPage() {
           <p className="text-slate-500">Organize your product and service taxonomy.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="control-button-primary shadow-sm h-10 px-4">
+          <button onClick={() => handleOpenModal()} className="control-button-primary shadow-sm h-10 px-4">
             <Plus className="w-4 h-4 mr-2" /> New Category
           </button>
         </div>
@@ -86,9 +120,11 @@ export default function AdminCategoriesPage() {
                       {category.description || <span className="text-slate-400">No description</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleOpenModal(category)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -97,7 +133,28 @@ export default function AdminCategoriesPage() {
           </table>
         </div>
       </div>
-      
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingCategory ? "Edit Category" : "New Category"}
+        footer={
+          <>
+            <button onClick={() => setIsModalOpen(false)} className="control-button-secondary h-10 px-4">Cancel</button>
+            <button onClick={handleSubmit} className="control-button-primary h-10 px-6">Save</button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Category Name</label>
+            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="control-input w-full h-10 mt-1" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Description</label>
+            <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="control-input w-full h-24 mt-1 py-2 resize-none" />
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

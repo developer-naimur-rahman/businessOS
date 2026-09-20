@@ -1,10 +1,14 @@
 "use client"
 import React, { useState } from "react"
 import Link from "next/link"
-import { Search, ShoppingBag, Menu } from "lucide-react"
+import { Search, ShoppingBag, Menu, User } from "lucide-react"
+import { useCartStore } from "../../store/useCartStore"
+import { useCustomerAuthStore } from "../../store/useCustomerAuthStore"
 
 export default function StorefrontLayout({ children }: { children: React.ReactNode }) {
   const [isScrolled, setIsScrolled] = useState(false)
+  const cartItemsCount = useCartStore((state) => state.totalItems())
+  const { isAuthenticated } = useCustomerAuthStore()
 
   // Simple scroll effect for header
   React.useEffect(() => {
@@ -44,9 +48,16 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
             <button className="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors">
               <Search className="w-5 h-5" />
             </button>
+            <Link href={isAuthenticated ? "/account" : "/checkout"} className="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors">
+              <User className="w-5 h-5" />
+            </Link>
             <Link href="/cart" className="w-10 h-10 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors relative">
               <ShoppingBag className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-slate-900 rounded-full"></span>
+              {cartItemsCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-slate-900 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {cartItemsCount}
+                </span>
+              )}
             </Link>
             <button className="md:hidden w-10 h-10 flex items-center justify-center text-slate-600">
               <Menu className="w-5 h-5" />

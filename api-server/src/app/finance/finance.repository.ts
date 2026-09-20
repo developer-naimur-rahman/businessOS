@@ -70,14 +70,32 @@ export class FinanceRepository {
     return account;
   }
 
-  async postJournalEntry(organizationId: string, journalId: string, userId?: string) {
+  async findAccountsByOrganization(organizationId: string) {
+    return this.client.account.findMany({
+      where: { chartOfAccounts: { organizationId } },
+    });
+  }
+
+  async findJournalEntriesByOrganization(organizationId: string) {
+    return this.client.journalEntry.findMany({
+      where: { organizationId },
+      include: { lines: { include: { account: true } }, createdBy: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async postJournalEntry(organizationId: string, journalId: string, userId: string) {
+    const data: any = {
+      status: EntryStatus.POSTED,
+      postedAt: new Date(),
+    };
+    if (userId && userId !== 'SYSTEM') {
+       data.postedBy = { connect: { id: userId } };
+    }
+    
     return this.client.journalEntry.update({
       where: { id: journalId },
-      data: {
-        status: EntryStatus.POSTED,
-        postedByUserId: userId,
-        postedAt: new Date(),
-      },
+      data,
     });
   }
 }

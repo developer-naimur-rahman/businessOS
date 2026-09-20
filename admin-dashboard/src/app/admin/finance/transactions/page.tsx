@@ -4,20 +4,38 @@ import { DataTable } from "../../../../components/ui/data-table"
 import { ArrowDownRight, ArrowUpRight, FileText } from "lucide-react"
 import { Button } from "../../../../components/ui/button"
 
+import { api } from "../../../../lib/api-client"
+
 export default function FinanceTransactionsPage() {
-  const [transactions, setTransactions] = useState([])
+  const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Simulated fetch for transactions journal
-    setTimeout(() => {
-      setTransactions([
-        { id: '1', date: new Date().toISOString(), reference: 'SL-1001', description: 'POS Sale', account: 'Main Cash Register', type: 'CREDIT', amount: 4500, balance: 45000 },
-        { id: '2', date: new Date(Date.now() - 86400000).toISOString(), reference: 'EX-902', description: 'Office Supplies', account: 'Main Cash Register', type: 'DEBIT', amount: 1200, balance: 40500 },
-        { id: '3', date: new Date(Date.now() - 172800000).toISOString(), reference: 'TR-102', description: 'Bank Deposit', account: 'Bank Account - Brac', type: 'CREDIT', amount: 20000, balance: 125000 },
-      ])
-      setLoading(false)
-    }, 600)
+    const fetchTransactions = async () => {
+      try {
+        const res = await api.get("/finance/journal-entries")
+        // Map the backend data to match the UI format or update the UI. The real backend has lines.
+        // For simplicity we will flatten them or just store them and render the first line for display.
+        const formatted = res.data.flatMap((entry: any) => 
+          entry.lines.map((line: any) => ({
+            id: line.id,
+            date: entry.accountingDate,
+            reference: entry.description,
+            description: entry.referenceType + ' ' + entry.referenceId,
+            account: line.account.name,
+            type: line.debit > 0 ? 'DEBIT' : 'CREDIT',
+            amount: line.debit > 0 ? line.debit : line.credit,
+            balance: 0 // The backend doesn't return running balance in this payload easily, default to 0
+          }))
+        )
+        setTransactions(formatted)
+        setLoading(false)
+      } catch (error) {
+        console.error("Failed to fetch transactions", error)
+        setLoading(false)
+      }
+    }
+    fetchTransactions()
   }, [])
 
   const columns = [
@@ -101,8 +119,7 @@ export default function FinanceTransactionsPage() {
         <DataTable
           columns={columns}
           data={transactions}
-          searchKey="reference"
-          loading={loading}
+          isLoading={loading}
         />
       </div>
     </div>

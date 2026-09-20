@@ -26,6 +26,7 @@ export default function WarehousesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
   
   // Form State
   const [formData, setFormData] = useState({ name: '', code: '', branchId: '', isDefault: false, isActive: true });
@@ -51,17 +52,38 @@ export default function WarehousesPage() {
     }
   };
 
+  const handleOpenModal = (warehouse: Warehouse | null = null) => {
+    if (warehouse) {
+      setEditingWarehouse(warehouse);
+      setFormData({
+        name: warehouse.name,
+        code: warehouse.code || '',
+        branchId: warehouse.branchId,
+        isDefault: warehouse.isDefault,
+        isActive: warehouse.isActive
+      });
+    } else {
+      setEditingWarehouse(null);
+      setFormData({ name: '', code: '', branchId: '', isDefault: false, isActive: true });
+    }
+    setIsModalOpen(true);
+  };
+
   const handleCreateWarehouse = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsSubmitting(true);
-      await api.post("/operational-structure/warehouses", formData);
-      toast.success("Warehouse created successfully");
+      if (editingWarehouse) {
+        await api.put(`/operational-structure/warehouses/${editingWarehouse.id}`, formData);
+        toast.success("Warehouse updated successfully");
+      } else {
+        await api.post("/operational-structure/warehouses", formData);
+        toast.success("Warehouse created successfully");
+      }
       setIsModalOpen(false);
-      setFormData({ name: '', code: '', branchId: '', isDefault: false, isActive: true });
       fetchData();
     } catch (error) {
-      toast.error("Failed to create warehouse");
+      toast.error("Failed to save warehouse");
     } finally {
       setIsSubmitting(false);
     }
@@ -90,6 +112,12 @@ export default function WarehousesPage() {
           {item.isActive ? 'ACTIVE' : 'INACTIVE'}
         </span>
       )
+    },
+    {
+      header: "Actions",
+      cell: (item: Warehouse) => (
+        <button onClick={() => handleOpenModal(item)} className="text-blue-600 hover:underline text-xs font-medium">Edit</button>
+      )
     }
   ];
 
@@ -98,7 +126,7 @@ export default function WarehousesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <PageHeader title="Warehouses" description="Manage inventory locations across branches." />
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => handleOpenModal()}
           className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md text-sm font-medium transition-colors"
         >
           Add Warehouse
@@ -115,7 +143,7 @@ export default function WarehousesPage() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => !isSubmitting && setIsModalOpen(false)} 
-        title="Add Warehouse"
+        title={editingWarehouse ? "Edit Warehouse" : "Add Warehouse"}
         footer={
           <>
             <button 
@@ -183,6 +211,17 @@ export default function WarehousesPage() {
                   className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" 
                 />
                 Make Default Warehouse
+              </label>
+            </div>
+            <div className="flex items-end pb-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+                  className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" 
+                />
+                Active
               </label>
             </div>
           </div>

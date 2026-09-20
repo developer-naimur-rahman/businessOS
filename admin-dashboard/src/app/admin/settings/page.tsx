@@ -1,15 +1,16 @@
 "use client"
 import React, { useState } from "react"
 import { Building2, Store, Palette, Shield, CreditCard, Bell, UploadCloud } from "lucide-react"
+import { StaffSettings } from "../../../components/settings/staff-settings"
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState('general')
 
   const tabs = [
     { id: 'general', label: 'General', icon: Building2 },
+    { id: 'staff', label: 'Staff & Roles', icon: Shield },
     { id: 'storefront', label: 'Storefront', icon: Store },
     { id: 'branding', label: 'Branding', icon: Palette },
-    { id: 'security', label: 'Security', icon: Shield },
     { id: 'billing', label: 'Billing', icon: CreditCard },
     { id: 'notifications', label: 'Notifications', icon: Bell },
   ]
@@ -108,8 +109,10 @@ export default function AdminSettingsPage() {
             </div>
           )}
 
+          {activeTab === 'staff' && <StaffSettings />}
+
           {/* Placeholder for other tabs */}
-          {activeTab !== 'general' && (
+          {activeTab !== 'general' && activeTab !== 'staff' && (
             <div className="p-20 text-center flex flex-col items-center justify-center animate-in fade-in">
               <Building2 className="w-12 h-12 text-slate-300 mb-4" />
               <h3 className="text-lg font-medium text-slate-900 mb-2">Configuration Area</h3>

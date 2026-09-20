@@ -8,13 +8,18 @@ import { MediaImage } from "../../components/ui/media-image"
 
 export default function StorefrontHomePage() {
   const [products, setProducts] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchCatalog() {
       try {
-        const res = await api.get('/public/catalog/products')
-        setProducts(res.data)
+        const [productsRes, categoriesRes] = await Promise.all([
+          api.get('/public/catalog/products'),
+          api.get('/public/catalog/categories')
+        ])
+        setProducts(productsRes.data)
+        setCategories(categoriesRes.data)
       } catch (err) {
         console.error("Failed to load catalog", err)
       } finally {
@@ -68,12 +73,12 @@ export default function StorefrontHomePage() {
       <section className="py-12 border-b border-slate-100 bg-slate-50/50">
         <div className="max-w-[1400px] mx-auto px-6">
           <div className="flex overflow-x-auto pb-4 hide-scrollbar gap-4 md:grid md:grid-cols-4 md:gap-6 md:pb-0">
-            {demoContent.categories.map((category) => (
-              <Link href={category.link} key={category.title} className="group relative min-w-[200px] aspect-[16/9] rounded-2xl overflow-hidden interactive-item shadow-sm border border-slate-200/50">
-                <MediaImage asset={category.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            {categories.slice(0, 4).map((category) => (
+              <Link href={`/categories/${category.id}`} key={category.id} className="group relative min-w-[200px] aspect-[16/9] rounded-2xl overflow-hidden interactive-item shadow-sm border border-slate-200/50">
+                <MediaImage asset={null} fallbackUrl="https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?q=80&w=800&auto=format&fit=crop" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                  <h3 className="font-semibold text-white tracking-tight">{category.title}</h3>
+                  <h3 className="font-semibold text-white tracking-tight">{category.name}</h3>
                   <ArrowRight className="w-4 h-4 text-white opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
                 </div>
               </Link>

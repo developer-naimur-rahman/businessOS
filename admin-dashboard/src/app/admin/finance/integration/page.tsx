@@ -1,19 +1,49 @@
 "use client"
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "../../../../components/ui/button"
-import { ArrowRightLeft, CheckCircle2, AlertCircle, RefreshCw, Server } from "lucide-react"
+import { ArrowRightLeft, CheckCircle2, AlertCircle, RefreshCw, Server, XCircle } from "lucide-react"
+import { api } from "../../../../lib/api-client"
+import { toast } from "sonner"
+import { format } from "date-fns"
 
 export default function FinanceIntegrationPage() {
   const [syncing, setSyncing] = useState(false)
-  const [lastSync, setLastSync] = useState(new Date().toISOString())
+  const [status, setStatus] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  const handleSync = () => {
-    setSyncing(true)
-    setTimeout(() => {
-      setSyncing(false)
-      setLastSync(new Date().toISOString())
-    }, 2000)
+  useEffect(() => {
+    fetchStatus()
+  }, [])
+
+  const fetchStatus = async () => {
+    try {
+      const res = await api.get('/finance-integration/status')
+      setStatus(res.data)
+    } catch (err) {
+      toast.error('Failed to load integration status')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const handleSync = async () => {
+    setSyncing(true)
+    try {
+      const res = await api.post('/finance-integration/process')
+      toast.success(res.data.message)
+      await fetchStatus()
+    } catch (err) {
+      toast.error('Failed to force sync')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="p-8 text-center text-slate-500">Loading integration engine status...</div>
+  }
+
+  const events = status?.recentEvents || []
 
   return (
     <div className="space-y-6">
@@ -32,7 +62,9 @@ export default function FinanceIntegrationPage() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">Integration Engine</h2>
-              <p className="text-sm text-slate-500">Currently running in Auto-Sync mode</p>
+              <p className="text-sm text-slate-500">
+                {status?.isAutoSyncEnabled ? 'Currently running in Auto-Sync mode' : 'Manual sync mode'}
+              </p>
             </div>
           </div>
 
@@ -65,14 +97,13 @@ export default function FinanceIntegrationPage() {
           <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider mb-4">Sync Status</h3>
           
           <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${syncing ? 'bg-primary/20 text-primary animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center ${syncing || status?.pendingCount > 0 ? 'bg-primary/20 text-primary animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
               <RefreshCw className={`w-8 h-8 ${syncing ? 'animate-spin' : ''}`} />
             </div>
             
             <div>
-              <p className="font-semibold text-slate-900">{syncing ? 'Synchronizing Events...' : 'All Events Synced'}</p>
-              <p className="text-xs text-slate-500 mt-1">
-                Last sync: {new Date(lastSync).toLocaleTimeString()}
+              <p className="font-semibold text-slate-900">
+                {syncing ? 'Synchronizing Events...' : status?.pendingCount > 0 ? `${status.pendingCount} Pending Events` : 'All Events Synced'}
               </p>
             </div>
           </div>
@@ -80,7 +111,7 @@ export default function FinanceIntegrationPage() {
           <Button 
             className="w-full mt-6 bg-slate-900 text-white hover:bg-slate-800 interaction-bounce"
             onClick={handleSync}
-            disabled={syncing}
+            disabled={syncing || status?.pendingCount === 0}
           >
             {syncing ? 'Syncing...' : 'Force Sync Now'}
           </Button>
@@ -91,13 +122,25 @@ export default function FinanceIntegrationPage() {
         <div className="flex items-center gap-2 mb-4 text-slate-700 font-semibold">
           <Server className="w-5 h-5 text-slate-400" /> Recent Event Logs
         </div>
-        <div className="bg-slate-900 rounded-xl p-4 font-mono text-xs text-emerald-400 overflow-x-auto h-48 overflow-y-auto">
+        <div className="bg-slate-900 rounded-xl p-4 font-mono text-xs overflow-x-auto h-64 overflow-y-auto">
           <div className="space-y-2">
-            <p>[{new Date().toISOString()}] INFO: Engine listening for Outbox events...</p>
-            <p className="text-slate-400">[{new Date(Date.now() - 5000).toISOString()}] Processing EVENT_SALE_COMPLETED (ID: 8092)</p>
-            <p>[{new Date(Date.now() - 4900).toISOString()}] OK: Generated Double-Entry Journal SL-1001</p>
-            <p className="text-slate-400">[{new Date(Date.now() - 32000).toISOString()}] Processing EVENT_STOCK_ADJUST (ID: 8091)</p>
-            <p>[{new Date(Date.now() - 31800).toISOString()}] OK: Generated Double-Entry Journal INV-990</p>
+            {events.length === 0 ? (
+              <p className="text-slate-500">No events found.</p>
+            ) : (
+              events.map((evt: any) => {
+                const time = format(new Date(evt.createdAt), 'yyyy-MM-dd HH:mm:ss')
+                let colorClass = 'text-slate-400'
+                if (evt.status === 'COMPLETED') colorClass = 'text-emerald-400'
+                if (evt.status === 'FAILED') colorClass = 'text-rose-400'
+                if (evt.status === 'PENDING') colorClass = 'text-amber-400'
+                
+                return (
+                  <p key={evt.id} className={colorClass}>
+                    [{time}] {evt.status}: {evt.eventType} (Aggregate: {evt.aggregateType} - {evt.aggregateId}) {evt.lastError ? `- ERROR: ${evt.lastError}` : ''}
+                  </p>
+                )
+              })
+            )}
           </div>
         </div>
       </div>

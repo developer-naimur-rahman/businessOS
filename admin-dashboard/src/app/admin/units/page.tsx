@@ -1,25 +1,59 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
-import { Plus, Search, MoreHorizontal, Scale } from "lucide-react"
+import { Plus, Search, MoreHorizontal, Scale, Edit } from "lucide-react"
+import { Modal } from "../../../components/ui/modal"
 
 export default function AdminUnitsPage() {
   const [units, setUnits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingUnit, setEditingUnit] = useState<any>(null)
+  const [formData, setFormData] = useState({ name: '', abbreviation: '' })
+
+  const fetchUnits = async () => {
+    try {
+      const res = await api.get('/business-core/units')
+      setUnits(res.data)
+    } catch (err) {
+      console.error("Failed to load units", err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchUnits() {
-      try {
-        const res = await api.get('/business-core/units')
-        setUnits(res.data)
-      } catch (err) {
-        console.error("Failed to load units", err)
-      } finally {
-        setLoading(false)
-      }
-    }
     fetchUnits()
   }, [])
+
+  const handleOpenModal = (unit: any = null) => {
+    if (unit) {
+      setEditingUnit(unit)
+      setFormData({
+        name: unit.name,
+        abbreviation: unit.abbreviation || ''
+      })
+    } else {
+      setEditingUnit(null)
+      setFormData({ name: '', abbreviation: '' })
+    }
+    setIsModalOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (editingUnit) {
+        await api.put(`/business-core/units/${editingUnit.id}`, formData)
+      } else {
+        await api.post('/business-core/units', formData)
+      }
+      setIsModalOpen(false)
+      fetchUnits()
+    } catch (err) {
+      alert("Failed to save unit")
+    }
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -31,7 +65,7 @@ export default function AdminUnitsPage() {
           <p className="text-slate-500">Define standard units for your products and services.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="control-button-primary shadow-sm h-10 px-4">
+          <button onClick={() => handleOpenModal()} className="control-button-primary shadow-sm h-10 px-4">
             <Plus className="w-4 h-4 mr-2" /> New Unit
           </button>
         </div>
@@ -87,9 +121,11 @@ export default function AdminUnitsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => handleOpenModal(unit)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -98,7 +134,28 @@ export default function AdminUnitsPage() {
           </table>
         </div>
       </div>
-      
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingUnit ? "Edit Unit" : "New Unit"}
+        footer={
+          <>
+            <button onClick={() => setIsModalOpen(false)} className="control-button-secondary h-10 px-4">Cancel</button>
+            <button onClick={handleSubmit} className="control-button-primary h-10 px-6">Save</button>
+          </>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Unit Name</label>
+            <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} type="text" placeholder="e.g. Kilogram" className="control-input w-full h-10 mt-1" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Abbreviation</label>
+            <input value={formData.abbreviation} onChange={e => setFormData({...formData, abbreviation: e.target.value})} type="text" placeholder="e.g. kg" className="control-input w-full h-10 mt-1" />
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

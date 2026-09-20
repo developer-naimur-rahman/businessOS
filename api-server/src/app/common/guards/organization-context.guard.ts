@@ -9,10 +9,12 @@ export class OrganizationContextGuard implements CanActivate {
     const user = request.user as AuthenticatedUser;
 
     if (!user) {
+      console.log('OrganizationContextGuard: User is not authenticated');
       throw new UnauthorizedException('Authentication required for organization context');
     }
 
     if (!user.organizationId) {
+      console.log('OrganizationContextGuard: User lacks organizationId', user);
       throw new ForbiddenException('User lacks a trusted organization context');
     }
 
@@ -43,6 +45,7 @@ export class OrganizationContextGuard implements CanActivate {
 
     for (const providedId of clientProvidedIds) {
       if (providedId !== trustedOrganizationId) {
+        console.log(`OrganizationContextGuard: Client provided id ${providedId} does not match trusted ${trustedOrganizationId}`);
         throw new ForbiddenException(
           'Client-provided organization context overrides are strictly forbidden',
         );

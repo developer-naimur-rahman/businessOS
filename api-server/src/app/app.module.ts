@@ -11,9 +11,10 @@ import { OperationalStructureModule } from './operational-structure/operational-
 import { InventoryModule } from './inventory/inventory.module';
 import { SalesModule } from './sales/sales.module';
 import { FinanceIntegrationModule } from './finance-integration/finance-integration.module';
+import { DesignStudioModule } from './design-studio/design-studio.module';
 
 @Module({
-  imports: [PrismaModule, IamModule, AuthModule, SystemModule, FinanceModule, BusinessCoreModule, OperationalStructureModule, InventoryModule, SalesModule, FinanceIntegrationModule],
+  imports: [PrismaModule, IamModule, AuthModule, SystemModule, FinanceModule, BusinessCoreModule, OperationalStructureModule, InventoryModule, SalesModule, FinanceIntegrationModule, DesignStudioModule],
   controllers: [AppController],
   providers: [AppService],
 })

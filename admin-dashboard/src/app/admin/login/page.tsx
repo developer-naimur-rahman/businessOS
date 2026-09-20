@@ -3,21 +3,32 @@ import React, { useState } from "react"
 import { useAuthStore } from "../../../store/useAuthStore"
 import { useRouter } from "next/navigation"
 
+import { api } from "../../../lib/api-client"
+
 export default function AdminLogin() {
   const [pin, setPin] = useState("")
   const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
   const setUser = useAuthStore((state) => state.setUser)
   const setToken = useAuthStore((state) => state.setToken)
+  const fetchProfile = useAuthStore((state) => state.fetchProfile)
   const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (pin === "5825825825iW.") {
-      setUser({ userId: "1", organizationId: "1", roleIds: [], permissions: [] })
-      setToken("dummy_token")
-      router.push("/admin")
-    } else {
-      setError("Invalid PIN")
+    setLoading(true)
+    setError("")
+    try {
+      const res = await api.post('/auth/admin-pin-login', { pin })
+      if (res.data.access_token) {
+        setToken(res.data.access_token)
+        await fetchProfile()
+        router.push("/admin")
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Invalid PIN")
+    } finally {
+      setLoading(false)
     }
   }
 

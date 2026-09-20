@@ -6,7 +6,7 @@ import { Button } from "../../../../components/ui/button"
 import { Wallet, Activity, Plus } from "lucide-react"
 
 export default function FinanceAccountsPage() {
-  const [accounts, setAccounts] = useState([])
+  const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -15,17 +15,9 @@ export default function FinanceAccountsPage() {
 
   const fetchAccounts = async () => {
     try {
-      // In a real app, this connects to the finance API endpoint
-      // const res = await api.get("/finance/accounts")
-      // setAccounts(res.data)
-      setTimeout(() => {
-        setAccounts([
-          { id: '1', name: 'Main Cash Register', type: 'CASH', balance: 45000, currency: 'BDT' },
-          { id: '2', name: 'Bank Account - Brac', type: 'BANK', balance: 125000, currency: 'BDT' },
-          { id: '3', name: 'Mobile Money - bKash', type: 'MOBILE_MONEY', balance: 15400, currency: 'BDT' }
-        ])
-        setLoading(false)
-      }, 500)
+      const res = await api.get("/finance/accounts")
+      setAccounts(res.data)
+      setLoading(false)
     } catch (error) {
       console.error("Failed to fetch accounts", error)
       setLoading(false)
@@ -109,8 +101,7 @@ export default function FinanceAccountsPage() {
         <DataTable
           columns={columns}
           data={accounts}
-          searchKey="name"
-          loading={loading}
+          isLoading={loading}
         />
       </div>
     </div>

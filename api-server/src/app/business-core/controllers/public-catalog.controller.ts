@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { ProductsService } from '../services/products.service';
 
@@ -39,6 +39,31 @@ export class PublicCatalogController {
           name: p.category.name
         } : null
       }));
+  }
+
+  @Get('products/:id')
+  async getPublicProduct(@Param('id') id: string) {
+    const orgId = await this.getDefaultOrganizationId();
+    
+    // Ensure we fetch through the service to maintain boundary
+    const product = await this.productsService.findOne(orgId, id);
+    
+    if (!product || !product.isActive) {
+      throw new NotFoundException('Product not found');
+    }
+    
+    return {
+      id: product.id,
+      code: product.code,
+      name: product.name,
+      description: product.description,
+      type: product.type,
+      sellingPrice: product.sellingPrice,
+      category: product.category ? {
+        id: product.category.id,
+        name: product.category.name
+      } : null
+    };
   }
 
   @Get('categories')

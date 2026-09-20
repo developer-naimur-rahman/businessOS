@@ -40,6 +40,7 @@ model Organization {
   stockBalances             StockBalance[]
   outboxEvents              OutboxEvent[]
   financeIntegrationConfigs FinanceIntegrationConfig[]
+  bannerDesigns             BannerDesign[]
 }
 
 model BusinessUnit {
@@ -77,6 +78,7 @@ model Branch {
   journalLines JournalLine[]
   warehouses   Warehouse[]
   sales        Sale[]
+  bannerDesigns BannerDesign[]
 
   @@unique([organizationId, name])
   @@unique([organizationId, code])
@@ -391,6 +393,7 @@ model Customer {
   phone          String?
   email          String?
   address        String?
+  password       String? // Hashed password for customer login
   status         String   @default("ACTIVE") // ACTIVE, INACTIVE
   notes          String?
   createdAt      DateTime @default(now())
@@ -442,7 +445,8 @@ model Category {
   parentId       String?
   name           String
   description    String?
-  createdAt      DateTime @default(now())
+  displayOrder   Int         @default(0)
+  createdAt      DateTime    @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
@@ -467,9 +471,11 @@ model Product {
   code           String? // SKU or internal code
   name           String
   description    String?
+  imageUrl       String?
   sellingPrice   Decimal     @default(0) @db.Decimal(19, 4)
   costPrice      Decimal?    @db.Decimal(19, 4)
   isActive       Boolean     @default(true)
+  displayOrder   Int         @default(0)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -690,4 +696,34 @@ model SalePayment {
   paymentDate DateTime      @default(now())
 
   sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------
+// DESIGN STUDIO MODULE
+// ---------------------------------------------------------
+
+model BannerDesign {
+  id             String   @id @default(uuid())
+  organizationId String
+  branchId       String?
+  name           String
+  type           String
+  
+  // Dimensions
+  width          Decimal  @db.Decimal(10, 2)
+  height         Decimal  @db.Decimal(10, 2)
+  unit           String   // e.g., 'IN', 'FT', 'MM', 'CM'
+  
+  // Design details
+  template       String
+  settings       Json     // Follows DesignSettings interface in TypeScript
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  branch         Branch?      @relation(fields: [branchId], references: [id])
+
+  @@index([organizationId])
+  @@index([branchId])
 }

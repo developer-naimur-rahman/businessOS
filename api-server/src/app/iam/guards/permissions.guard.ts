@@ -21,14 +21,16 @@ export class PermissionsGuard implements CanActivate {
     const user = request.user as AuthenticatedUser;
 
     if (!user) {
+      console.log('PermissionsGuard: User is not authenticated');
       throw new ForbiddenException('User is not authenticated');
     }
 
-    const hasPermission = requiredPermissions.every((permission) =>
-      user.permissions.includes(permission),
+    const hasPermission = user.permissions?.includes('*') || requiredPermissions.every((permission) =>
+      user.permissions?.includes(permission),
     );
 
     if (!hasPermission) {
+      console.log(`PermissionsGuard: Insufficient permissions for user`, user, `Requires:`, requiredPermissions);
       throw new ForbiddenException('Insufficient permissions');
     }
 

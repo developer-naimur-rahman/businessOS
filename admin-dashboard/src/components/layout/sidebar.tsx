@@ -31,6 +31,7 @@ export function Sidebar() {
       label: "Inventory & Supply",
       items: [
         { name: "Products", href: "/admin/products", icon: Package },
+        { name: "Service Price List", href: "/admin/services/price-list", icon: Package },
         { name: "Categories", href: "/admin/categories", icon: Package },
         { name: "Units", href: "/admin/units", icon: Package },
         { name: "Stock Levels", href: "/admin/inventory", icon: Boxes },
@@ -40,6 +41,7 @@ export function Sidebar() {
     {
       label: "Platform",
       items: [
+        { name: "Design Studio", href: "/admin/design-studio", icon: Store },
         { name: "Media Library", href: "/admin/media", icon: Store },
         { name: "Finance Sync", href: "/admin/finance", icon: ArrowRightLeft },
       ]

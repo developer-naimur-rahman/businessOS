@@ -27,6 +27,14 @@ export interface CreateJournalEntryDto {
 export class FinanceService {
   constructor(private readonly financeRepository: FinanceRepository) {}
 
+  async getAccounts(organizationId: string) {
+    return this.financeRepository.findAccountsByOrganization(organizationId);
+  }
+
+  async getJournalEntries(organizationId: string) {
+    return this.financeRepository.findJournalEntriesByOrganization(organizationId);
+  }
+
   async createDraftJournalEntry(
     organizationId: string, 
     userId: string, 
@@ -49,7 +57,7 @@ export class FinanceService {
 
     const entry = await this.financeRepository.createJournalEntry(organizationId, {
       organization: { connect: { id: organizationId } },
-      createdBy: { connect: { id: userId } },
+      ...(userId && userId !== 'SYSTEM' ? { createdBy: { connect: { id: userId } } } : {}),
       accountingDate: data.accountingDate,
       referenceType: data.referenceType,
       referenceId: data.referenceId,

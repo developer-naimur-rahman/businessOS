@@ -1,23 +1,28 @@
 "use client"
 
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuthStore } from "../../store/useAuthStore"
 import { Sidebar } from "../../components/layout/sidebar"
 import { Header } from "../../components/layout/header"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuthStore()
+  const { user } = useAuthStore()
   const pathname = usePathname()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user && pathname !== "/admin/login") {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (mounted && !user && pathname !== "/admin/login") {
       router.push("/admin/login")
     }
-  }, [user, loading, pathname, router])
+  }, [user, mounted, pathname, router])
 
-  if (loading) {
+  if (!mounted) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50">Loading...</div>
   }
 

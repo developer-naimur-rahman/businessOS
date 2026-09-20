@@ -28,10 +28,13 @@ export class WarehousesService {
           data: { isDefault: false },
         });
 
+        const createData: any = { ...data };
+        delete createData.branchId;
+
         // Create the new default warehouse
         return tx.warehouse.create({
           data: {
-            ...data,
+            ...createData,
             organization: { connect: { id: organizationId } },
             branch: { connect: { id: data.branchId } },
           },
@@ -39,9 +42,13 @@ export class WarehousesService {
       });
     }
 
+    const createData: any = { ...data };
+    const branchId = createData.branchId;
+    delete createData.branchId;
+
     return this.warehousesRepository.create(organizationId, {
-      ...data,
-      branch: { connect: { id: data.branchId } },
+      ...createData,
+      branch: { connect: { id: branchId } },
     });
   }
 
