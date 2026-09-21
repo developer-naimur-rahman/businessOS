@@ -49,4 +49,39 @@ export class CustomersRepository {
       },
     });
   }
+
+  async getLedger(organizationId: string, customerId: string) {
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        organizationId,
+        customerId,
+        status: 'COMPLETED',
+      },
+      select: {
+        id: true,
+        saleNumber: true,
+        saleDate: true,
+        total: true,
+      },
+    });
+
+    const saleIds = sales.map((s) => s.id);
+
+    const payments = await this.prisma.salePayment.findMany({
+      where: {
+        organizationId,
+        saleId: { in: saleIds },
+      },
+      select: {
+        id: true,
+        saleId: true,
+        amount: true,
+        paymentDate: true,
+        reference: true,
+        method: true,
+      },
+    });
+
+    return { sales, payments };
+  }
 }

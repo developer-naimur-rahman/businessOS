@@ -17,7 +17,7 @@ export class SalesRepository {
     return this.uow.run(work);
   }
 
-  async createSale(data: Prisma.SaleUncheckedCreateInput): Promise<Sale> {
+  async createSale(data: Prisma.SaleUncheckedCreateInput) {
     return this.client.sale.create({ 
       data, 
       include: { 
@@ -28,7 +28,7 @@ export class SalesRepository {
     });
   }
 
-  async findById(organizationId: string, id: string): Promise<Sale | null> {
+  async findById(organizationId: string, id: string) {
     return this.client.sale.findUnique({
       where: { id, organizationId },
       include: { 
@@ -39,7 +39,7 @@ export class SalesRepository {
     });
   }
 
-  async findByIdempotencyKey(organizationId: string, idempotencyKey: string): Promise<Sale | null> {
+  async findByIdempotencyKey(organizationId: string, idempotencyKey: string) {
     return this.client.sale.findUnique({
       where: { organizationId_idempotencyKey: { organizationId, idempotencyKey } },
       include: { 
@@ -50,11 +50,32 @@ export class SalesRepository {
     });
   }
 
-  async updateStatus(organizationId: string, id: string, status: 'COMPLETED' | 'CANCELLED', saleNumber?: string): Promise<Sale> {
+  async updateStatus(organizationId: string, id: string, status: 'COMPLETED' | 'CANCELLED', saleNumber?: string) {
     return this.client.sale.update({
       where: { id, organizationId },
       data: { status, saleNumber, updatedAt: new Date() },
       include: { lines: true, payments: true },
+    });
+  }
+
+  async updatePaymentStatus(organizationId: string, id: string, paymentStatus: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID') {
+    return this.client.sale.update({
+      where: { id, organizationId },
+      data: { paymentStatus, updatedAt: new Date() },
+      include: { lines: true, payments: true },
+    });
+  }
+
+  async addPayment(organizationId: string, data: Prisma.SalePaymentCreateInput) {
+    return this.client.salePayment.create({
+      data,
+    });
+  }
+
+  async findPaymentByIdempotencyKey(organizationId: string, idempotencyKey: string) {
+    if (!idempotencyKey) return null;
+    return this.client.salePayment.findUnique({
+      where: { organizationId_idempotencyKey: { organizationId, idempotencyKey } },
     });
   }
 

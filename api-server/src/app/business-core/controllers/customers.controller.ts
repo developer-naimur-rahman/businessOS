@@ -33,4 +33,10 @@ export class CustomersController {
   async update(@Request() req, @Param('id') id: string, @Body() body: any) {
     return this.customersService.update(req.user.organizationId, id, body);
   }
+
+  @Get(':id/ledger')
+  @RequirePermissions('businesscore.customers.view')
+  async getLedger(@Request() req, @Param('id') id: string) {
+    return this.customersService.getLedger(req.user.organizationId, id);
+  }
 }

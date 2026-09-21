@@ -44,6 +44,8 @@ export class FinanceIntegrationService {
       await this.processPurchaseCompletedEvent(event);
     } else if (event.eventType === 'PURCHASE_PAYMENT' && event.aggregateType === 'Purchase') {
       await this.processPurchasePaymentEvent(event);
+    } else if (event.eventType === 'SALE_PAYMENT' && event.aggregateType === 'SalePayment') {
+      await this.processSalePaymentEvent(event);
     } else {
       throw new Error(`Unsupported event type: ${event.eventType}`);
     }
@@ -147,6 +149,51 @@ export class FinanceIntegrationService {
         referenceId: payment.id,
         idempotencyKey: event.id,
         description: `Payment for Purchase ${payment.purchaseId}`,
+        lines: lines,
+      };
+
+      const draftEntry = await this.financeService.createDraftJournalEntry(event.organizationId, 'SYSTEM', dto);
+      await this.financeService.postJournalEntry(event.organizationId, draftEntry.id, 'SYSTEM');
+      await this.repo.markEventCompleted(event.id);
+    });
+  }
+
+  private async processSalePaymentEvent(event: any) {
+    const payload = event.payload as any;
+    const salePaymentId = payload.salePaymentId;
+
+    const payment = await this.prismaManager.client.salePayment.findUnique({
+      where: { id: salePaymentId },
+      include: { sale: true },
+    });
+
+    if (!payment) throw new Error(`SalePayment not found: ${salePaymentId}`);
+
+    const config = await this.repo.getConfig(event.organizationId);
+    if (!config || !config.accountsReceivableAccountId) {
+      throw new Error('Finance config missing Accounts Receivable.');
+    }
+
+    let accountId: string | null = null;
+    if (payment.method === 'CASH') accountId = config.cashAccountId;
+    else if (payment.method === 'BANK') accountId = config.bankAccountId;
+    else if (payment.method === 'MOBILE_BANKING') accountId = config.mobileBankingAccountId;
+    else accountId = config.cashAccountId;
+
+    if (!accountId) throw new Error(`Payment account for method ${payment.method} not configured.`);
+
+    const lines: CreateJournalLineDto[] = [
+      { accountId, debit: new Decimal(payment.amount), branchId: payment.sale.branchId || undefined },
+      { accountId: config.accountsReceivableAccountId, credit: new Decimal(payment.amount), branchId: payment.sale.branchId || undefined },
+    ];
+
+    await this.uow.run(async () => {
+      const dto: CreateJournalEntryDto = {
+        accountingDate: payment.paymentDate,
+        referenceType: 'SALE_PAYMENT',
+        referenceId: payment.id,
+        idempotencyKey: event.id,
+        description: `Payment for Sale ${payment.saleId}`,
         lines: lines,
       };
 

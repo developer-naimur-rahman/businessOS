@@ -69,8 +69,11 @@ import { PriceListService } from './services/price-list.service';
   ],
   exports: [
     CustomersService,
+    CustomersRepository,
     SuppliersService,
+    SuppliersRepository,
     ProductsService,
+    ProductsRepository,
     CategoriesService,
     UnitsService,
     VariantsService,

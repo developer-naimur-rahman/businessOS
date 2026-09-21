@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Param, Request, UseGuards } from '@nestjs/common';
-import { SalesService, CreateSaleDto } from './sales.service';
+import { SalesService, CreateSaleDto, AddSalePaymentDto } from './sales.service';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrganizationContextGuard } from '../common/guards/organization-context.guard';
@@ -36,5 +36,17 @@ export class SalesController {
       .catch(err => console.error("Failed to process finance outbox events:", err));
 
     return sale;
+  }
+
+  @Post(':id/payments')
+  @RequirePermissions('sales.create')
+  async addPayment(@Request() req, @Param('id') id: string, @Body() data: AddSalePaymentDto) {
+    const payment = await this.salesService.addPayment(req.user.organizationId, id, data);
+    
+    // Trigger async processing of finance outbox events
+    this.financeIntegrationService.processPendingOutboxEvents(req.user.organizationId)
+      .catch(err => console.error("Failed to process finance outbox events:", err));
+
+    return payment;
   }
 }

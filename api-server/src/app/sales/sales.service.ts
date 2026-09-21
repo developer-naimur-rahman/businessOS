@@ -26,6 +26,14 @@ export interface CreateSaleDto {
   }>;
 }
 
+export interface AddSalePaymentDto {
+  amount: number | string;
+  method: PaymentMethod;
+  reference?: string;
+  paymentDate: string | Date;
+  idempotencyKey?: string;
+}
+
 @Injectable()
 export class SalesService {
   constructor(
@@ -126,6 +134,7 @@ export class SalesService {
         if (amount.lte(0)) throw new BadRequestException('Payment amount must be greater than zero.');
         totalPaid = totalPaid.add(amount);
         paymentsToCreate.push({
+          organizationId,
           method: p.method,
           amount,
           reference: p.reference,
@@ -219,5 +228,66 @@ export class SalesService {
     const sale = await this.salesRepo.findById(organizationId, id);
     if (!sale) throw new NotFoundException('Sale not found');
     return sale;
+  }
+
+  async addPayment(organizationId: string, id: string, dto: AddSalePaymentDto) {
+    return this.salesRepo.runTransaction(async () => {
+      const sale = await this.salesRepo.findById(organizationId, id);
+      if (!sale) throw new NotFoundException('Sale not found');
+      if (sale.status !== 'COMPLETED') {
+        throw new BadRequestException('Payments can only be added to COMPLETED sales.');
+      }
+
+      const currentPaid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const newTotalPaid = currentPaid + Number(dto.amount);
+      if (newTotalPaid > Number(sale.total) + 0.01) { // 0.01 for rounding
+        throw new BadRequestException('Payment exceeds outstanding balance.');
+      }
+
+      // Check idempotency inside transaction
+      if (dto.idempotencyKey) {
+        const existingPayment = await this.salesRepo.findPaymentByIdempotencyKey(organizationId, dto.idempotencyKey);
+        if (existingPayment) return existingPayment;
+      }
+
+      const payment = await this.salesRepo.addPayment(organizationId, {
+        organization: { connect: { id: organizationId } },
+        sale: { connect: { id } },
+        amount: dto.amount,
+        method: dto.method,
+        reference: dto.reference,
+        paymentDate: new Date(dto.paymentDate),
+        idempotencyKey: dto.idempotencyKey,
+      });
+
+      // Recalculate payment status
+      let paymentStatus: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' = 'UNPAID';
+      const grandTotal = new Prisma.Decimal(sale.total);
+      const totalPaid = new Prisma.Decimal(newTotalPaid);
+
+      if (totalPaid.equals(grandTotal) && grandTotal.gt(0)) {
+        paymentStatus = 'PAID';
+      } else if (totalPaid.gt(0)) {
+        paymentStatus = 'PARTIALLY_PAID';
+      } else if (grandTotal.equals(0)) {
+        paymentStatus = 'PAID'; // Free sale
+      }
+
+      if (sale.paymentStatus !== paymentStatus) {
+        await this.salesRepo.updatePaymentStatus(organizationId, id, paymentStatus);
+      }
+
+      await this.prismaManager.client.outboxEvent.create({
+        data: {
+          organizationId,
+          eventType: 'SALE_PAYMENT',
+          aggregateType: 'SalePayment',
+          aggregateId: payment.id,
+          payload: { salePaymentId: payment.id },
+        }
+      });
+
+      return payment;
+    });
   }
 }

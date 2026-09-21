@@ -52,6 +52,7 @@ model Organization {
   purchases                 Purchase[]
   purchaseLines             PurchaseLine[]
   purchasePayments          PurchasePayment[]
+  salePayments              SalePayment[]
 }
 
 model BusinessUnit {
@@ -726,14 +727,26 @@ model SaleLine {
 }
 
 model SalePayment {
-  id          String        @id @default(uuid())
-  saleId      String
-  amount      Decimal       @db.Decimal(19, 4)
-  method      PaymentMethod
-  reference   String?
-  paymentDate DateTime      @default(now())
+  id             String        @id @default(uuid())
+  organizationId String
+  saleId         String
 
-  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  amount         Decimal       @db.Decimal(19, 4)
+  method         PaymentMethod
+  reference      String?
+  paymentDate    DateTime      @default(now())
+
+  idempotencyKey String?
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  sale           Sale          @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, saleId])
+  @@index([organizationId, paymentDate])
 }
 
 // ---------------------------------------------------------
