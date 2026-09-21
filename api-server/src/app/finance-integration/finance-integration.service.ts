@@ -40,9 +40,120 @@ export class FinanceIntegrationService {
   private async processEvent(event: any) {
     if (event.eventType === 'SALE_COMPLETED' && event.aggregateType === 'Sale') {
       await this.processSaleCompletedEvent(event);
+    } else if (event.eventType === 'PURCHASE_COMPLETED' && event.aggregateType === 'Purchase') {
+      await this.processPurchaseCompletedEvent(event);
+    } else if (event.eventType === 'PURCHASE_PAYMENT' && event.aggregateType === 'Purchase') {
+      await this.processPurchasePaymentEvent(event);
     } else {
       throw new Error(`Unsupported event type: ${event.eventType}`);
     }
+  }
+
+  private async processPurchaseCompletedEvent(event: any) {
+    const payload = event.payload as any;
+    const purchaseId = payload.purchaseId;
+
+    const purchase = await this.prismaManager.client.purchase.findUnique({
+      where: { id: purchaseId },
+      include: {
+        lines: true,
+        payments: true,
+      },
+    });
+
+    if (!purchase) throw new Error(`Purchase not found: ${purchaseId}`);
+
+    const config = await this.repo.getConfig(event.organizationId);
+    if (!config || !config.inventoryAssetAccountId || !config.accountsPayableAccountId) {
+      throw new Error('Finance integration config missing required accounts (Inventory / AP).');
+    }
+
+    const lines: CreateJournalLineDto[] = [];
+    const purchaseTotal = new Decimal(purchase.total);
+    let totalPaid = new Decimal(0);
+
+    for (const payment of purchase.payments) {
+      const amount = new Decimal(payment.amount);
+      totalPaid = totalPaid.plus(amount);
+
+      let accountId: string | null = null;
+      if (payment.method === 'CASH') accountId = config.cashAccountId;
+      else if (payment.method === 'BANK') accountId = config.bankAccountId;
+      else if (payment.method === 'MOBILE_BANKING') accountId = config.mobileBankingAccountId;
+      else accountId = config.cashAccountId;
+
+      if (!accountId) throw new Error(`Payment account for method ${payment.method} not configured.`);
+      lines.push({ accountId, credit: amount, branchId: purchase.branchId || undefined });
+    }
+
+    if (totalPaid.lessThan(purchaseTotal)) {
+      const apAmount = purchaseTotal.minus(totalPaid);
+      lines.push({ accountId: config.accountsPayableAccountId, credit: apAmount, branchId: purchase.branchId || undefined });
+    }
+
+    if (purchaseTotal.greaterThan(0)) {
+      lines.push({ accountId: config.inventoryAssetAccountId, debit: purchaseTotal, branchId: purchase.branchId || undefined });
+    }
+
+    await this.uow.run(async () => {
+      const dto: CreateJournalEntryDto = {
+        accountingDate: purchase.purchaseDate,
+        referenceType: 'PURCHASE',
+        referenceId: purchase.id,
+        idempotencyKey: event.id,
+        description: `Purchase ${purchase.id}`,
+        lines: lines,
+      };
+
+      const draftEntry = await this.financeService.createDraftJournalEntry(event.organizationId, 'SYSTEM', dto);
+      await this.financeService.postJournalEntry(event.organizationId, draftEntry.id, 'SYSTEM');
+      await this.repo.markEventCompleted(event.id);
+    });
+  }
+
+  private async processPurchasePaymentEvent(event: any) {
+    const payload = event.payload as any;
+    const purchasePaymentId = payload.purchasePaymentId;
+
+    const payment = await this.prismaManager.client.purchasePayment.findUnique({
+      where: { id: purchasePaymentId },
+      include: { purchase: true },
+    });
+
+    if (!payment) throw new Error(`PurchasePayment not found: ${purchasePaymentId}`);
+
+    const config = await this.repo.getConfig(event.organizationId);
+    if (!config || !config.accountsPayableAccountId) {
+      throw new Error('Finance config missing Accounts Payable.');
+    }
+
+    let accountId: string | null = null;
+    if (payment.method === 'CASH') accountId = config.cashAccountId;
+    else if (payment.method === 'BANK') accountId = config.bankAccountId;
+    else if (payment.method === 'MOBILE_BANKING') accountId = config.mobileBankingAccountId;
+    else accountId = config.cashAccountId;
+
+    if (!accountId) throw new Error(`Payment account for method ${payment.method} not configured.`);
+
+    const lines: CreateJournalLineDto[] = [
+      { accountId: config.accountsPayableAccountId, debit: new Decimal(payment.amount), branchId: payment.purchase.branchId || undefined },
+      { accountId, credit: new Decimal(payment.amount), branchId: payment.purchase.branchId || undefined },
+    ];
+
+    await this.uow.run(async () => {
+      const dto: CreateJournalEntryDto = {
+        accountingDate: payment.paymentDate,
+        referenceType: 'PURCHASE_PAYMENT',
+        referenceId: payment.id,
+        idempotencyKey: event.id,
+        description: `Payment for Purchase ${payment.purchaseId}`,
+        lines: lines,
+      };
+
+      const draftEntry = await this.financeService.createDraftJournalEntry(event.organizationId, 'SYSTEM', dto);
+      await this.financeService.postJournalEntry(event.organizationId, draftEntry.id, 'SYSTEM');
+      await this.repo.markEventCompleted(event.id);
+    });
   }
 
   private async processSaleCompletedEvent(event: any) {
@@ -52,7 +163,7 @@ export class FinanceIntegrationService {
     const sale = await this.prismaManager.client.sale.findUnique({
       where: { id: saleId },
       include: {
-        lines: { include: { product: true } },
+        lines: { include: { variant: { include: { product: true } } } },
         payments: true,
       },
     });
@@ -99,9 +210,9 @@ export class FinanceIntegrationService {
     let serviceSubtotal = new Decimal(0);
 
     for (const line of sale.lines) {
-      if (line.product.type === ProductType.PRODUCT) {
+      if (line.variant?.product?.type === ProductType.PRODUCT) {
         productSubtotal = productSubtotal.plus(line.lineTotal);
-      } else if (line.product.type === ProductType.SERVICE) {
+      } else if (line.variant?.product?.type === ProductType.SERVICE) {
         serviceSubtotal = serviceSubtotal.plus(line.lineTotal);
       }
     }

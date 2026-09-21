@@ -18,20 +18,35 @@ export class SalesRepository {
   }
 
   async createSale(data: Prisma.SaleUncheckedCreateInput): Promise<Sale> {
-    return this.client.sale.create({ data, include: { lines: true, payments: true } });
+    return this.client.sale.create({ 
+      data, 
+      include: { 
+        lines: { include: { variant: { include: { product: true } } } }, 
+        payments: true,
+        customer: true 
+      } 
+    });
   }
 
   async findById(organizationId: string, id: string): Promise<Sale | null> {
     return this.client.sale.findUnique({
       where: { id, organizationId },
-      include: { lines: true, payments: true },
+      include: { 
+        lines: { include: { variant: { include: { product: true } } } }, 
+        payments: true,
+        customer: true
+      },
     });
   }
 
   async findByIdempotencyKey(organizationId: string, idempotencyKey: string): Promise<Sale | null> {
     return this.client.sale.findUnique({
       where: { organizationId_idempotencyKey: { organizationId, idempotencyKey } },
-      include: { lines: true, payments: true },
+      include: { 
+        lines: { include: { variant: { include: { product: true } } } }, 
+        payments: true,
+        customer: true 
+      },
     });
   }
 

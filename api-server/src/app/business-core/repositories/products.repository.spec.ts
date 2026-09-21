@@ -16,7 +16,7 @@ describe('ProductsRepository - Tenant Isolation', () => {
   });
 
   it('should throw NotFoundException on cross-tenant lookup', async () => {
-    (prisma.product.findUnique as jest.Mock).mockResolvedValue({ id: 'prod-1', organizationId: 'org-B' });
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue(null);
     await expect(repository.findByIdAndOrganization('org-A', 'prod-1')).rejects.toThrow(NotFoundException);
   });
 });

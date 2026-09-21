@@ -33,12 +33,12 @@ export class InventoryMovementsRepository {
     });
   }
   
-  async findManyByOrganization(organizationId: string, params: { warehouseId?: string; productId?: string; skip?: number; take?: number } = {}): Promise<InventoryMovement[]> {
+  async findManyByOrganization(organizationId: string, params: { warehouseId?: string; variantId?: string; skip?: number; take?: number } = {}): Promise<InventoryMovement[]> {
     return this.client.inventoryMovement.findMany({
       where: {
         organizationId,
         ...(params.warehouseId && { warehouseId: params.warehouseId }),
-        ...(params.productId && { productId: params.productId }),
+        ...(params.variantId && { variantId: params.variantId }),
       },
       skip: params.skip,
       take: params.take,

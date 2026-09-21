@@ -1,36 +1,73 @@
-import { Controller, Get, Post, Put, Param, Body, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Delete,
+  Query,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { ProductsService } from '../services/products.service';
+import { CreateProductDto } from '../dto/create-product.dto';
+import { FilterProductDto } from '../dto/filter-product.dto';
+import { BulkProductOperationDto } from '../dto/bulk-product.dto';
+import { Prisma } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { OrganizationContextGuard } from '../../common/guards/organization-context.guard';
 import { PermissionsGuard } from '../../iam/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 
-@Controller('business-core/products')
 @UseGuards(JwtAuthGuard, OrganizationContextGuard, PermissionsGuard)
+@Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @RequirePermissions('businesscore.products.manage')
-  async create(@Request() req, @Body() body: any) {
-    return this.productsService.create(req.user.organizationId, body);
+  @RequirePermissions('catalog.manage')
+  create(@Request() req, @Body() createProductDto: CreateProductDto) {
+    const organizationId = req.user.organizationId;
+    return this.productsService.create(organizationId, createProductDto);
   }
 
   @Get()
-  @RequirePermissions('businesscore.products.view')
-  async findAll(@Request() req) {
-    return this.productsService.findAll(req.user.organizationId);
+  @RequirePermissions('catalog.view')
+  findAll(@Request() req, @Query() filterDto: FilterProductDto) {
+    const organizationId = req.user.organizationId;
+    return this.productsService.findAll(organizationId, filterDto);
   }
 
   @Get(':id')
-  @RequirePermissions('businesscore.products.view')
-  async findOne(@Request() req, @Param('id') id: string) {
-    return this.productsService.findOne(req.user.organizationId, id);
+  @RequirePermissions('catalog.view')
+  findOne(@Request() req, @Param('id') id: string) {
+    const organizationId = req.user.organizationId;
+    return this.productsService.findOne(organizationId, id);
   }
 
-  @Put(':id')
-  @RequirePermissions('businesscore.products.manage')
-  async update(@Request() req, @Param('id') id: string, @Body() body: any) {
-    return this.productsService.update(req.user.organizationId, id, body);
+  @Patch(':id')
+  @RequirePermissions('catalog.manage')
+  update(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() updateProductDto: Prisma.ProductUpdateInput,
+  ) {
+    const organizationId = req.user.organizationId;
+    return this.productsService.update(organizationId, id, updateProductDto);
+  }
+
+  @Post('bulk')
+  @RequirePermissions('catalog.manage')
+  bulkOperation(@Request() req, @Body() bulkDto: BulkProductOperationDto) {
+    const organizationId = req.user.organizationId;
+    return this.productsService.bulkOperation(organizationId, bulkDto);
+  }
+
+  @Delete(':id')
+  @RequirePermissions('catalog.manage')
+  archive(@Request() req, @Param('id') id: string) {
+    const organizationId = req.user.organizationId;
+    return this.productsService.archive(organizationId, id);
   }
 }

@@ -85,7 +85,7 @@ describe('FinanceIntegrationService', () => {
         { amount: '1000', method: PaymentMethod.CASH }
       ],
       lines: [
-        { lineTotal: '1000', product: { type: ProductType.PRODUCT } }
+        { lineTotal: '1000', variant: { product: { type: ProductType.PRODUCT } } }
       ]
     });
 

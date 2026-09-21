@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InventoryMovementsRepository } from './inventory-movements.repository';
 import { StockBalancesRepository } from './stock-balances.repository';
 import { ProductsService } from '../business-core/services/products.service';
+import { VariantsService } from '../business-core/services/variants.service';
 import { WarehousesService } from '../operational-structure/warehouses/warehouses.service';
 import { Prisma, MovementType } from '@prisma/client';
 
@@ -11,29 +12,31 @@ export class InventoryService {
     private readonly movementsRepo: InventoryMovementsRepository,
     private readonly balancesRepo: StockBalancesRepository,
     private readonly productsService: ProductsService,
+    private readonly variantsService: VariantsService,
     private readonly warehousesService: WarehousesService,
   ) {}
 
-  async getBalances(organizationId: string, warehouseId?: string, productId?: string) {
-    return this.balancesRepo.findManyByOrganization(organizationId, { warehouseId, productId });
+  async getBalances(organizationId: string, warehouseId?: string, variantId?: string, productId?: string) {
+    return this.balancesRepo.findManyByOrganization(organizationId, { warehouseId, variantId, productId });
   }
 
-  async getMovements(organizationId: string, warehouseId?: string, productId?: string) {
-    return this.movementsRepo.findManyByOrganization(organizationId, { warehouseId, productId });
+  async getMovements(organizationId: string, warehouseId?: string, variantId?: string) {
+    return this.movementsRepo.findManyByOrganization(organizationId, { warehouseId, variantId });
   }
 
-  private async validateDependencies(organizationId: string, warehouseId: string, productId: string) {
+  private async validateDependencies(organizationId: string, warehouseId: string, variantId: string) {
     const warehouse = await this.warehousesService.findOne(organizationId, warehouseId);
     if (!warehouse.isActive) {
       throw new BadRequestException(`Warehouse ${warehouseId} is inactive.`);
     }
 
-    const product = await this.productsService.findOne(organizationId, productId);
+    const variant = await this.variantsService.findOne(organizationId, variantId);
+    const product = await this.productsService.findOne(organizationId, variant.productId);
     if (product.type === 'SERVICE') {
-      throw new BadRequestException(`Product ${productId} is a SERVICE and cannot have physical stock.`);
+      throw new BadRequestException(`Product ${variantId} is a SERVICE and cannot have physical stock.`);
     }
     if (!product.isActive) {
-      throw new BadRequestException(`Product ${productId} is inactive.`);
+      throw new BadRequestException(`Product ${variantId} is inactive.`);
     }
   }
 
@@ -41,7 +44,7 @@ export class InventoryService {
     organizationId: string,
     data: {
       warehouseId: string;
-      productId: string;
+      variantId: string;
       quantity: Prisma.Decimal | number;
       type: 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT';
       referenceType?: string;
@@ -60,14 +63,14 @@ export class InventoryService {
       throw new BadRequestException('Quantity must be greater than zero.');
     }
 
-    await this.validateDependencies(organizationId, data.warehouseId, data.productId);
+    await this.validateDependencies(organizationId, data.warehouseId, data.variantId);
 
     return this.movementsRepo.runTransaction(async () => {
       // 1. Update Balance
       if (data.type === 'ADJUSTMENT_IN') {
-        await this.balancesRepo.upsertStock(organizationId, data.warehouseId, data.productId, data.quantity);
+        await this.balancesRepo.upsertStock(organizationId, data.warehouseId, data.variantId, data.quantity);
       } else {
-        await this.balancesRepo.decrementStock(organizationId, data.warehouseId, data.productId, data.quantity);
+        await this.balancesRepo.decrementStock(organizationId, data.warehouseId, data.variantId, data.quantity);
       }
 
       // 2. Create Movement
@@ -75,7 +78,7 @@ export class InventoryService {
         data: {
           organizationId,
           warehouseId: data.warehouseId,
-          productId: data.productId,
+          variantId: data.variantId, // FIXME: API needs to be updated to accept variantId instead of variantId, but for now we map it. Wait, the DTO probably still says variantId. Let's map it.
           type: data.type,
           quantity: data.quantity,
           referenceType: data.referenceType,
@@ -93,7 +96,7 @@ export class InventoryService {
     data: {
       sourceWarehouseId: string;
       destinationWarehouseId: string;
-      productId: string;
+      variantId: string;
       quantity: Prisma.Decimal | number;
       referenceType?: string;
       referenceId?: string;
@@ -118,21 +121,21 @@ export class InventoryService {
       }
     }
 
-    await this.validateDependencies(organizationId, data.sourceWarehouseId, data.productId);
-    await this.validateDependencies(organizationId, data.destinationWarehouseId, data.productId);
+    await this.validateDependencies(organizationId, data.sourceWarehouseId, data.variantId);
+    await this.validateDependencies(organizationId, data.destinationWarehouseId, data.variantId);
 
     return this.movementsRepo.runTransaction(async () => {
       // Outbound from Source
-      await this.balancesRepo.decrementStock(organizationId, data.sourceWarehouseId, data.productId, data.quantity);
+      await this.balancesRepo.decrementStock(organizationId, data.sourceWarehouseId, data.variantId, data.quantity);
 
       // Inbound to Destination
-      await this.balancesRepo.upsertStock(organizationId, data.destinationWarehouseId, data.productId, data.quantity);
+      await this.balancesRepo.upsertStock(organizationId, data.destinationWarehouseId, data.variantId, data.quantity);
 
       const sourceMovement = await this.movementsRepo.createMovement({
         data: {
           organizationId,
           warehouseId: data.sourceWarehouseId,
-          productId: data.productId,
+          variantId: data.variantId,
           type: MovementType.TRANSFER_OUT,
           quantity: data.quantity,
           referenceType: data.referenceType,
@@ -147,7 +150,7 @@ export class InventoryService {
         data: {
           organizationId,
           warehouseId: data.destinationWarehouseId,
-          productId: data.productId,
+          variantId: data.variantId,
           type: MovementType.TRANSFER_IN,
           quantity: data.quantity,
           referenceType: data.referenceType,
@@ -162,10 +165,70 @@ export class InventoryService {
     });
   }
 
+  async createReceipt(
+    organizationId: string,
+    warehouseId: string,
+    items: Array<{ variantId: string; quantity: Prisma.Decimal | number; unitCost: Prisma.Decimal | number }>,
+    referenceId: string,
+    userId: string,
+    idempotencyKeyPrefix?: string,
+  ) {
+    // We assume we are in the Purchase UoW transaction via PRISMA_TX_ALS automatically.
+    const movements = [];
+    
+    for (const item of items) {
+      const quantity = new Prisma.Decimal(item.quantity);
+      const unitCost = new Prisma.Decimal(item.unitCost);
+      
+      const variant = await this.variantsService.findOne(organizationId, item.variantId);
+      
+      // Calculate WAC
+      const currentBalance = await this.balancesRepo.getStockBalance(organizationId, warehouseId, item.variantId);
+      const currentQty = currentBalance ? currentBalance.quantity : new Prisma.Decimal(0);
+      const oldQty = currentQty.greaterThanOrEqualTo(0) ? currentQty : new Prisma.Decimal(0);
+      const oldWac = variant.costPrice ? new Prisma.Decimal(variant.costPrice) : new Prisma.Decimal(0);
+      
+      const totalOldValue = oldQty.times(oldWac);
+      const totalNewValue = quantity.times(unitCost);
+      const newTotalQty = oldQty.plus(quantity);
+      
+      let newWac = unitCost;
+      if (newTotalQty.greaterThan(0)) {
+        newWac = totalOldValue.plus(totalNewValue).dividedBy(newTotalQty).toDecimalPlaces(4);
+      }
+
+      // Update variant costPrice (WAC)
+      await this.variantsService.update(organizationId, item.variantId, {
+        costPrice: newWac,
+      });
+
+      // Update StockBalance
+      await this.balancesRepo.upsertStock(organizationId, warehouseId, item.variantId, quantity);
+      
+      // Create movement
+      const movement = await this.movementsRepo.createMovement({
+        data: {
+          organizationId,
+          warehouseId,
+          variantId: item.variantId,
+          type: MovementType.RECEIPT,
+          quantity: quantity,
+          unitCost: unitCost,
+          referenceType: 'PURCHASE',
+          referenceId: referenceId,
+          idempotencyKey: idempotencyKeyPrefix ? `${idempotencyKeyPrefix}-${item.variantId}` : undefined,
+          createdByUserId: userId,
+        },
+      });
+      movements.push(movement);
+    }
+    return movements;
+  }
+
   async deductStockForSale(
     organizationId: string,
     warehouseId: string,
-    items: Array<{ productId: string; quantity: Prisma.Decimal | number }>,
+    items: Array<{ variantId: string; quantity: Prisma.Decimal | number }>,
     saleId: string,
     userId: string,
   ) {
@@ -174,13 +237,13 @@ export class InventoryService {
     
     const movements = [];
     for (const item of items) {
-      await this.balancesRepo.decrementStock(organizationId, warehouseId, item.productId, item.quantity);
+      await this.balancesRepo.decrementStock(organizationId, warehouseId, item.variantId, item.quantity);
       
       const movement = await this.movementsRepo.createMovement({
         data: {
           organizationId,
           warehouseId,
-          productId: item.productId,
+          variantId: item.variantId,
           type: MovementType.ISSUE,
           quantity: item.quantity,
           referenceType: 'SALE',

@@ -8,8 +8,9 @@ import { DesignState, defaultDesignState } from "../../../../components/design-s
 import { DesignCanvas } from "../../../../components/design-studio/primitives"
 import { TEMPLATES } from "../../../../components/design-studio/TemplateRegistry"
 
-export default function DesignStudioEditor({ params }: { params: { id: string } }) {
-  const isNew = params.id === 'new'
+export default function DesignStudioEditor({ params }: { params: Promise<{ id: string }> }) {
+  const unwrappedParams = React.use(params)
+  const isNew = unwrappedParams.id === 'new'
   const router = useRouter()
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
@@ -23,7 +24,7 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
     if (!isNew) {
       fetchDesign()
     }
-  }, [params.id])
+  }, [unwrappedParams.id])
 
   const fetchServices = async () => {
     try {
@@ -35,7 +36,7 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
   const fetchDesign = async () => {
     try {
       const res = await api.get('/design-studio/designs')
-      const design = res.data.find((d: any) => d.id === params.id)
+      const design = res.data.find((d: any) => d.id === unwrappedParams.id)
       if (design && design.settings && design.settings.version) {
         setState({
           ...defaultDesignState, // fallback for missing fields in old designs
@@ -80,7 +81,7 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
         toast.success("Created successfully")
         router.push('/admin/design-studio')
       } else {
-        await api.put(`/design-studio/designs/${params.id}`, payload)
+        await api.put(`/design-studio/designs/${unwrappedParams.id}`, payload)
         toast.success("Saved successfully")
       }
     } catch (err) {
@@ -120,7 +121,9 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
             price: Number(s.sellingPrice), 
             unit: s.unit?.name || null,
             categoryName: s.category?.name || 'Uncategorized',
-            displayOrder: prev.services.length 
+            displayOrder: prev.services.length,
+            description: s.description || null,
+            imageUrl: s.imageUrl || null
           }] 
         }
       }
@@ -135,7 +138,7 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
           const newServices = prev.services.map(ps => {
              const found = updatedCatalog.find((c: any) => c.id === ps.serviceId);
              if (found) {
-                return { ...ps, price: Number(found.sellingPrice), name: found.name, unit: found.unit?.name || ps.unit };
+                return { ...ps, price: Number(found.sellingPrice), name: found.name, unit: found.unit?.name || ps.unit, description: found.description || ps.description, imageUrl: found.imageUrl || ps.imageUrl };
              }
              return ps;
           });
@@ -242,20 +245,23 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
                   <label className="block text-xs font-semibold text-slate-600 uppercase">Select Services</label>
                   <button onClick={handleRefreshServicePrices} className="text-xs text-primary hover:underline">Refresh Prices</button>
                </div>
-               {services.map(s => (
-                  <label key={s.id} className="flex items-center space-x-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
-                    <input 
-                      type="checkbox" 
-                      checked={!!state.services.find(x => x.serviceId === s.id)} 
-                      onChange={() => toggleService(s)} 
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{s.name}</p>
-                      <p className="text-xs text-slate-500">৳{Number(s.sellingPrice)}</p>
-                    </div>
-                  </label>
-               ))}
+               
+               <div className="space-y-2">
+                 {services.map(s => (
+                    <label key={s.id} className="flex items-center space-x-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
+                      <input 
+                        type="checkbox" 
+                        checked={!!state.services.find(x => x.serviceId === s.id)} 
+                        onChange={() => toggleService(s)} 
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{s.name}</p>
+                        <p className="text-xs text-slate-500">৳{Number(s.sellingPrice)}</p>
+                      </div>
+                    </label>
+                 ))}
+               </div>
             </div>
           )}
 
@@ -305,8 +311,9 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
                <div>
                   <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Font Family</label>
                   <select value={state.typography.fontFamily} onChange={e => updateState('typography', 'fontFamily', e.target.value)} className="w-full border rounded-md px-3 py-2 text-sm">
-                    <option value='"Noto Sans Bengali", sans-serif'>Noto Sans Bengali (Primary)</option>
-                    <option value='"Inter", sans-serif'>Inter (English)</option>
+                    <option value='"Inter", "Kalpurush", sans-serif'>Inter / Kalpurush (Default)</option>
+                    <option value='"Outfit", "Kalpurush", sans-serif'>Outfit / Kalpurush</option>
+                    <option value='"Noto Sans Bengali", sans-serif'>Noto Sans Bengali</option>
                     <option value='"Roboto", sans-serif'>Roboto</option>
                   </select>
                </div>
@@ -340,6 +347,14 @@ export default function DesignStudioEditor({ params }: { params: { id: string } 
                <div className="flex items-center space-x-2 mt-4 pt-4 border-t">
                   <input type="checkbox" checked={state.layout.safeAreaEnabled} onChange={e => updateState('layout', 'safeAreaEnabled', e.target.checked)} id="safeArea" />
                   <label htmlFor="safeArea" className="text-sm font-medium">Show Print Safe Area</label>
+               </div>
+               <div className="flex items-center space-x-2 mt-2">
+                  <input type="checkbox" checked={state.layout.showDescriptions} onChange={e => updateState('layout', 'showDescriptions', e.target.checked)} id="showDescriptions" />
+                  <label htmlFor="showDescriptions" className="text-sm font-medium">Show Service Descriptions</label>
+               </div>
+               <div className="flex items-center space-x-2 mt-2">
+                  <input type="checkbox" checked={state.layout.showServiceImages} onChange={e => updateState('layout', 'showServiceImages', e.target.checked)} id="showServiceImages" />
+                  <label htmlFor="showServiceImages" className="text-sm font-medium">Show Service Images</label>
                </div>
             </div>
           )}

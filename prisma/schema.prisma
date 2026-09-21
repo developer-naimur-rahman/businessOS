@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 // ---------------------------------------------------------
@@ -41,6 +42,16 @@ model Organization {
   outboxEvents              OutboxEvent[]
   financeIntegrationConfigs FinanceIntegrationConfig[]
   bannerDesigns             BannerDesign[]
+  productVariants           ProductVariant[]
+  variantBarcodes           ProductVariantBarcode[]
+  productMedia              ProductMedia[]
+  attributes                Attribute[]
+  attributeValues           AttributeValue[]
+  variantAttributes         VariantAttribute[]
+  saleLines                 SaleLine[]
+  purchases                 Purchase[]
+  purchaseLines             PurchaseLine[]
+  purchasePayments          PurchasePayment[]
 }
 
 model BusinessUnit {
@@ -56,6 +67,7 @@ model BusinessUnit {
   branches     Branch[]
   journalLines JournalLine[]
 
+  @@unique([organizationId, id])
   @@unique([organizationId, name])
 }
 
@@ -73,13 +85,15 @@ model Branch {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
-  journalLines JournalLine[]
-  warehouses   Warehouse[]
-  sales        Sale[]
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  businessUnit  BusinessUnit?  @relation(fields: [organizationId, businessUnitId], references: [organizationId, id])
+  journalLines  JournalLine[]
+  warehouses    Warehouse[]
+  sales         Sale[]
   bannerDesigns BannerDesign[]
+  purchases     Purchase[]
 
+  @@unique([organizationId, id])
   @@unique([organizationId, name])
   @@unique([organizationId, code])
 }
@@ -97,11 +111,13 @@ model Warehouse {
   updatedAt      DateTime @updatedAt
 
   organization       Organization        @relation(fields: [organizationId], references: [id])
-  branch             Branch              @relation(fields: [branchId], references: [id])
+  branch             Branch              @relation(fields: [organizationId, branchId], references: [organizationId, id])
   inventoryMovements InventoryMovement[]
   stockBalances      StockBalance[]
   sales              Sale[]
+  purchases          Purchase[]
 
+  @@unique([organizationId, id])
   @@unique([organizationId, code])
   @@index([branchId])
 }
@@ -402,6 +418,7 @@ model Customer {
   organization Organization @relation(fields: [organizationId], references: [id])
   sales        Sale[]
 
+  @@unique([organizationId, id])
   @@unique([organizationId, code])
   @@index([organizationId, status])
 }
@@ -420,7 +437,9 @@ model Supplier {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
+  purchases    Purchase[]
 
+  @@unique([organizationId, id])
   @@unique([organizationId, code])
   @@index([organizationId, status])
 }
@@ -436,6 +455,7 @@ model Unit {
   organization Organization @relation(fields: [organizationId], references: [id])
   products     Product[]
 
+  @@unique([organizationId, id])
   @@unique([organizationId, name])
 }
 
@@ -445,15 +465,16 @@ model Category {
   parentId       String?
   name           String
   description    String?
-  displayOrder   Int         @default(0)
-  createdAt      DateTime    @default(now())
+  displayOrder   Int      @default(0)
+  createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
-  parent       Category?    @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  parent       Category?    @relation("CategoryHierarchy", fields: [organizationId, parentId], references: [organizationId, id])
   children     Category[]   @relation("CategoryHierarchy")
   products     Product[]
 
+  @@unique([organizationId, id])
   @@unique([organizationId, name])
 }
 
@@ -476,19 +497,24 @@ model Product {
   costPrice      Decimal?    @db.Decimal(19, 4)
   isActive       Boolean     @default(true)
   displayOrder   Int         @default(0)
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
 
-  organization       Organization        @relation(fields: [organizationId], references: [id])
-  category           Category?           @relation(fields: [categoryId], references: [id])
-  unit               Unit?               @relation(fields: [unitId], references: [id])
-  inventoryMovements InventoryMovement[]
-  stockBalances      StockBalance[]
-  saleLines          SaleLine[]
+  status          ProductStatus @default(DRAFT)
+  isOnlineVisible Boolean       @default(false)
+  isPosVisible    Boolean       @default(true)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  category     Category?    @relation(fields: [organizationId, categoryId], references: [organizationId, id])
+  unit         Unit?        @relation(fields: [organizationId, unitId], references: [organizationId, id])
+
+  variants ProductVariant[]
+  media    ProductMedia[]
+
+  @@unique([organizationId, id])
   @@unique([organizationId, code])
-  @@index([organizationId, isActive])
-  @@index([organizationId, categoryId])
+  @@index([organizationId, status])
 }
 
 // ---------------------------------------------------------
@@ -537,6 +563,8 @@ model FinanceIntegrationConfig {
   salesRevenueAccountId       String?
   serviceRevenueAccountId     String?
   accountsReceivableAccountId String?
+  accountsPayableAccountId    String?
+  inventoryAssetAccountId     String?
 
   organization Organization @relation(fields: [organizationId], references: [id])
 }
@@ -556,28 +584,31 @@ enum MovementType {
 
 /// The authoritative source of truth for inventory. Immutable.
 model InventoryMovement {
-  id             String       @id @default(uuid())
+  id             String @id @default(uuid())
   organizationId String
   warehouseId    String
-  productId      String
-  type           MovementType
-  quantity       Decimal      @db.Decimal(19, 4) // Always positive
-  movementDate   DateTime     @default(now())
+  variantId      String @default("var-123")
 
-  referenceType   String? // e.g., 'MANUAL_ADJUSTMENT', 'TRANSFER'
+  type         MovementType
+  quantity     Decimal      @db.Decimal(19, 4)
+  unitCost     Decimal?     @db.Decimal(19, 4)
+  serialNumber String?
+  movementDate DateTime     @default(now())
+
+  referenceType   String?
   referenceId     String?
-  idempotencyKey  String? // Safe replay prevention
+  idempotencyKey  String?
   notes           String?
   createdByUserId String?
   createdAt       DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
-  product      Product      @relation(fields: [productId], references: [id])
-  createdBy    User?        @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  variant      ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
+  warehouse    Warehouse      @relation(fields: [organizationId, warehouseId], references: [organizationId, id])
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  createdBy    User?          @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, idempotencyKey])
-  @@index([organizationId, warehouseId, productId])
+  @@index([organizationId, warehouseId, variantId])
   @@index([organizationId, movementDate])
   @@index([referenceType, referenceId])
 }
@@ -587,15 +618,15 @@ model StockBalance {
   id             String   @id @default(uuid())
   organizationId String
   warehouseId    String
-  productId      String
+  variantId      String   @default("var-123")
   quantity       Decimal  @default(0) @db.Decimal(19, 4)
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
-  product      Product      @relation(fields: [productId], references: [id])
+  organization Organization   @relation(fields: [organizationId], references: [id])
+  warehouse    Warehouse      @relation(fields: [organizationId, warehouseId], references: [organizationId, id])
+  variant      ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
 
-  @@unique([organizationId, warehouseId, productId])
+  @@unique([organizationId, warehouseId, variantId])
 }
 
 // ---------------------------------------------------------
@@ -656,9 +687,9 @@ model Sale {
   updatedAt       DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
-  branch       Branch       @relation(fields: [branchId], references: [id])
-  warehouse    Warehouse    @relation(fields: [warehouseId], references: [id])
-  customer     Customer?    @relation(fields: [customerId], references: [id])
+  branch       Branch       @relation(fields: [organizationId, branchId], references: [organizationId, id])
+  warehouse    Warehouse    @relation(fields: [organizationId, warehouseId], references: [organizationId, id])
+  customer     Customer?    @relation(fields: [organizationId, customerId], references: [organizationId, id])
   createdBy    User?        @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   lines          SaleLine[]
@@ -666,6 +697,7 @@ model Sale {
   fiscalPeriod   FiscalPeriod? @relation(fields: [fiscalPeriodId], references: [id])
   fiscalPeriodId String?
 
+  @@unique([organizationId, id])
   @@unique([organizationId, saleNumber])
   @@unique([organizationId, idempotencyKey])
   @@index([organizationId, saleDate])
@@ -674,17 +706,23 @@ model Sale {
 }
 
 model SaleLine {
-  id           String  @id @default(uuid())
-  saleId       String
-  productId    String
+  id             String @id @default(uuid())
+  organizationId String @default("org-123")
+  saleId         String
+  variantId      String @default("var-123")
+
   quantity     Decimal @db.Decimal(19, 4)
   unitPrice    Decimal @db.Decimal(19, 4)
   discount     Decimal @default(0) @db.Decimal(19, 4)
   lineSubtotal Decimal @db.Decimal(19, 4)
   lineTotal    Decimal @db.Decimal(19, 4)
 
-  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  productNameSnapshot String @default("")
+  skuSnapshot         String @default("")
+
+  sale         Sale           @relation(fields: [organizationId, saleId], references: [organizationId, id], onDelete: Cascade)
+  variant      ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
+  organization Organization   @relation(fields: [organizationId], references: [id])
 }
 
 model SalePayment {
@@ -703,27 +741,225 @@ model SalePayment {
 // ---------------------------------------------------------
 
 model BannerDesign {
-  id             String   @id @default(uuid())
+  id             String  @id @default(uuid())
   organizationId String
   branchId       String?
   name           String
   type           String
-  
+
   // Dimensions
-  width          Decimal  @db.Decimal(10, 2)
-  height         Decimal  @db.Decimal(10, 2)
-  unit           String   // e.g., 'IN', 'FT', 'MM', 'CM'
-  
+  width  Decimal @db.Decimal(10, 2)
+  height Decimal @db.Decimal(10, 2)
+  unit   String // e.g., 'IN', 'FT', 'MM', 'CM'
+
   // Design details
-  template       String
-  settings       Json     // Follows DesignSettings interface in TypeScript
+  template String
+  settings Json // Follows DesignSettings interface in TypeScript
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  branch         Branch?      @relation(fields: [branchId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  branch       Branch?      @relation(fields: [branchId], references: [id])
 
   @@index([organizationId])
   @@index([branchId])
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum TrackingType {
+  NONE
+  SERIAL
+}
+
+model ProductVariant {
+  id             String @id @default(uuid())
+  organizationId String
+  productId      String
+
+  sku String
+
+  costPrice   Decimal? @db.Decimal(19, 4)
+  retailPrice Decimal  @default(0) @db.Decimal(19, 4)
+  posPrice    Decimal? @db.Decimal(19, 4)
+
+  trackingType  TrackingType  @default(NONE)
+  status        ProductStatus @default(ACTIVE)
+  attributeHash String        @default("")
+
+  isOnlineVisible Boolean?
+  isPosVisible    Boolean?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product      Product      @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  attributes VariantAttribute[]
+  barcodes   ProductVariantBarcode[]
+  media      ProductMedia[]
+
+  stockBalances      StockBalance[]
+  saleLines          SaleLine[]
+  inventoryMovements InventoryMovement[]
+  purchaseLines      PurchaseLine[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, sku])
+  @@unique([productId, attributeHash])
+}
+
+model ProductVariantBarcode {
+  id             String  @id @default(uuid())
+  organizationId String
+  variantId      String
+  barcode        String
+  isActive       Boolean @default(true)
+
+  variant      ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Cascade)
+  organization Organization   @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, barcode])
+}
+
+model Attribute {
+  id             String @id @default(uuid())
+  organizationId String
+  name           String
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  values       AttributeValue[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, name])
+}
+
+model AttributeValue {
+  id             String @id @default(uuid())
+  organizationId String
+  attributeId    String
+  value          String
+
+  attribute    Attribute    @relation(fields: [organizationId, attributeId], references: [organizationId, id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  variants VariantAttribute[]
+
+  @@unique([organizationId, id])
+  @@unique([organizationId, attributeId, value])
+}
+
+model VariantAttribute {
+  organizationId   String
+  variantId        String
+  attributeValueId String
+
+  variant        ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Cascade)
+  attributeValue AttributeValue @relation(fields: [organizationId, attributeValueId], references: [organizationId, id], onDelete: Restrict)
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+
+  @@id([variantId, attributeValueId])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  PDF
+}
+
+model ProductMedia {
+  id             String    @id @default(uuid())
+  organizationId String
+  productId      String
+  variantId      String?
+  url            String
+  type           MediaType @default(IMAGE)
+  displayOrder   Int       @default(0)
+  isPrimary      Boolean   @default(false)
+
+  product      Product         @relation(fields: [organizationId, productId], references: [organizationId, id], onDelete: Cascade)
+  variant      ProductVariant? @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id])
+}
+
+// ---------------------------------------------------------
+// PURCHASE / SUPPLIER OPERATIONS
+// ---------------------------------------------------------
+
+enum PurchaseStatus {
+  DRAFT
+  COMPLETED
+}
+
+model Purchase {
+  id             String         @id @default(uuid())
+  organizationId String
+  supplierId     String
+  branchId       String?
+  warehouseId    String
+  status         PurchaseStatus @default(DRAFT)
+  purchaseDate   DateTime
+  subtotal       Decimal        @default(0) @db.Decimal(19, 4)
+  totalDiscount  Decimal        @default(0) @db.Decimal(19, 4)
+  total          Decimal        @default(0) @db.Decimal(19, 4)
+  idempotencyKey String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  supplier     Supplier     @relation(fields: [organizationId, supplierId], references: [organizationId, id])
+  branch       Branch?      @relation(fields: [organizationId, branchId], references: [organizationId, id])
+  warehouse    Warehouse    @relation(fields: [organizationId, warehouseId], references: [organizationId, id])
+
+  lines    PurchaseLine[]
+  payments PurchasePayment[]
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, purchaseDate])
+  @@index([organizationId, status])
+}
+
+model PurchaseLine {
+  id             String @id @default(uuid())
+  organizationId String
+  purchaseId     String
+  variantId      String
+
+  quantity     Decimal @db.Decimal(19, 4)
+  unitCost     Decimal @db.Decimal(19, 4)
+  discount     Decimal @default(0) @db.Decimal(19, 4)
+  lineSubtotal Decimal @db.Decimal(19, 4)
+  lineTotal    Decimal @db.Decimal(19, 4)
+
+  productNameSnapshot String
+  skuSnapshot         String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchase     Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  variant      ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id], onDelete: Restrict)
+  organization Organization   @relation(fields: [organizationId], references: [id])
+}
+
+model PurchasePayment {
+  id             String        @id @default(uuid())
+  organizationId String
+  purchaseId     String
+  amount         Decimal       @db.Decimal(19, 4)
+  method         PaymentMethod
+  reference      String?
+  paymentDate    DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  purchase     Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
 }

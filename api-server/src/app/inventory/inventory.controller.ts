@@ -13,14 +13,14 @@ export class InventoryController {
 
   @Get('balances')
   @RequirePermissions('inventory.view')
-  async getBalances(@Request() req, @Query('warehouseId') warehouseId?: string, @Query('productId') productId?: string) {
-    return this.inventoryService.getBalances(req.user.organizationId, warehouseId, productId);
+  async getBalances(@Request() req, @Query('warehouseId') warehouseId?: string, @Query('variantId') variantId?: string, @Query('productId') productId?: string) {
+    return this.inventoryService.getBalances(req.user.organizationId, warehouseId, variantId, productId);
   }
 
   @Get('movements')
   @RequirePermissions('inventory.view')
-  async getMovements(@Request() req, @Query('warehouseId') warehouseId?: string, @Query('productId') productId?: string) {
-    return this.inventoryService.getMovements(req.user.organizationId, warehouseId, productId);
+  async getMovements(@Request() req, @Query('warehouseId') warehouseId?: string, @Query('variantId') variantId?: string) {
+    return this.inventoryService.getMovements(req.user.organizationId, warehouseId, variantId);
   }
 
   @Post('adjustments')
@@ -30,7 +30,7 @@ export class InventoryController {
     @Body()
     data: {
       warehouseId: string;
-      productId: string;
+      variantId: string;
       quantity: string | number;
       type: 'ADJUSTMENT_IN' | 'ADJUSTMENT_OUT';
       referenceType?: string;
@@ -54,7 +54,7 @@ export class InventoryController {
     data: {
       sourceWarehouseId: string;
       destinationWarehouseId: string;
-      productId: string;
+      variantId: string;
       quantity: string | number;
       referenceType?: string;
       referenceId?: string;

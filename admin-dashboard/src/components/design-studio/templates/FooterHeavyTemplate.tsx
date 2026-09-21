@@ -11,8 +11,8 @@ export function FooterHeavyTemplate({ state }: { state: DesignState }) {
       </div>
       <div style={{ backgroundColor: state.colors.accent, padding: state.layout.padding, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
          <div>
-           <TextBlock state={state} text={state.content.businessName} type="heading" customColor="#fff" />
-           <TextBlock state={state} text={state.content.address} customColor="#fff" />
+           <TextBlock state={state} text={state.content.businessName} type="heading" color="#ffffff" />
+           <TextBlock state={state} text={state.content.address} color="rgba(255,255,255,0.8)" />
          </div>
          <LogoBlock state={state} />
       </div>

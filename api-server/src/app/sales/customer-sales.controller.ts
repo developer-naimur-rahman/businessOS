@@ -42,7 +42,7 @@ export class CustomerSalesController {
       branchId: branch.id,
       warehouseId: warehouse.id,
       lines: data.lines ? data.lines.map((line: any) => ({
-        productId: line.productId,
+        variantId: line.variantId,
         quantity: line.quantity,
         discount: line.discount || 0,
       })) : [],
@@ -69,7 +69,7 @@ export class CustomerSalesController {
       },
       include: {
         lines: {
-          include: { product: true }
+          include: { variant: { include: { product: true } } }
         },
         payments: true
       },
@@ -92,7 +92,7 @@ export class CustomerSalesController {
       },
       include: {
         lines: {
-          include: { product: true }
+          include: { variant: { include: { product: true } } }
         },
         payments: true
       }

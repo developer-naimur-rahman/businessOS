@@ -10,37 +10,41 @@ export class StockBalancesRepository {
     return this.prismaManager.client;
   }
 
-  async findByProductAndWarehouse(organizationId: string, warehouseId: string, productId: string): Promise<StockBalance | null> {
+  async getStockBalance(organizationId: string, warehouseId: string, variantId: string): Promise<StockBalance | null> {
     return this.client.stockBalance.findUnique({
       where: {
-        organizationId_warehouseId_productId: {
+        organizationId_warehouseId_variantId: {
           organizationId,
           warehouseId,
-          productId,
+          variantId: variantId,
         },
       },
     });
   }
 
-  async findManyByOrganization(organizationId: string, params: { warehouseId?: string; productId?: string; skip?: number; take?: number } = {}): Promise<StockBalance[]> {
+  async findManyByOrganization(organizationId: string, params: { warehouseId?: string; variantId?: string; productId?: string; skip?: number; take?: number } = {}): Promise<StockBalance[]> {
     return this.client.stockBalance.findMany({
       where: {
         organizationId,
         ...(params.warehouseId && { warehouseId: params.warehouseId }),
-        ...(params.productId && { productId: params.productId }),
+        ...(params.variantId && { variantId: params.variantId }),
+        ...(params.productId && { variant: { productId: params.productId } }),
+      },
+      include: {
+        warehouse: true // Include warehouse details for the frontend
       },
       skip: params.skip,
       take: params.take,
     });
   }
 
-  async upsertStock(organizationId: string, warehouseId: string, productId: string, quantity: Prisma.Decimal | number) {
+  async upsertStock(organizationId: string, warehouseId: string, variantId: string, quantity: Prisma.Decimal | number) {
     return this.client.stockBalance.upsert({
       where: {
-        organizationId_warehouseId_productId: {
+        organizationId_warehouseId_variantId: {
           organizationId,
           warehouseId,
-          productId,
+          variantId: variantId,
         },
       },
       update: {
@@ -49,18 +53,18 @@ export class StockBalancesRepository {
       create: {
         organizationId,
         warehouseId,
-        productId,
+        variantId: variantId,
         quantity,
       },
     });
   }
 
-  async decrementStock(organizationId: string, warehouseId: string, productId: string, quantity: Prisma.Decimal | number) {
+  async decrementStock(organizationId: string, warehouseId: string, variantId: string, quantity: Prisma.Decimal | number) {
     const res = await this.client.stockBalance.updateMany({
       where: {
         organizationId,
         warehouseId,
-        productId,
+        variantId: variantId,
         quantity: { gte: quantity },
       },
       data: {

@@ -104,7 +104,9 @@ export class DesignStudioService {
       price: Number(p.sellingPrice),
       unit: p.unit?.name || null,
       categoryName: p.category?.name || 'Uncategorized',
-      displayOrder: idx
+      displayOrder: idx,
+      description: p.description || null,
+      imageUrl: p.imageUrl || null
     }));
 
     return {

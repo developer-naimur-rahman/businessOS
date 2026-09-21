@@ -44,15 +44,26 @@ export interface DesignState {
     logoPlacement: 'top-left' | 'top-center' | 'top-right' | 'hidden';
     safeAreaEnabled: boolean;
     serviceSpacing: string;
+    showDescriptions: boolean;
+    showServiceImages: boolean;
   };
   services: {
     serviceId: string;
     name: string;
     price: number;
     unit: string | null;
-    categoryName?: string;
+    categoryName: string;
     displayOrder: number;
+    description: string | null;
+    imageUrl: string | null;
   }[];
+  aesthetics: {
+    dropShadow: 'none' | 'sm' | 'md' | 'lg' | 'xl';
+    cornerRadius: 'none' | 'sm' | 'md' | 'lg' | 'pill';
+    glassmorphism: boolean;
+    overlayOpacity: number;
+    gradientBackground: string | null;
+  };
 }
 
 export const defaultDesignState: DesignState = {
@@ -77,7 +88,7 @@ export const defaultDesignState: DesignState = {
     backgroundImageUrl: null,
   },
   typography: {
-    fontFamily: '"Noto Sans Bengali", sans-serif',
+    fontFamily: '"Inter", "Kalpurush", sans-serif',
     headingSize: '1.5rem',
     bodySize: '1rem',
     priceSize: '1.25rem',
@@ -101,6 +112,15 @@ export const defaultDesignState: DesignState = {
     logoPlacement: 'top-center',
     safeAreaEnabled: true,
     serviceSpacing: '0.5em',
+    showDescriptions: true,
+    showServiceImages: true,
   },
   services: [],
+  aesthetics: {
+    dropShadow: 'md',
+    cornerRadius: 'md',
+    glassmorphism: false,
+    overlayOpacity: 0.5,
+    gradientBackground: null,
+  }
 };

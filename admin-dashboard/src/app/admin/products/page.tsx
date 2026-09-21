@@ -1,13 +1,28 @@
 "use client"
 import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
-import { Plus, Search, Filter, MoreHorizontal, Package, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Filter, Edit, Trash2, Package } from "lucide-react"
 import { MediaImage } from "../../../components/ui/media-image"
 import { Modal } from "../../../components/ui/modal"
+import { useRouter } from "next/navigation"
+
+import { ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react"
 
 export default function AdminProductsPage() {
+  const router = useRouter()
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Pagination & Filtering state
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [search, setSearch] = useState('')
+  const [totalPages, setTotalPages] = useState(1)
+  
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false)
+
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [formData, setFormData] = useState({
@@ -16,9 +31,17 @@ export default function AdminProductsPage() {
   })
 
   const fetchProducts = async () => {
+    setLoading(true)
     try {
-      const res = await api.get('/business-core/products')
-      setProducts(res.data)
+      const res = await api.get('/business-core/products', {
+        params: { page, pageSize, search }
+      })
+      if (res.data.items) {
+        setProducts(res.data.items)
+        setTotalPages(res.data.meta.totalPages || 1)
+      } else {
+        setProducts(res.data)
+      }
     } catch (err) {
       console.error("Failed to load products", err)
     } finally {
@@ -27,8 +50,11 @@ export default function AdminProductsPage() {
   }
 
   useEffect(() => {
-    fetchProducts()
-  }, [])
+    const timer = setTimeout(() => {
+      fetchProducts()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [page, pageSize, search])
 
   const handleOpenModal = (product: any = null) => {
     if (product) {
@@ -57,7 +83,7 @@ export default function AdminProductsPage() {
     e.preventDefault()
     try {
       if (editingProduct) {
-        await api.put(`/business-core/products/${editingProduct.id}`, formData)
+        await api.patch(`/business-core/products/${editingProduct.id}`, formData)
       } else {
         await api.post('/business-core/products', formData)
       }
@@ -65,6 +91,46 @@ export default function AdminProductsPage() {
       fetchProducts()
     } catch (err) {
       alert("Failed to save product")
+    }
+  }
+
+  const handleArchive = async (id: string) => {
+    if (!confirm('Are you sure you want to archive this product?')) return
+    try {
+      await api.delete(`/business-core/products/${id}`)
+      fetchProducts()
+    } catch (err) {
+      alert("Failed to archive product")
+    }
+  }
+
+  const toggleSelection = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === products.length && products.length > 0) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(products.map(p => p.id)))
+    }
+  }
+
+  const handleBulkAction = async (action: string) => {
+    if (selectedIds.size === 0) return
+    try {
+      await api.post('/business-core/products/bulk', {
+        productIds: Array.from(selectedIds),
+        action
+      })
+      setSelectedIds(new Set())
+      setIsBulkActionMenuOpen(false)
+      fetchProducts()
+    } catch (err) {
+      alert('Bulk action failed')
     }
   }
 
@@ -92,9 +158,35 @@ export default function AdminProductsPage() {
             type="text" 
             placeholder="Search products..." 
             className="control-input pl-9 h-10 w-full"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
+          {selectedIds.size > 0 && (
+            <div className="relative">
+              <button 
+                onClick={() => setIsBulkActionMenuOpen(!isBulkActionMenuOpen)}
+                className="control-button-secondary h-10 px-3 flex items-center bg-blue-50 text-blue-700 border-blue-200"
+              >
+                {selectedIds.size} Selected <ChevronLeft className="w-4 h-4 ml-2 -rotate-90" />
+              </button>
+              {isBulkActionMenuOpen && (
+                <div className="absolute top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-10">
+                  <button onClick={() => handleBulkAction('ACTIVATE')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Activate Selected</button>
+                  <button onClick={() => handleBulkAction('DEACTIVATE')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Deactivate Selected</button>
+                  <div className="border-t border-slate-100 my-1"></div>
+                  <button onClick={() => handleBulkAction('SET_ONLINE_VISIBLE')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Set Online Visible</button>
+                  <button onClick={() => handleBulkAction('SET_ONLINE_HIDDEN')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Set Online Hidden</button>
+                  <div className="border-t border-slate-100 my-1"></div>
+                  <button onClick={() => handleBulkAction('SET_POS_VISIBLE')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Set POS Visible</button>
+                  <button onClick={() => handleBulkAction('SET_POS_HIDDEN')} className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Set POS Hidden</button>
+                  <div className="border-t border-slate-100 my-1"></div>
+                  <button onClick={() => handleBulkAction('ARCHIVE')} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Archive Selected</button>
+                </div>
+              )}
+            </div>
+          )}
           <button className="control-button-secondary h-10 px-3 w-full md:w-auto">
             <Filter className="w-4 h-4 mr-2 text-slate-500" /> Filter
           </button>
@@ -109,6 +201,15 @@ export default function AdminProductsPage() {
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50/50 border-b border-slate-200/70">
               <tr>
+                <th className="font-medium text-slate-500 px-4 py-3 w-12 text-center">
+                  <button onClick={toggleSelectAll}>
+                    {selectedIds.size === products.length && products.length > 0 ? (
+                      <CheckSquare className="w-5 h-5 text-blue-600" />
+                    ) : (
+                      <Square className="w-5 h-5 text-slate-400" />
+                    )}
+                  </button>
+                </th>
                 <th className="font-medium text-slate-500 px-4 py-3 w-12"></th>
                 <th className="font-medium text-slate-500 px-4 py-3">Product Name</th>
                 <th className="font-medium text-slate-500 px-4 py-3">Category</th>
@@ -130,7 +231,16 @@ export default function AdminProductsPage() {
                 </tr>
               ) : (
                 products.map((product: any) => (
-                  <tr key={product.id} className="table-row-refined group">
+                  <tr key={product.id} onClick={() => router.push(`/admin/products/${product.id}`)} className={`table-row-refined group cursor-pointer ${selectedIds.has(product.id) ? 'bg-blue-50/50' : ''}`}>
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <button onClick={() => toggleSelection(product.id)}>
+                        {selectedIds.has(product.id) ? (
+                          <CheckSquare className="w-5 h-5 text-blue-600" />
+                        ) : (
+                          <Square className="w-5 h-5 text-slate-400" />
+                        )}
+                      </button>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-200/50">
                         <MediaImage 
@@ -157,10 +267,13 @@ export default function AdminProductsPage() {
                         {product.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => handleOpenModal(product)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                           <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleArchive(product.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -169,6 +282,28 @@ export default function AdminProductsPage() {
               )}
             </tbody>
           </table>
+        </div>
+        {/* Pagination */}
+        <div className="border-t border-slate-200/70 p-4 flex items-center justify-between">
+          <div className="text-sm text-slate-500">
+            Page {page} of {totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              disabled={page === 1} 
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="control-button-secondary h-8 px-2 disabled:opacity-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button 
+              disabled={page === totalPages} 
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="control-button-secondary h-8 px-2 disabled:opacity-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
       
@@ -208,7 +343,7 @@ export default function AdminProductsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-slate-700 uppercase">Cost Price</label>
-              <input required type="number" min="0" step="0.01" value={formData.costPrice} onChange={e => setFormData({...formData, costPrice: parseFloat(e.target.value) || 0})} className="control-input w-full h-10 mt-1" />
+              <input disabled type="number" value={formData.costPrice} className="control-input w-full h-10 mt-1 bg-slate-50 text-slate-500 cursor-not-allowed" title="Cost Price (WAC) is managed by the system via Purchases." />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-700 uppercase">Selling Price</label>

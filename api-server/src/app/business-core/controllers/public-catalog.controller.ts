@@ -22,23 +22,27 @@ export class PublicCatalogController {
     const orgId = await this.getDefaultOrganizationId();
     
     // Use the existing service logic but filter/map to a public DTO
-    const products = await this.productsService.findAll(orgId);
+    const products = await this.productsService.findAll(orgId, {});
     
     // Return only public fields
-    return products
-      .filter(p => p.isActive)
-      .map(p => ({
-        id: p.id,
-        code: p.code,
-        name: p.name,
-        description: p.description,
-        type: p.type,
-        sellingPrice: p.sellingPrice,
-        category: p.category ? {
-          id: p.category.id,
-          name: p.category.name
-        } : null
-      }));
+    return {
+      ...products,
+      items: products.items
+        .filter((p: any) => p.isActive)
+        .map((p: any) => ({
+          id: p.id,
+          code: p.code,
+          name: p.name,
+          description: p.description,
+          price: p.sellingPrice,
+          category: p.category ? { id: p.category.id, name: p.category.name } : null,
+          variants: p.variants.map((v: any) => ({
+            id: v.id,
+            sku: v.sku,
+            price: v.retailPrice || p.sellingPrice
+          }))
+        }))
+    };
   }
 
   @Get('products/:id')
@@ -46,7 +50,7 @@ export class PublicCatalogController {
     const orgId = await this.getDefaultOrganizationId();
     
     // Ensure we fetch through the service to maintain boundary
-    const product = await this.productsService.findOne(orgId, id);
+    const product: any = await this.productsService.findOne(orgId, id);
     
     if (!product || !product.isActive) {
       throw new NotFoundException('Product not found');

@@ -4,12 +4,24 @@ import { api } from "../../../lib/api-client"
 import { Search, Filter, Receipt, MoreHorizontal, FileText, Eye } from "lucide-react"
 import Link from "next/link"
 import { Modal } from "../../../components/ui/modal"
+import { ReceiptTemplate } from "../../../components/pos/ReceiptTemplate"
+import { A4InvoiceTemplate } from "../../../components/pos/A4InvoiceTemplate"
 
 export default function AdminSalesHistoryPage() {
   const [sales, setSales] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSale, setSelectedSale] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [printMode, setPrintMode] = useState<'NONE' | 'RECEIPT' | 'A4'>('NONE')
+
+  useEffect(() => {
+    if (printMode !== 'NONE') {
+      setTimeout(() => {
+        window.print()
+        setPrintMode('NONE')
+      }, 100)
+    }
+  }, [printMode])
 
   const handleViewSale = async (id: string) => {
     try {
@@ -36,7 +48,16 @@ export default function AdminSalesHistoryPage() {
   }, [])
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <>
+      {/* Hidden Print Portals */}
+      {selectedSale && (
+        <div className="hidden print:block">
+          {printMode === 'RECEIPT' && <ReceiptTemplate sale={selectedSale} />}
+          {printMode === 'A4' && <A4InvoiceTemplate sale={selectedSale} />}
+        </div>
+      )}
+
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 print:hidden">
       
       {/* Workspace Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200/80">
@@ -144,7 +165,13 @@ export default function AdminSalesHistoryPage() {
         onClose={() => setIsModalOpen(false)}
         title={`Receipt ${selectedSale?.saleNumber || ''}`}
         footer={
-          <button onClick={() => setIsModalOpen(false)} className="control-button-secondary h-10 px-4">Close</button>
+          <div className="flex justify-between w-full">
+            <div className="flex gap-2">
+              <button onClick={() => setPrintMode('RECEIPT')} className="control-button-secondary h-10 px-4">Print POS</button>
+              <button onClick={() => setPrintMode('A4')} className="control-button-primary shadow-sm h-10 px-4">Print Invoice</button>
+            </div>
+            <button onClick={() => setIsModalOpen(false)} className="control-button-secondary h-10 px-4">Close</button>
+          </div>
         }
       >
         {selectedSale && (
@@ -165,13 +192,13 @@ export default function AdminSalesHistoryPage() {
             <div className="mt-4 pt-4 border-t border-slate-200">
               <h4 className="font-semibold text-slate-900 mb-2">Items</h4>
               <div className="space-y-2">
-                {selectedSale.items?.map((item: any) => (
+                {selectedSale.lines?.map((item: any) => (
                   <div key={item.id} className="flex justify-between items-start">
                     <div>
                       <p className="font-medium">{item.product?.name || 'Unknown'}</p>
                       <p className="text-xs text-slate-500">{item.quantity} x ৳{Number(item.unitPrice).toLocaleString()}</p>
                     </div>
-                    <span className="font-medium text-slate-900">৳{Number(item.subtotal).toLocaleString()}</span>
+                    <span className="font-medium text-slate-900">৳{Number(item.lineTotal || (item.unitPrice * item.quantity)).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -186,5 +213,6 @@ export default function AdminSalesHistoryPage() {
         )}
       </Modal>
     </div>
+    </>
   )
 }

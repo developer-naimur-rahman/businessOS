@@ -4,6 +4,7 @@ import { CategoriesRepository } from '../repositories/categories.repository';
 import { UnitsRepository } from '../repositories/units.repository';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { BulkProductOperationDto, BulkProductAction } from '../dto/bulk-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -33,8 +34,8 @@ export class ProductsService {
     return this.productsRepository.create(organizationId, data);
   }
 
-  async findAll(organizationId: string) {
-    return this.productsRepository.findAll(organizationId);
+  async findAll(organizationId: string, filterDto: any) {
+    return this.productsRepository.findAll(organizationId, filterDto);
   }
 
   async findOne(organizationId: string, id: string) {
@@ -59,5 +60,52 @@ export class ProductsService {
     }
 
     return this.productsRepository.update(organizationId, id, data);
+  }
+
+  async archive(organizationId: string, id: string) {
+    // Soft archive: set status to ARCHIVED, online/POS visibility to false.
+    // The repository checks for existence.
+    return this.productsRepository.update(organizationId, id, {
+      status: 'ARCHIVED',
+      isOnlineVisible: false,
+      isPosVisible: false,
+    });
+  }
+
+  async bulkOperation(organizationId: string, dto: BulkProductOperationDto) {
+    const results = [];
+    for (const id of dto.productIds) {
+      try {
+        let updateData: Prisma.ProductUpdateInput = {};
+        switch (dto.action) {
+          case BulkProductAction.ACTIVATE:
+            updateData = { status: 'ACTIVE' };
+            break;
+          case BulkProductAction.DEACTIVATE:
+            updateData = { status: 'INACTIVE' };
+            break;
+          case BulkProductAction.ARCHIVE:
+            updateData = { status: 'ARCHIVED', isOnlineVisible: false, isPosVisible: false };
+            break;
+          case BulkProductAction.SET_ONLINE_VISIBLE:
+            updateData = { isOnlineVisible: true };
+            break;
+          case BulkProductAction.SET_ONLINE_HIDDEN:
+            updateData = { isOnlineVisible: false };
+            break;
+          case BulkProductAction.SET_POS_VISIBLE:
+            updateData = { isPosVisible: true };
+            break;
+          case BulkProductAction.SET_POS_HIDDEN:
+            updateData = { isPosVisible: false };
+            break;
+        }
+        await this.productsRepository.update(organizationId, id, updateData);
+        results.push({ id, success: true });
+      } catch (error: any) {
+        results.push({ id, success: false, error: error.message });
+      }
+    }
+    return results;
   }
 }

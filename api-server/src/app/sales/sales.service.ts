@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { SalesRepository } from './sales.repository';
 import { InventoryService } from '../inventory/inventory.service';
 import { ProductsService } from '../business-core/services/products.service';
+import { VariantsService } from '../business-core/services/variants.service';
 import { WarehousesService } from '../operational-structure/warehouses/warehouses.service';
 import { CustomersService } from '../business-core/services/customers.service';
 import { BranchesService } from '../operational-structure/branches/branches.service';
@@ -14,7 +15,7 @@ export interface CreateSaleDto {
   customerId?: string;
   idempotencyKey?: string;
   lines: Array<{
-    productId: string;
+    variantId: string;
     quantity: string | number;
     discount?: string | number;
   }>;
@@ -31,6 +32,7 @@ export class SalesService {
     private readonly salesRepo: SalesRepository,
     private readonly inventoryService: InventoryService,
     private readonly productsService: ProductsService,
+    private readonly variantsService: VariantsService,
     private readonly warehousesService: WarehousesService,
     private readonly customersService: CustomersService,
     private readonly branchesService: BranchesService,
@@ -69,13 +71,21 @@ export class SalesService {
     const inventoryItemsToDeduct = [];
 
     for (const line of data.lines) {
+      if ((line as any).productId) {
+        throw new BadRequestException('Legacy productId is no longer supported. Use variantId.');
+      }
+      if (!line.variantId) {
+        throw new BadRequestException('variantId is required for all sale lines.');
+      }
+
       const quantity = new Prisma.Decimal(line.quantity);
       if (quantity.lte(0)) throw new BadRequestException('Quantity must be greater than zero.');
 
-      const product = await this.productsService.findOne(organizationId, line.productId);
+      const variant = await this.variantsService.findOne(organizationId, line.variantId);
+      const product = await this.productsService.findOne(organizationId, variant.productId);
       if (!product.isActive) throw new BadRequestException(`Product ${product.name} is inactive.`);
-
-      const unitPrice = product.sellingPrice;
+      // Assuming variant has sellingPrice, but let's just use product's if variant doesn't have it (or variant overrides it)
+      const unitPrice = (variant as any).posPrice ?? (variant as any).retailPrice ?? product.sellingPrice;
       const lineSubtotal = unitPrice.mul(quantity);
       const discount = line.discount ? new Prisma.Decimal(line.discount) : new Prisma.Decimal(0);
       
@@ -86,17 +96,19 @@ export class SalesService {
       subtotal = subtotal.add(lineTotal); // Note: this is adding to the overall subtotal of the sale (which conceptually is the sum of line totals)
 
       saleLinesToCreate.push({
-        productId: product.id,
+        variantId: variant.id,
         quantity,
         unitPrice,
         discount,
         lineSubtotal,
         lineTotal,
+        productNameSnapshot: product.name,
+        skuSnapshot: variant.sku,
       });
 
       if (product.type === 'PRODUCT') {
         inventoryItemsToDeduct.push({
-          productId: product.id,
+          variantId: variant.id,
           quantity,
         });
       }

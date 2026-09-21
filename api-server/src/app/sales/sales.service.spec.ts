@@ -3,6 +3,7 @@ import { SalesService } from './sales.service';
 import { SalesRepository } from './sales.repository';
 import { InventoryService } from '../inventory/inventory.service';
 import { ProductsService } from '../business-core/services/products.service';
+import { VariantsService } from '../business-core/services/variants.service';
 import { WarehousesService } from '../operational-structure/warehouses/warehouses.service';
 import { CustomersService } from '../business-core/services/customers.service';
 import { BranchesService } from '../operational-structure/branches/branches.service';
@@ -15,6 +16,7 @@ describe('SalesService', () => {
   let salesRepo: jest.Mocked<SalesRepository>;
   let inventoryService: jest.Mocked<InventoryService>;
   let productsService: jest.Mocked<ProductsService>;
+  let variantsService: jest.Mocked<VariantsService>;
   let warehousesService: jest.Mocked<WarehousesService>;
   let branchesService: jest.Mocked<BranchesService>;
 
@@ -42,6 +44,10 @@ describe('SalesService', () => {
       findOne: jest.fn(),
     } as any;
 
+    variantsService = {
+      findOne: jest.fn(),
+    } as any;
+
     warehousesService = {
       findOne: jest.fn().mockResolvedValue({ id: 'w-1', branchId: 'b-1', isActive: true }),
     } as any;
@@ -56,6 +62,7 @@ describe('SalesService', () => {
         { provide: SalesRepository, useValue: salesRepo },
         { provide: InventoryService, useValue: inventoryService },
         { provide: ProductsService, useValue: productsService },
+        { provide: VariantsService, useValue: variantsService },
         { provide: WarehousesService, useValue: warehousesService },
         { provide: CustomersService, useValue: {} },
         { provide: BranchesService, useValue: branchesService },
@@ -68,6 +75,7 @@ describe('SalesService', () => {
 
   describe('createDirectSale', () => {
     it('should throw if physical product line has insufficient stock (inventory service throws)', async () => {
+      variantsService.findOne.mockResolvedValue({ id: 'v-1', productId: 'p-1', isActive: true, retailPrice: new Prisma.Decimal(10) } as any);
       productsService.findOne.mockResolvedValue({ id: 'p-1', isActive: true, type: 'PRODUCT', sellingPrice: new Prisma.Decimal(10) } as any);
       
       salesRepo.createSale.mockResolvedValue({ id: 's-1' } as any);
@@ -77,13 +85,14 @@ describe('SalesService', () => {
       const dto = {
         branchId: 'b-1',
         warehouseId: 'w-1',
-        lines: [{ productId: 'p-1', quantity: 2 }],
+        lines: [{ variantId: 'p-1', quantity: 2 }],
       };
 
       await expect(service.createDirectSale('org-1', dto, 'u-1')).rejects.toThrow(BadRequestException);
     });
 
     it('should NOT call inventoryService for SERVICE products', async () => {
+      variantsService.findOne.mockResolvedValue({ id: 'v-1', productId: 'p-1', isActive: true, retailPrice: new Prisma.Decimal(50) } as any);
       productsService.findOne.mockResolvedValue({ id: 'p-1', isActive: true, type: 'SERVICE', sellingPrice: new Prisma.Decimal(50) } as any);
       
       salesRepo.createSale.mockResolvedValue({ id: 's-1' } as any);
@@ -91,7 +100,7 @@ describe('SalesService', () => {
       const dto = {
         branchId: 'b-1',
         warehouseId: 'w-1',
-        lines: [{ productId: 'p-1', quantity: 1 }],
+        lines: [{ variantId: 'p-1', quantity: 1 }],
       };
 
       await service.createDirectSale('org-1', dto, 'u-1');
@@ -108,20 +117,21 @@ describe('SalesService', () => {
       const dto = {
         branchId: 'b-1',
         warehouseId: 'w-1',
-        lines: [{ productId: 'p-1', quantity: 1 }],
+        lines: [{ variantId: 'p-1', quantity: 1 }],
       };
 
       await expect(service.createDirectSale('org-1', dto, 'u-1')).rejects.toThrow('Warehouse does not belong to the specified branch');
     });
 
     it('should process payment correctly', async () => {
-      productsService.findOne.mockResolvedValue({ id: 'p-1', isActive: true, type: 'SERVICE', sellingPrice: new Prisma.Decimal(100) } as any);
+      variantsService.findOne.mockResolvedValue({ id: 'v-1', productId: 'p-1', isActive: true, retailPrice: new Prisma.Decimal(100) } as any);
+      productsService.findOne.mockResolvedValue({ id: 'p-1', isActive: true, type: 'PRODUCT', sellingPrice: new Prisma.Decimal(100) } as any);
       salesRepo.createSale.mockResolvedValue({ id: 's-1' } as any);
 
       const dto = {
         branchId: 'b-1',
         warehouseId: 'w-1',
-        lines: [{ productId: 'p-1', quantity: 1 }],
+        lines: [{ variantId: 'p-1', quantity: 1 }],
         payments: [{ method: PaymentMethod.CASH, amount: 100 }],
       };
 
@@ -133,12 +143,13 @@ describe('SalesService', () => {
     });
 
     it('should throw on overpayment', async () => {
-      productsService.findOne.mockResolvedValue({ id: 'p-1', isActive: true, type: 'SERVICE', sellingPrice: new Prisma.Decimal(100) } as any);
+      variantsService.findOne.mockResolvedValue({ id: 'v-1', productId: 'p-1', isActive: true, retailPrice: new Prisma.Decimal(100) } as any);
+      productsService.findOne.mockResolvedValue({ id: 'p-1', isActive: true, type: 'PRODUCT', sellingPrice: new Prisma.Decimal(100) } as any);
       
       const dto = {
         branchId: 'b-1',
         warehouseId: 'w-1',
-        lines: [{ productId: 'p-1', quantity: 1 }],
+        lines: [{ variantId: 'p-1', quantity: 1 }],
         payments: [{ method: PaymentMethod.CASH, amount: 150 }],
       };
 
