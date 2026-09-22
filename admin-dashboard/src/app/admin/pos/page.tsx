@@ -28,22 +28,26 @@ export default function AdminPOSPage() {
   useEffect(() => {
     async function fetchCatalog() {
       try {
-        const [productsRes, branchesRes, warehousesRes] = await Promise.all([
-          api.get('/business-core/products', { params: { pageSize: 1000 } }), // Fetch enough for POS
-          api.get('/operational-structure/branches'),
-          api.get('/operational-structure/warehouses')
-        ])
+        const productsRes = await api.get('/business-core/products', { params: { pageSize: 1000 } })
         const productItems = Array.isArray(productsRes.data) ? productsRes.data : (productsRes.data.items || [])
         setProducts(productItems.filter((p: any) => p.isActive))
-        if (branchesRes.data.length > 0) {
-          const firstBranch = branchesRes.data[0]
-          setBranchId(firstBranch.id)
-          const branchWarehouse = warehousesRes.data.find((w: any) => w.branchId === firstBranch.id)
-          if (branchWarehouse) {
-            setWarehouseId(branchWarehouse.id)
-          } else if (warehousesRes.data.length > 0) {
-             setWarehouseId(warehousesRes.data[0].id)
+        
+        try {
+          const branchesRes = await api.get('/operational-structure/branches')
+          const warehousesRes = await api.get('/operational-structure/warehouses')
+          
+          if (branchesRes.data.length > 0) {
+            const firstBranch = branchesRes.data[0]
+            setBranchId(firstBranch.id)
+            const branchWarehouse = warehousesRes.data.find((w: any) => w.branchId === firstBranch.id)
+            if (branchWarehouse) {
+              setWarehouseId(branchWarehouse.id)
+            } else if (warehousesRes.data.length > 0) {
+               setWarehouseId(warehousesRes.data[0].id)
+            }
           }
+        } catch (orgErr) {
+          console.warn("Failed to load branches/warehouses, POS will require manual selection if implemented", orgErr)
         }
       } catch (err) {
         console.error("Failed to load catalog", err)

@@ -13,7 +13,7 @@ export default function AdminCategoriesPage() {
 
   const fetchCategories = async () => {
     try {
-      const res = await api.get('/business-core/categories')
+      const res = await api.get('/business-core/categories?type=PRODUCT')
       setCategories(res.data)
     } catch (err) {
       console.error("Failed to load categories", err)
@@ -43,10 +43,11 @@ export default function AdminCategoriesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const dataToSave = { ...formData, type: 'PRODUCT' }
       if (editingCategory) {
-        await api.put(`/business-core/categories/${editingCategory.id}`, formData)
+        await api.put(`/business-core/categories/${editingCategory.id}`, dataToSave)
       } else {
-        await api.post('/business-core/categories', formData)
+        await api.post('/business-core/categories', dataToSave)
       }
       setIsModalOpen(false)
       fetchCategories()
@@ -59,10 +60,13 @@ export default function AdminCategoriesPage() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
       
       {/* Workspace Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-200/80">
+      <div className="flex justify-between items-center bg-slate-900/50 p-6 rounded-3xl border border-slate-800 backdrop-blur-xl">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 mb-1">Categories</h1>
-          <p className="text-slate-500">Organize your product and service taxonomy.</p>
+          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <FolderTree className="w-8 h-8 text-indigo-500" />
+            Store Categories
+          </h1>
+          <p className="text-slate-400 mt-2">Manage your product catalog structure taxonomy.</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => handleOpenModal()} className="control-button-primary shadow-sm h-10 px-4">

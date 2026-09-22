@@ -7,7 +7,7 @@ import { PermissionsGuard } from '../../iam/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 
 @UseGuards(JwtAuthGuard, OrganizationContextGuard, PermissionsGuard)
-@Controller('variants')
+@Controller('business-core/variants')
 export class VariantsController {
   constructor(private readonly service: VariantsService) {}
 

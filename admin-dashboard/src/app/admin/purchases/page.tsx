@@ -5,6 +5,8 @@ import { Plus, Search, FileText, CheckCircle2, ChevronRight, PackageOpen } from 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+import { api } from '../../../lib/api-client'
+
 export default function PurchasesPage() {
   const router = useRouter()
   const [purchases, setPurchases] = useState([])
@@ -17,11 +19,8 @@ export default function PurchasesPage() {
 
   const fetchPurchases = async () => {
     try {
-      const res = await fetch('/api/purchases')
-      if (res.ok) {
-        const data = await res.json()
-        setPurchases(data)
-      }
+      const res = await api.get('/purchases')
+      setPurchases(res.data)
     } catch (e) {
       console.error(e)
     } finally {

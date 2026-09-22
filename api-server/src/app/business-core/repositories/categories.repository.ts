@@ -15,9 +15,12 @@ export class CategoriesRepository {
     });
   }
 
-  async findAll(organizationId: string) {
+  async findAll(organizationId: string, type?: Prisma.ProductType) {
     return this.prisma.category.findMany({
-      where: { organizationId },
+      where: { 
+        organizationId,
+        ...(type ? { type } : {})
+      },
     });
   }
 

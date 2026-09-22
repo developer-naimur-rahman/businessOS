@@ -7,13 +7,22 @@ import { LogOut, Package, User } from "lucide-react"
 
 export default function AccountPage() {
   const router = useRouter()
-  const { customer, isAuthenticated, logout } = useCustomerAuthStore()
+  const { customer, isAuthenticated, login, logout } = useCustomerAuthStore()
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Auth form state
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [name, setName] = useState("")
+  const [phone, setPhone] = useState("")
+  const [authLoading, setAuthLoading] = useState(false)
+  const [error, setError] = useState("")
+
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/checkout') // or a dedicated login page
+      setLoading(false)
       return
     }
 
@@ -31,7 +40,78 @@ export default function AccountPage() {
     fetchOrders()
   }, [isAuthenticated, router])
 
-  if (!isAuthenticated) return null
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAuthLoading(true)
+    setError("")
+    try {
+      if (authMode === 'login') {
+        const res = await api.post('/public/auth/login', { email, password })
+        login(res.data.access_token, res.data.customer)
+      } else {
+        const res = await api.post('/public/auth/register', { email, password, name, phone })
+        login(res.data.access_token, res.data.customer)
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Authentication failed')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  if (loading) return null
+
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-md mx-auto px-6 py-20 animate-in fade-in duration-500">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 mb-2 text-center">
+          {authMode === 'login' ? 'Welcome Back' : 'Create an Account'}
+        </h1>
+        <p className="text-slate-500 text-center mb-8">
+          {authMode === 'login' ? 'Sign in to view your orders and manage your account.' : 'Join us to track orders and checkout faster.'}
+        </p>
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium border border-red-100 text-center">{error}</div>}
+          
+          {authMode === 'register' && (
+            <>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Name</label>
+                <input type="text" required value={name} onChange={e => setName(e.target.value)} className="control-input h-12 w-full mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Phone</label>
+                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="control-input h-12 w-full mt-1" />
+              </div>
+            </>
+          )}
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Email Address</label>
+            <input type="email" required value={email} onChange={e => setEmail(e.target.value)} className="control-input h-12 w-full mt-1" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</label>
+            <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="control-input h-12 w-full mt-1" />
+          </div>
+          
+          <div className="pt-4">
+            <button type="submit" disabled={authLoading} className="control-button-primary w-full h-12 rounded-lg">
+              {authLoading ? "Processing..." : authMode === 'login' ? "Sign In" : "Create Account"}
+            </button>
+          </div>
+          
+          <div className="text-center text-sm text-slate-500 mt-6 pt-4 border-t border-slate-200">
+            {authMode === 'login' ? (
+              <>Don't have an account? <button type="button" onClick={() => setAuthMode('register')} className="text-blue-600 font-semibold hover:underline">Register</button></>
+            ) : (
+              <>Already have an account? <button type="button" onClick={() => setAuthMode('login')} className="text-blue-600 font-semibold hover:underline">Sign In</button></>
+            )}
+          </div>
+        </form>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-12 md:py-20 animate-in fade-in duration-500">
@@ -46,7 +126,7 @@ export default function AccountPage() {
             logout()
             router.push('/')
           }}
-          className="control-button-secondary h-10 px-4 flex items-center text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+          className="control-button-secondary h-10 px-4 flex items-center text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
         >
           <LogOut className="w-4 h-4 mr-2" /> Sign Out
         </button>
@@ -92,21 +172,21 @@ export default function AccountPage() {
           ) : (
             <div className="space-y-4">
               {orders.map(order => (
-                <div key={order.id} className="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 hover:shadow-md transition-shadow">
+                <div key={order.id} className="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(`/order/${order.id}`)}>
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="font-semibold text-slate-900">Order {order.invoiceNumber}</span>
+                      <span className="font-semibold text-slate-900">Order {order.invoiceNumber || `#${order.id.slice(0,8)}`}</span>
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
                         {order.status}
                       </span>
                     </div>
                     <p className="text-sm text-slate-500">
-                      {new Date(order.saleDate).toLocaleDateString()} • {order.lines.length} items
+                      {new Date(order.saleDate).toLocaleDateString()} • {order.lines?.length || 0} items
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-slate-900 mb-2">৳{Number(order.totalAmount).toLocaleString()}</p>
-                    <button onClick={() => router.push(`/order/${order.id}`)} className="text-sm font-medium text-blue-600 hover:underline">
+                  <div className="text-right flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto">
+                    <p className="font-semibold text-slate-900 mb-0 md:mb-2 text-lg">৳{Number(order.totalAmount || 0).toLocaleString()}</p>
+                    <button className="text-sm font-medium text-blue-600 hover:underline">
                       View Details
                     </button>
                   </div>
@@ -119,3 +199,4 @@ export default function AccountPage() {
     </div>
   )
 }
+

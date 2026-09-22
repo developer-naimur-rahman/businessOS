@@ -6,12 +6,25 @@ import { resolveMediaUrl } from "../../lib/media-resolver";
 import { Image as ImageIcon } from "lucide-react";
 
 interface MediaImageProps extends Omit<React.ComponentPropsWithoutRef<typeof Image>, "src" | "alt"> {
-  asset?: MediaAsset | null;
+  asset?: MediaAsset | string | null;
   alt?: string;
   fallbackUrl?: string;
 }
 
-export function MediaImage({ asset, alt, fallbackUrl, className, ...props }: MediaImageProps) {
+export function MediaImage({ 
+  asset, 
+  alt, 
+  fallbackUrl, 
+  className, 
+  priority,
+  fill,
+  quality,
+  placeholder,
+  blurDataURL,
+  unoptimized,
+  loader,
+  ...props 
+}: MediaImageProps) {
   const [error, setError] = useState(false);
   const src = resolveMediaUrl(asset, fallbackUrl);
 

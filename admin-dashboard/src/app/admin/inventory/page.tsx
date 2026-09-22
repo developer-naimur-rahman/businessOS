@@ -33,7 +33,8 @@ export default function AdminInventoryPage() {
       ])
       setBalances(balRes.data)
       setMovements(movRes.data)
-      setProducts(prodRes.data)
+      const prodData = prodRes.data.items || prodRes.data || []
+      setProducts(Array.isArray(prodData) ? prodData : [])
       setWarehouses(whRes.data)
     } catch (err) {
       console.error("Failed to load inventory data", err)

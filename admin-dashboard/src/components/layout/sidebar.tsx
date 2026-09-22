@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { 
   LayoutDashboard, ShoppingCart, Users, Settings, 
   Package, Boxes, Store, Factory, ArrowRightLeft,
-  TerminalSquare
+  TerminalSquare, TrendingUp
 } from "lucide-react"
 
 export function Sidebar() {
@@ -17,6 +17,7 @@ export function Sidebar() {
       label: "Workspace",
       items: [
         { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+        { name: "Analytics", href: "/admin/analytics", icon: TrendingUp },
         { name: "Point of Sale", href: "/admin/pos", icon: TerminalSquare },
       ]
     },
@@ -31,8 +32,10 @@ export function Sidebar() {
       label: "Inventory & Supply",
       items: [
         { name: "Products", href: "/admin/products", icon: Package },
+        { name: "Services", href: "/admin/services", icon: Package },
         { name: "Service Price List", href: "/admin/services/price-list", icon: Package },
-        { name: "Categories", href: "/admin/categories", icon: Package },
+        { name: "Service Categories", href: "/admin/services/categories", icon: Package },
+        { name: "Store Categories", href: "/admin/categories", icon: Package },
         { name: "Units", href: "/admin/units", icon: Package },
         { name: "Stock Levels", href: "/admin/inventory", icon: Boxes },
         { name: "Suppliers", href: "/admin/suppliers", icon: Factory },

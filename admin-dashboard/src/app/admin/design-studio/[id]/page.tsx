@@ -29,7 +29,8 @@ export default function DesignStudioEditor({ params }: { params: Promise<{ id: s
   const fetchServices = async () => {
     try {
       const res = await api.get('/business-core/products')
-      setServices(res.data.filter((p: any) => p.type === 'SERVICE'))
+      const items = res.data.items || res.data || []
+      setServices((Array.isArray(items) ? items : []).filter((p: any) => p.type === 'SERVICE'))
     } catch (e) {}
   }
 
@@ -133,7 +134,7 @@ export default function DesignStudioEditor({ params }: { params: Promise<{ id: s
   const handleRefreshServicePrices = async () => {
     try {
        const res = await api.get('/business-core/products');
-       const updatedCatalog = res.data;
+       const updatedCatalog = res.data.items || res.data || [];
        setState(prev => {
           const newServices = prev.services.map(ps => {
              const found = updatedCatalog.find((c: any) => c.id === ps.serviceId);

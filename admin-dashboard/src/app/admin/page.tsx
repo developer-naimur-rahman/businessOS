@@ -26,7 +26,7 @@ export default function DashboardPage() {
         const inventory = inventoryRes?.data || [];
         
         let totalRevenue = 0;
-        sales.forEach((s: any) => { totalRevenue += Number(s.totalAmount || 0); });
+        sales.forEach((s: any) => { totalRevenue += Number(s.total || 0); });
 
         // Calculate low stock (quantity <= 5 for demo)
         const lowStockCount = inventory.filter((item: any) => Number(item.quantity) <= 5).length;
@@ -123,7 +123,7 @@ export default function DashboardPage() {
                       <tr key={sale.id} className="table-row-refined group cursor-pointer">
                         <td className="px-4 py-3 font-medium text-slate-900">{sale.saleNumber}</td>
                         <td className="px-4 py-3 text-slate-500">{new Date(sale.createdAt).toLocaleTimeString()}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-medium">৳{Number(sale.totalAmount).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">৳{Number(sale.total).toLocaleString()}</td>
                       </tr>
                     ))
                   )}

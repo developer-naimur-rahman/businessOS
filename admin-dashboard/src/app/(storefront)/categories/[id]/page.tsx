@@ -20,10 +20,12 @@ export default function CategoryProductsPage() {
           api.get('/public/catalog/categories')
         ])
         
-        const currentCategory = categoriesRes.data.find((c: any) => c.id === params.id)
+        const cats = categoriesRes.data.items || categoriesRes.data || []
+        const currentCategory = cats.find((c: any) => c.id === params.id)
         setCategory(currentCategory || null)
         
-        const categoryProducts = productsRes.data.filter((p: any) => p.category?.id === params.id)
+        const prods = productsRes.data.items || productsRes.data || []
+        const categoryProducts = prods.filter((p: any) => p.category?.id === params.id)
         setProducts(categoryProducts)
       } catch (err) {
         console.error("Failed to load category data", err)
@@ -96,7 +98,7 @@ export default function CategoryProductsPage() {
             <Link href={`/products/${product.id}`} key={product.id} className="group block interactive-item">
               <div className="bg-slate-100 aspect-[4/5] rounded-2xl mb-6 overflow-hidden relative shadow-sm border border-slate-200/50">
                 <MediaImage 
-                  asset={null} 
+                  asset={product.imageUrl} 
                   fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=800&auto=format&fit=crop" 
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 mix-blend-multiply" 
                 />

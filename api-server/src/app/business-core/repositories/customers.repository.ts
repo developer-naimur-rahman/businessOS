@@ -24,6 +24,23 @@ export class CustomersRepository {
   async findByIdAndOrganization(organizationId: string, id: string) {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
+      include: {
+        sales: {
+          orderBy: { saleDate: 'desc' },
+          include: { 
+            payments: true,
+            lines: {
+              include: {
+                variant: {
+                  include: {
+                    product: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
 
     if (!customer || customer.organizationId !== organizationId) {

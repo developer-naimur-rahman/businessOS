@@ -13,8 +13,8 @@ export class CategoriesService {
     return this.categoriesRepository.create(organizationId, data);
   }
 
-  async findAll(organizationId: string) {
-    return this.categoriesRepository.findAll(organizationId);
+  async findAll(organizationId: string, type?: Prisma.ProductType) {
+    return this.categoriesRepository.findAll(organizationId, type);
   }
 
   async findOne(organizationId: string, id: string) {

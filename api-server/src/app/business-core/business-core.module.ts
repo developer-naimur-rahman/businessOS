@@ -30,6 +30,10 @@ import { MediaController } from './controllers/media.controller';
 import { PublicCatalogController } from './controllers/public-catalog.controller';
 import { PriceListController } from './controllers/price-list.controller';
 import { PriceListService } from './services/price-list.service';
+import { AnalyticsService } from './services/analytics.service';
+import { AnalyticsController } from './controllers/analytics.controller';
+import { StorefrontConfigService } from './services/storefront-config.service';
+import { StorefrontConfigController, AdminStorefrontConfigController } from './controllers/storefront-config.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -45,6 +49,9 @@ import { PriceListService } from './services/price-list.service';
     MediaController,
     PublicCatalogController,
     PriceListController,
+    AnalyticsController,
+    StorefrontConfigController,
+    AdminStorefrontConfigController,
   ],
   providers: [
     CustomersRepository,
@@ -66,6 +73,8 @@ import { PriceListService } from './services/price-list.service';
     BarcodesService,
     MediaService,
     PriceListService,
+    AnalyticsService,
+    StorefrontConfigService,
   ],
   exports: [
     CustomersService,
@@ -80,6 +89,8 @@ import { PriceListService } from './services/price-list.service';
     AttributesService,
     BarcodesService,
     MediaService,
+    AnalyticsService,
+    StorefrontConfigService,
   ],
 })
 export class BusinessCoreModule {}

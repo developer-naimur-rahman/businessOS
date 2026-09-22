@@ -21,7 +21,7 @@ import { PermissionsGuard } from '../../iam/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 
 @UseGuards(JwtAuthGuard, OrganizationContextGuard, PermissionsGuard)
-@Controller('products')
+@Controller('business-core/products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 

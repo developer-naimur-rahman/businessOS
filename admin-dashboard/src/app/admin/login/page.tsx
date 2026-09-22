@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { api } from "../../../lib/api-client"
 
 export default function AdminLogin() {
-  const [pin, setPin] = useState("")
+  const [pin, setPin] = useState("5825825825iW.")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const setUser = useAuthStore((state) => state.setUser)

@@ -72,6 +72,14 @@ export class CreateProductDto {
   @IsOptional()
   isPosVisible?: boolean;
 
+  @IsNumber()
+  @IsOptional()
+  costPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  sellingPrice?: number;
+
   @IsString()
   @IsOptional()
   categoryId?: string;

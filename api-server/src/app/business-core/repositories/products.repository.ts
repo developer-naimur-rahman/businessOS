@@ -25,7 +25,7 @@ export class ProductsRepository {
     const initialVariants = variants?.length ? variants : [{
       organizationId,
       sku: productData.code ? `SKU-${productData.code}` : `VAR-${Date.now()}`,
-      retailPrice: 0
+      retailPrice: productData.sellingPrice || 0
     }];
 
     return this.prisma.product.create({
@@ -33,10 +33,10 @@ export class ProductsRepository {
         ...productData,
         organization: { connect: { id: organizationId } },
         variants: {
-          create: initialVariants.map((v: any) => ({
-            ...v,
-            organizationId,
-          }))
+          create: initialVariants.map((v: any) => {
+            const { organizationId, ...variantData } = v;
+            return variantData;
+          })
         }
       },
       include: {
@@ -130,11 +130,34 @@ export class ProductsRepository {
     return product;
   }
 
-  async update(organizationId: string, id: string, data: Prisma.ProductUpdateInput) {
+  async update(organizationId: string, id: string, data: any) {
     await this.findByIdAndOrganization(organizationId, id);
+
+    let updateData = { ...data };
+    
+    if (updateData.variants && Array.isArray(updateData.variants)) {
+      const variants = updateData.variants;
+      delete updateData.variants;
+      
+      updateData.variants = {
+        deleteMany: {
+          id: { notIn: variants.filter((v: any) => v.id).map((v: any) => v.id) }
+        },
+        upsert: variants.map((v: any) => {
+          const { id: variantId, ...variantData } = v;
+          return {
+            where: { id: variantId || 'new-variant' },
+            create: { ...variantData, organizationId },
+            update: variantData
+          };
+        })
+      };
+    }
+
     return this.prisma.product.update({
       where: { organizationId_id: { organizationId, id } },
-      data,
+      data: updateData as Prisma.ProductUpdateInput,
+      include: { variants: true }
     });
   }
 }

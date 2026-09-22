@@ -146,7 +146,7 @@ export default function AdminSalesHistoryPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-900">
-                      ৳{Number(sale.totalAmount).toLocaleString()}
+                      ৳{Number(sale.total).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button onClick={() => handleViewSale(sale.id)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
@@ -195,7 +195,7 @@ export default function AdminSalesHistoryPage() {
                 {selectedSale.lines?.map((item: any) => (
                   <div key={item.id} className="flex justify-between items-start">
                     <div>
-                      <p className="font-medium">{item.product?.name || 'Unknown'}</p>
+                      <p className="font-medium">{item.productNameSnapshot || 'Unknown'}</p>
                       <p className="text-xs text-slate-500">{item.quantity} x ৳{Number(item.unitPrice).toLocaleString()}</p>
                     </div>
                     <span className="font-medium text-slate-900">৳{Number(item.lineTotal || (item.unitPrice * item.quantity)).toLocaleString()}</span>
@@ -206,7 +206,7 @@ export default function AdminSalesHistoryPage() {
             <div className="mt-4 pt-4 border-t border-slate-200">
               <div className="flex justify-between items-end">
                 <span className="font-semibold text-slate-900">Total</span>
-                <span className="text-lg font-semibold text-slate-900 tabular-nums">৳{Number(selectedSale.totalAmount).toLocaleString()}</span>
+                <span className="text-lg font-semibold text-slate-900 tabular-nums">৳{Number(selectedSale.total).toLocaleString()}</span>
               </div>
             </div>
           </div>

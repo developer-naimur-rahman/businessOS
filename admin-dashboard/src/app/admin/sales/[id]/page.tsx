@@ -1,11 +1,12 @@
 "use client"
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, use } from "react"
 import { api } from "../../../../lib/api-client"
 import { Button } from "../../../../components/ui/button"
 import { ArrowLeft, Printer, CreditCard } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-export default function SaleReceiptPage({ params }: { params: { id: string } }) {
+export default function SaleReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const [sale, setSale] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -23,7 +24,7 @@ export default function SaleReceiptPage({ params }: { params: { id: string } }) 
 
   const fetchSale = async () => {
     try {
-      const res = await api.get(`/sales/${params.id}`)
+      const res = await api.get(`/sales/${id}`)
       setSale(res.data)
     } catch (error) {
       console.error("Failed to fetch sale", error)
@@ -42,7 +43,7 @@ export default function SaleReceiptPage({ params }: { params: { id: string } }) 
 
     setSubmittingPayment(true)
     try {
-      await api.post(`/sales/${params.id}/payments`, {
+      await api.post(`/sales/${id}/payments`, {
         amount,
         method: paymentMethod,
         reference: paymentReference,
@@ -111,7 +112,7 @@ export default function SaleReceiptPage({ params }: { params: { id: string } }) 
           <tbody>
             {sale.lines?.map((line: any) => (
               <tr key={line.id} className="border-b border-slate-100 last:border-0">
-                <td className="py-3 text-slate-900">{line.variant?.product?.name || line.productId}</td>
+                <td className="py-3 text-slate-900">{line.productNameSnapshot || line.skuSnapshot || 'Unknown'}</td>
                 <td className="py-3 text-right tabular-nums">{Number(line.quantity)}</td>
                 <td className="py-3 text-right tabular-nums">৳{Number(line.unitPrice).toLocaleString()}</td>
                 <td className="py-3 text-right tabular-nums font-medium text-slate-900">৳{Number(line.lineTotal).toLocaleString()}</td>

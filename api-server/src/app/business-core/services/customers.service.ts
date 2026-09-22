@@ -11,7 +11,62 @@ export class CustomersService {
   }
 
   async findAll(organizationId: string) {
-    return this.customersRepository.findAll(organizationId);
+    const customers = await this.customersRepository.findAll(organizationId);
+    
+    // Dynamically calculate due for each customer using the exact same rule as getLedger
+    const customerIds = customers.map(c => c.id);
+    
+    if (customerIds.length === 0) return customers;
+
+    const data = await this.customersRepository['prisma'].sale.findMany({
+      where: {
+        organizationId,
+        customerId: { in: customerIds },
+        status: 'COMPLETED',
+      },
+      select: {
+        id: true,
+        customerId: true,
+        total: true,
+        saleDate: true,
+        payments: {
+          select: {
+            amount: true
+          }
+        }
+      }
+    });
+
+    const dueMap = new Map<string, number>();
+    const totalSpentMap = new Map<string, number>();
+    const orderCountMap = new Map<string, number>();
+    const lastActivityMap = new Map<string, Date>();
+
+    data.forEach(sale => {
+      const saleTotal = Number(sale.total) || 0;
+      const salePaid = sale.payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      
+      const currentDue = dueMap.get(sale.customerId!) || 0;
+      const currentSpent = totalSpentMap.get(sale.customerId!) || 0;
+      
+      // Calculate due exactly as getLedger does (totalSales - totalPaid)
+      dueMap.set(sale.customerId!, currentDue + (saleTotal - salePaid));
+      totalSpentMap.set(sale.customerId!, currentSpent + saleTotal);
+      orderCountMap.set(sale.customerId!, (orderCountMap.get(sale.customerId!) || 0) + 1);
+      
+      const lastActivity = lastActivityMap.get(sale.customerId!);
+      if (!lastActivity || new Date(sale.saleDate) > lastActivity) {
+        lastActivityMap.set(sale.customerId!, new Date(sale.saleDate));
+      }
+    });
+
+    return customers.map(c => ({
+      ...c,
+      outstandingBalance: Math.max(0, dueMap.get(c.id) || 0),
+      totalSpent: totalSpentMap.get(c.id) || 0,
+      totalOrders: orderCountMap.get(c.id) || 0,
+      lastActivity: lastActivityMap.get(c.id) || c.updatedAt
+    }));
   }
 
   async findOne(organizationId: string, id: string) {

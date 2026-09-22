@@ -12,7 +12,8 @@ export default function ServicesPage() {
     async function fetchCatalog() {
       try {
         const res = await api.get('/public/catalog/products')
-        setServices(res.data.filter((p: any) => p.type === 'SERVICE'))
+        const items = res.data.items || res.data || []
+        setServices(items.filter((p: any) => p.type === 'SERVICE'))
       } catch (err) {
         console.error("Failed to load catalog", err)
       } finally {

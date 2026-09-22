@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react"
 import { api } from "../../../../lib/api-client"
 import Link from "next/link"
-import { ArrowLeft, Check, Truck, ShieldCheck, Plus, Minus } from "lucide-react"
+import { ArrowLeft, Check, Truck, ShieldCheck, Plus, Minus, Star } from "lucide-react"
 import { MediaImage } from "../../../../components/ui/media-image"
 import { useParams } from "next/navigation"
 import { useCartStore } from "../../../../store/useCartStore"
@@ -18,10 +18,10 @@ export default function ProductDetailPage() {
     async function fetchProduct() {
       try {
         const res = await api.get(`/public/catalog/products/${params.id}`)
-        if (res.data && res.data.type === 'PRODUCT') {
+        if (res.data && (res.data.type === 'PRODUCT' || res.data.type === 'SERVICE')) {
           setProduct(res.data)
         } else {
-          setProduct(null) // Only allow viewing products on this page
+          setProduct(null)
         }
       } catch (err) {
         console.error("Failed to load product", err)
@@ -84,8 +84,8 @@ export default function ProductDetailPage() {
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="aspect-square bg-slate-50 rounded-xl border border-slate-200 overflow-hidden cursor-pointer opacity-70 hover:opacity-100 transition-opacity">
                 <MediaImage 
-                  asset={null} 
-                  fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=200&auto=format&fit=crop" 
+                  asset={product.imageUrl} 
+                  fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=800&auto=format&fit=crop" 
                   className="w-full h-full object-cover mix-blend-multiply" 
                 />
               </div>
@@ -170,6 +170,109 @@ export default function ProductDetailPage() {
 
         </div>
       </div>
+
+      {/* Customer Reviews Section */}
+      <div className="mt-24 pt-16 border-t border-slate-200">
+        <h2 className="text-3xl font-semibold text-slate-900 mb-12">Customer Reviews</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
+          
+          <div className="lg:col-span-1">
+            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-100 sticky top-32">
+              <div className="text-center mb-8">
+                <div className="text-5xl font-black text-slate-900 mb-2">{product.rating ? Number(product.rating).toFixed(1) : '0.0'}</div>
+                <div className="flex justify-center gap-1 text-amber-400 mb-2">
+                  {[1,2,3,4,5].map(star => (
+                    <Star key={star} className={`w-6 h-6 ${star <= Math.round(product.rating || 0) ? 'fill-current' : 'text-slate-300'}`} />
+                  ))}
+                </div>
+                <div className="text-sm text-slate-500">Based on {product.reviewCount || 0} reviews</div>
+              </div>
+
+              <div className="border-t border-slate-200 pt-8 mt-8">
+                <h3 className="font-semibold text-slate-900 mb-4">Write a Review</h3>
+                <form 
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = e.target as HTMLFormElement;
+                    const rating = parseInt((form.elements.namedItem('rating') as HTMLSelectElement).value);
+                    const orderId = (form.elements.namedItem('orderId') as HTMLInputElement).value;
+                    const comment = (form.elements.namedItem('comment') as HTMLTextAreaElement).value;
+                    
+                    try {
+                      await api.post(`/public/catalog/products/${product.id}/reviews`, { rating, orderId, comment });
+                      alert('Review submitted successfully!');
+                      form.reset();
+                      // Refresh product data to show new review
+                      const res = await api.get(`/public/catalog/products/${product.id}`);
+                      setProduct(res.data);
+                    } catch (err: any) {
+                      alert(err.response?.data?.message || 'Failed to submit review. Are you sure you purchased this product?');
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase mb-1 block">Rating</label>
+                    <select name="rating" required className="control-input w-full h-10">
+                      <option value="5">5 - Excellent</option>
+                      <option value="4">4 - Good</option>
+                      <option value="3">3 - Average</option>
+                      <option value="2">2 - Poor</option>
+                      <option value="1">1 - Terrible</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase mb-1 block">Your Order ID</label>
+                    <input name="orderId" required type="text" className="control-input w-full h-10" placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000" />
+                    <p className="text-[10px] text-slate-400 mt-1">We need this to verify your purchase. Find it in your recent orders.</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase mb-1 block">Comment</label>
+                    <textarea name="comment" className="control-input w-full h-24 py-2 resize-none" placeholder="What did you like or dislike?"></textarea>
+                  </div>
+                  <button type="submit" className="control-button-primary w-full h-10">Submit Review</button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 space-y-6">
+            {(!product.reviews || product.reviews.length === 0) ? (
+              <div className="text-center py-20 bg-slate-50 rounded-3xl border border-slate-100">
+                <Star className="w-12 h-12 mx-auto text-slate-300 mb-4" />
+                <h3 className="text-xl font-semibold text-slate-900 mb-2">No reviews yet</h3>
+                <p className="text-slate-500">Be the first to review this product!</p>
+              </div>
+            ) : (
+              product.reviews.map((review: any) => (
+                <div key={review.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+                        {review.authorName.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-900">{review.authorName}</div>
+                        <div className="text-xs text-slate-500">{new Date(review.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-0.5 text-amber-400">
+                      {[1,2,3,4,5].map(star => (
+                        <Star key={star} className={`w-4 h-4 ${star <= review.rating ? 'fill-current' : 'text-slate-200'}`} />
+                      ))}
+                    </div>
+                  </div>
+                  {review.comment && (
+                    <p className="text-slate-700 leading-relaxed">{review.comment}</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
     </div>
   )
 }

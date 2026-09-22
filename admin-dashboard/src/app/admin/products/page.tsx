@@ -23,18 +23,24 @@ export default function AdminProductsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isBulkActionMenuOpen, setIsBulkActionMenuOpen] = useState(false)
 
+  const [categories, setCategories] = useState<any[]>([])
+  
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [formData, setFormData] = useState({
     name: '', code: '', description: '', type: 'PRODUCT', 
-    costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: ''
+    costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: '', categoryId: ''
   })
+  
+  // Variants State
+  const [hasVariants, setHasVariants] = useState(false)
+  const [variants, setVariants] = useState<{ id?: string, sku: string, retailPrice: number, costPrice: number, status: string }[]>([])
 
   const fetchProducts = async () => {
     setLoading(true)
     try {
       const res = await api.get('/business-core/products', {
-        params: { page, pageSize, search }
+        params: { page, pageSize, search, type: 'PRODUCT' }
       })
       if (res.data.items) {
         setProducts(res.data.items)
@@ -48,6 +54,19 @@ export default function AdminProductsPage() {
       setLoading(false)
     }
   }
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get('/business-core/categories')
+      setCategories(res.data)
+    } catch (err) {
+      console.error("Failed to load categories", err)
+    }
+  }
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -67,14 +86,30 @@ export default function AdminProductsPage() {
         costPrice: Number(product.costPrice),
         sellingPrice: Number(product.sellingPrice),
         isActive: product.isActive,
-        imageUrl: product.imageUrl || ''
+        imageUrl: product.imageUrl || '',
+        categoryId: product.categoryId || ''
       })
+      if (product.variants && product.variants.length > 1) {
+        setHasVariants(true)
+        setVariants(product.variants.map((v: any) => ({
+          id: v.id,
+          sku: v.sku,
+          retailPrice: Number(v.retailPrice),
+          costPrice: Number(v.costPrice || 0),
+          status: v.status
+        })))
+      } else {
+        setHasVariants(false)
+        setVariants([])
+      }
     } else {
       setEditingProduct(null)
       setFormData({
         name: '', code: '', description: '', type: 'PRODUCT', 
-        costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: ''
+        costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: '', categoryId: ''
       })
+      setHasVariants(false)
+      setVariants([])
     }
     setIsModalOpen(true)
   }
@@ -82,10 +117,25 @@ export default function AdminProductsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const submitData: any = { ...formData, categoryId: formData.categoryId || null }
+      
+      if (hasVariants && variants.length > 0) {
+        submitData.variants = variants.map(v => ({
+          id: v.id,
+          sku: v.sku,
+          retailPrice: v.retailPrice,
+          costPrice: v.costPrice,
+          status: v.status
+        }))
+      } else if (hasVariants && variants.length === 0) {
+        alert("Please add at least one variant, or disable 'Has Multiple Variants'")
+        return
+      }
+
       if (editingProduct) {
-        await api.patch(`/business-core/products/${editingProduct.id}`, formData)
+        await api.patch(`/business-core/products/${editingProduct.id}`, submitData)
       } else {
-        await api.post('/business-core/products', formData)
+        await api.post('/business-core/products', submitData)
       }
       setIsModalOpen(false)
       fetchProducts()
@@ -333,23 +383,69 @@ export default function AdminProductsPage() {
               <input value={formData.imageUrl} onChange={e => setFormData({...formData, imageUrl: e.target.value})} type="text" className="control-input w-full h-10 mt-1" placeholder="https://..." />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-700 uppercase">Type</label>
-            <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="control-input w-full h-10 mt-1">
-              <option value="PRODUCT">Product (Physical)</option>
-              <option value="SERVICE">Service</option>
-            </select>
-          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-slate-700 uppercase">Cost Price</label>
-              <input disabled type="number" value={formData.costPrice} className="control-input w-full h-10 mt-1 bg-slate-50 text-slate-500 cursor-not-allowed" title="Cost Price (WAC) is managed by the system via Purchases." />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-700 uppercase">Selling Price</label>
-              <input required type="number" min="0" step="0.01" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: parseFloat(e.target.value) || 0})} className="control-input w-full h-10 mt-1" />
+              <label className="text-xs font-semibold text-slate-700 uppercase">Category</label>
+              <select value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})} className="control-input w-full h-10 mt-1">
+                <option value="">No Category</option>
+                {categories.filter(c => c.type === 'PRODUCT').map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </div>
           </div>
+          <div className="flex items-center gap-2 mt-2 border-b border-slate-100 pb-4 mb-4">
+            <input type="checkbox" id="hasVariants" checked={hasVariants} onChange={e => {
+              setHasVariants(e.target.checked)
+              if (e.target.checked && variants.length === 0) {
+                setVariants([{ sku: '', retailPrice: formData.sellingPrice, costPrice: formData.costPrice, status: 'ACTIVE' }])
+              }
+            }} className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" />
+            <label htmlFor="hasVariants" className="text-sm font-semibold text-slate-700">Has Multiple Variants</label>
+          </div>
+
+          {!hasVariants ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 uppercase">Cost Price</label>
+                <input disabled type="number" value={formData.costPrice} className="control-input w-full h-10 mt-1 bg-slate-50 text-slate-500 cursor-not-allowed" title="Cost Price (WAC) is managed by the system via Purchases." />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-700 uppercase">Selling Price</label>
+                <input required type="number" min="0" step="0.01" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: parseFloat(e.target.value) || 0})} className="control-input w-full h-10 mt-1" />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-slate-700 uppercase">Variants</label>
+                <button type="button" onClick={() => setVariants([...variants, { sku: '', retailPrice: formData.sellingPrice, costPrice: 0, status: 'ACTIVE' }])} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-2 py-1 rounded-md">
+                  + Add Variant
+                </button>
+              </div>
+              {variants.map((variant, index) => (
+                <div key={index} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                  <div className="flex-1">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase">Variant SKU / Name</label>
+                    <input required value={variant.sku} onChange={e => {
+                      const newVars = [...variants]; newVars[index].sku = e.target.value; setVariants(newVars)
+                    }} type="text" className="control-input w-full h-8 mt-1 text-sm" placeholder="e.g. TSHIRT-RED-M" />
+                  </div>
+                  <div className="w-24">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase">Selling Price</label>
+                    <input required type="number" min="0" step="0.01" value={variant.retailPrice} onChange={e => {
+                      const newVars = [...variants]; newVars[index].retailPrice = parseFloat(e.target.value) || 0; setVariants(newVars)
+                    }} className="control-input w-full h-8 mt-1 text-sm" />
+                  </div>
+                  <button type="button" onClick={() => {
+                    const newVars = [...variants]; newVars.splice(index, 1); setVariants(newVars)
+                  }} className="mt-5 p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div>
             <label className="text-xs font-semibold text-slate-700 uppercase">Description</label>
             <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="control-input w-full h-24 mt-1 py-2 resize-none" />

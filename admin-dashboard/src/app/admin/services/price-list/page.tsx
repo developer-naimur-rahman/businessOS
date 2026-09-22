@@ -35,8 +35,9 @@ export default function PriceListPage() {
     try {
       setLoading(true)
       const res = await api.get("/business-core/products")
+      const allProducts = res.data.items || res.data || []
       // Filter only services
-      let srv = res.data.filter((p: any) => p.type === "SERVICE")
+      let srv = (Array.isArray(allProducts) ? allProducts : []).filter((p: any) => p.type === "SERVICE")
       // Sort by display order
       srv = srv.sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
       setServices(srv)

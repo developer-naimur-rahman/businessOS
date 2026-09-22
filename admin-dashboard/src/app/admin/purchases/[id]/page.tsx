@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, FileText, Download, Edit, CreditCard, Box } from 'lucide-react'
+import { api } from '../../../../lib/api-client'
 
 export default function PurchaseDetailPage() {
   const params = useParams()
@@ -25,10 +26,8 @@ export default function PurchaseDetailPage() {
 
   const fetchPurchase = async () => {
     try {
-      const res = await fetch(`/api/purchases/${params.id}`)
-      if (res.ok) {
-        setPurchase(await res.json())
-      }
+      const res = await api.get(`/purchases/${params.id}`)
+      setPurchase(res.data)
     } catch (e) {
       console.error(e)
     } finally {
@@ -41,15 +40,10 @@ export default function PurchaseDetailPage() {
     
     setCompleting(true)
     try {
-      const res = await fetch(`/api/purchases/${params.id}/complete`, { method: 'POST' })
-      if (res.ok) {
-        fetchPurchase()
-      } else {
-        const err = await res.json()
-        alert(err.message || 'Failed to complete purchase')
-      }
-    } catch (e) {
-      alert('Error completing purchase')
+      await api.post(`/purchases/${params.id}/complete`, { notes: 'Completed from admin' })
+      fetchPurchase()
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to complete purchase')
     } finally {
       setCompleting(false)
     }
@@ -59,27 +53,18 @@ export default function PurchaseDetailPage() {
     e.preventDefault()
     setAddingPayment(true)
     try {
-      const res = await fetch(`/api/purchases/${params.id}/payments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...paymentForm,
-          paymentDate: new Date(paymentForm.paymentDate).toISOString()
-        })
+      await api.post(`/purchases/${params.id}/payments`, {
+        ...paymentForm,
+        paymentDate: new Date(paymentForm.paymentDate).toISOString()
       })
-      if (res.ok) {
-        fetchPurchase()
-        setPaymentForm({
-          ...paymentForm,
-          amount: 0,
-          reference: ''
-        })
-      } else {
-        const err = await res.json()
-        alert(err.message || 'Failed to add payment')
-      }
-    } catch (e) {
-      alert('Error adding payment')
+      fetchPurchase()
+      setPaymentForm({
+        ...paymentForm,
+        amount: 0,
+        reference: ''
+      })
+    } catch (e: any) {
+      alert(e.response?.data?.message || 'Failed to add payment')
     } finally {
       setAddingPayment(false)
     }
