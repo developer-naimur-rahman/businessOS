@@ -61,6 +61,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     {
       label: "Operations & Platform",
       items: [
+        { name: "Staff & Users", href: "/admin/staff", icon: Users },
         { name: "Branches", href: "/admin/branches", icon: GitBranch },
         { name: "Warehouses", href: "/admin/warehouses", icon: Warehouse },
         { name: "Storefront CMS", href: "/admin/storefront", icon: Store },

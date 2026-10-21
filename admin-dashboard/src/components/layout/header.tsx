@@ -61,8 +61,12 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end hidden sm:flex">
-            <span className="text-[13px] font-medium text-slate-900 leading-tight">{user?.firstName || 'Admin'} {user?.lastName || ''}</span>
-            <span className="text-[11px] text-slate-500 uppercase tracking-wider">{'Staff'}</span>
+            <span className="text-[13px] font-medium text-slate-900 leading-tight">
+              {user?.firstName || 'Admin'} {user?.lastName || ''}
+            </span>
+            <span className="text-[11px] text-indigo-600 font-semibold uppercase tracking-wider">
+              {user?.email ? user.email.split('@')[0] : 'Staff'}
+            </span>
           </div>
           <Button 
             variant="ghost" 

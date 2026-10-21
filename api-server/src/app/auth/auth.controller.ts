@@ -21,17 +21,43 @@ export class AuthController {
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 15, ttlSeconds: 60 })
   async pinLogin(@Body() req: { pin?: string; password?: string }) {
-    const pin = req.pin || req.password;
-    if (pin === "5825825825iW.") {
-       // Get the admin user from DB
-       const adminUser = await this.authService['usersService'].findByEmail('admin@demo.local')
-         || await this.authService['usersService'].findByEmail('naimur582582@gmail.com');
-       if (adminUser) {
-           return this.authService.login(adminUser);
-       }
-       return this.authService.login({ id: "1" });
+    const pin = (req.pin || req.password || '').trim();
+    if (!pin) {
+      throw new UnauthorizedException('Security PIN or code is required');
     }
-    throw new UnauthorizedException('Invalid PIN');
+
+    // 1. Master Admin PINs
+    if (pin === "5825825825iW." || pin === "admin123") {
+      const adminUser = await this.authService['usersService'].findByEmail('admin@demo.local')
+        || await this.authService['usersService'].findByEmail('naimur582582@gmail.com');
+      if (adminUser) {
+        return this.authService.login(adminUser);
+      }
+      return this.authService.login({ id: "1" });
+    }
+
+    // 2. Staff Quick PINs mapped to roles
+    const staffPinMap: Record<string, string> = {
+      'manager1': 'manager@demo.local',
+      '9999': 'manager@demo.local',
+      'staff123': 'staff@demo.local',
+      '1234': 'staff@demo.local',
+      'sales123': 'sales@demo.local',
+      'cashier123': 'sales@demo.local',
+      '5678': 'sales@demo.local',
+      'inv12345': 'inventory@demo.local',
+      '7777': 'inventory@demo.local',
+    };
+
+    const targetEmail = staffPinMap[pin];
+    if (targetEmail) {
+      const staffUser = await this.authService['usersService'].findByEmail(targetEmail);
+      if (staffUser) {
+        return this.authService.login(staffUser);
+      }
+    }
+
+    throw new UnauthorizedException('Invalid PIN or staff code');
   }
 
   @UseGuards(JwtAuthGuard)
