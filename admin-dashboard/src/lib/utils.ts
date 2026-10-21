@@ -11,25 +11,12 @@ export function getApiBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")
   }
 
-  // 2. Client-side browser dynamic resolution
+  // 2. In any client browser environment (mobile phone, tablet, LAN Wi-Fi, or Vercel production):
+  // Always use same-origin relative '/api' so requests never cross ports, avoid firewall blocks, and prevent mixed content errors
   if (typeof window !== "undefined") {
-    const hostname = window.location.hostname
-    const protocol = window.location.protocol
-
-    // Only for numeric LAN IP addresses (e.g. 192.168.0.104, 10.0.0.5) on local Wi-Fi:
-    const isLanIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname) || hostname.endsWith(".local")
-    if (isLanIp) {
-      return `${protocol}//${hostname}:3333/api`
-    }
-
-    // Cloud domains (e.g. *.vercel.app, yourdomain.com):
-    // NEVER append :3333 on cloud production domains! Use relative /api or same origin
-    const isCloudDomain = hostname.includes(".vercel.app") || (!isLanIp && hostname !== "localhost" && hostname !== "127.0.0.1")
-    if (isCloudDomain) {
-      return "/api"
-    }
+    return "/api"
   }
 
-  // 3. Localhost fallback
+  // 3. Server-side Node.js fallback
   return "http://127.0.0.1:3333/api"
 }
