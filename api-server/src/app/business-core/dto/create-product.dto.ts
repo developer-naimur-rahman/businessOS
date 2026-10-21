@@ -56,6 +56,10 @@ export class CreateProductDto {
   @IsOptional()
   description?: string;
 
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
   @IsEnum(ProductType)
   @IsOptional()
   type?: ProductType;

@@ -9,8 +9,8 @@ export class StorefrontConfigController {
 
   @Get()
   async getConfig() {
-    // Assuming a single org for public storefront for now
-    return this.configService.getConfig('1');
+    const org = await this.configService['prisma'].organization.findFirst();
+    return this.configService.getConfig(org ? org.id : '1');
   }
 }
 

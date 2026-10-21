@@ -8,6 +8,28 @@ import { ArrowRight, Star, ChevronLeft, ChevronRight, ShoppingCart, ShieldCheck,
 import { MediaImage } from "../../components/ui/media-image"
 import { useCartStore } from "../../store/useCartStore"
 
+const getFallbackProductImage = (name: string = "", type?: string) => {
+  const n = name.toLowerCase();
+  if (n.includes("mouse")) return "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("keyboard")) return "https://images.unsplash.com/photo-1587829741301-dc798b83add3?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("pendrive") || n.includes("usb")) return "https://images.unsplash.com/photo-1624823183493-5f212ceea2eb?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("cable") || n.includes("hdmi") || n.includes("cat6")) return "https://images.unsplash.com/photo-1544652478-6653e09f18a2?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("ssd") || n.includes("storage")) return "https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("ram") || n.includes("memory")) return "https://images.unsplash.com/photo-1562976540-1502c2145186?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("router") || n.includes("wi-fi") || n.includes("net")) return "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("earbuds") || n.includes("airpod")) return "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("headphone") || n.includes("audio")) return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("paper") || n.includes("ream")) return "https://images.unsplash.com/photo-1586075010923-2dd4570fb338?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("pen")) return "https://images.unsplash.com/photo-1585336261026-77825593c66f?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("wedding")) return "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("photo") || n.includes("portrait") || n.includes("passport")) return "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("print") || n.includes("copy")) return "https://images.unsplash.com/photo-1568667256549-094345857637?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("logo") || n.includes("design") || n.includes("creative")) return "https://images.unsplash.com/photo-1626785774573-4b799315345d?q=80&w=800&auto=format&fit=crop";
+  if (n.includes("cv") || n.includes("resume") || n.includes("form")) return "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=800&auto=format&fit=crop";
+  if (type === 'SERVICE') return "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800&auto=format&fit=crop";
+  return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop";
+};
+
 const ProductCard = ({ product }: { product: any }) => {
   const imageUrl = product.imageUrl || (product.variants && product.variants.length > 0 ? product.variants[0].imageUrl : null)
   const price = Number(product.sellingPrice)
@@ -37,15 +59,12 @@ const ProductCard = ({ product }: { product: any }) => {
         </div>
       )}
       <div className="aspect-[4/5] bg-slate-50 relative overflow-hidden group-hover:bg-slate-100 transition-colors">
-        {imageUrl ? (
-          <MediaImage 
-            asset={imageUrl} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 mix-blend-multiply p-4" 
-            alt={product.name}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-100">No Image</div>
-        )}
+        <MediaImage 
+          asset={imageUrl} 
+          fallbackUrl={getFallbackProductImage(product.name, product.type)}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 mix-blend-multiply p-4" 
+          alt={product.name}
+        />
         
         {/* Quick Add Button Overlay */}
         <div className="absolute bottom-4 left-0 right-0 flex justify-center opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 px-4">
@@ -385,13 +404,14 @@ export default function StorefrontHomePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {actualServices.slice(0, 8).map((service: any) => (
                 <Link href={`/products/${service.id}`} key={service.id} className="group block relative rounded-3xl overflow-hidden aspect-[4/5] md:aspect-[3/4] lg:aspect-[4/5] border border-slate-800 shadow-xl bg-slate-900 flex flex-col">
-                  {service.imageUrl ? (
-                    <div className="absolute inset-0">
-                      <MediaImage asset={service.imageUrl} className="w-full h-full object-cover opacity-50 transition-transform duration-700 group-hover:scale-105 group-hover:opacity-40" />
-                    </div>
-                  ) : (
-                    <div className="absolute inset-0 bg-slate-800 transition-colors duration-500 group-hover:bg-slate-700"></div>
-                  )}
+                  <div className="absolute inset-0">
+                    <MediaImage 
+                      asset={service.imageUrl} 
+                      fallbackUrl={getFallbackProductImage(service.name, 'SERVICE')}
+                      className="w-full h-full object-cover opacity-50 transition-transform duration-700 group-hover:scale-105 group-hover:opacity-40" 
+                      alt={service.name}
+                    />
+                  </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent z-0"></div>
                   
                   <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8 z-10 w-full">

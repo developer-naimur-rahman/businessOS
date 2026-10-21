@@ -4,7 +4,10 @@ import { MediaAsset } from "../types/media";
  * Resolves a MediaAsset into a usable image URL.
  * In the future, this will handle Cloudinary URL generation (e.g. transformations).
  */
-export function resolveMediaUrl(asset?: MediaAsset | string | null, fallbackUrl: string = '/demo/placeholders/fallback.webp'): string {
+export function resolveMediaUrl(
+  asset?: MediaAsset | string | null, 
+  fallbackUrl: string = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop'
+): string {
   if (!asset) {
     return fallbackUrl;
   }
