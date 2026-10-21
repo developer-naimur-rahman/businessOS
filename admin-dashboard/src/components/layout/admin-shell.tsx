@@ -16,15 +16,15 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const isLoginRoute = pathname === "/admin/login"
 
-  // Check stored token from either Zustand or localStorage
-  const storedToken = typeof window !== 'undefined' 
-    ? (localStorage.getItem('token') || localStorage.getItem('access_token') || localStorage.getItem('adminToken')) 
-    : null
-  const effectiveToken = token || storedToken
+  const [effectiveToken, setEffectiveToken] = useState<string | null>(token)
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    const stored = typeof window !== 'undefined' 
+      ? (localStorage.getItem('token') || localStorage.getItem('access_token') || localStorage.getItem('adminToken')) 
+      : null
+    setEffectiveToken(token || stored)
+  }, [token])
 
   useEffect(() => {
     setMobileSidebarOpen(false)
@@ -67,13 +67,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     return <div className="min-h-screen bg-slate-50">{children}</div>
   }
 
-  // Prevent ANY dashboard flash while mounting or checking authentication
+  // Prevent ANY dashboard flash while mounting or checking authentication (consistent static text prevents SSR hydration mismatch)
   if (!mounted || authChecking || !effectiveToken || !user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
         <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
         <p className="text-slate-500 font-semibold mt-4 text-xs tracking-wider uppercase">
-          {effectiveToken ? "Verifying Session..." : "Authenticating Workspace..."}
+          Authenticating Workspace...
         </p>
       </div>
     )
