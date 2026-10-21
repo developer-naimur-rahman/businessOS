@@ -23,6 +23,14 @@ export class ProductsService {
       data.costPrice = new Decimal(data.costPrice);
       if (data.costPrice.isNegative()) throw new BadRequestException('Cost price cannot be negative');
     }
+    if (data.supplierCost !== undefined && data.supplierCost !== null) {
+      data.supplierCost = new Decimal(data.supplierCost);
+      if (data.supplierCost.isNegative()) throw new BadRequestException('Supplier cost cannot be negative');
+    }
+    if (data.estimatedShippingCost !== undefined && data.estimatedShippingCost !== null) {
+      data.estimatedShippingCost = new Decimal(data.estimatedShippingCost);
+      if (data.estimatedShippingCost.isNegative()) throw new BadRequestException('Estimated shipping cost cannot be negative');
+    }
 
     if (data.categoryId) {
       await this.categoriesRepository.findByIdAndOrganization(organizationId, data.categoryId);
@@ -51,6 +59,14 @@ export class ProductsService {
       data.costPrice = new Decimal(data.costPrice);
       if (data.costPrice.isNegative()) throw new BadRequestException('Cost price cannot be negative');
     }
+    if (data.supplierCost !== undefined && data.supplierCost !== null) {
+      data.supplierCost = new Decimal(data.supplierCost);
+      if (data.supplierCost.isNegative()) throw new BadRequestException('Supplier cost cannot be negative');
+    }
+    if (data.estimatedShippingCost !== undefined && data.estimatedShippingCost !== null) {
+      data.estimatedShippingCost = new Decimal(data.estimatedShippingCost);
+      if (data.estimatedShippingCost.isNegative()) throw new BadRequestException('Estimated shipping cost cannot be negative');
+    }
     
     if (data.categoryId) {
       await this.categoriesRepository.findByIdAndOrganization(organizationId, data.categoryId);
@@ -60,6 +76,60 @@ export class ProductsService {
     }
 
     return this.productsRepository.update(organizationId, id, data);
+  }
+
+  analyzeProfit(data: {
+    sellingPrice: number;
+    supplierCost: number;
+    estimatedShippingCost?: number;
+    gatewayFeePercentage?: number;
+  }) {
+    const sellingPrice = Number(data.sellingPrice) || 0;
+    const supplierCost = Number(data.supplierCost) || 0;
+    const estimatedShippingCost = Number(data.estimatedShippingCost) || 0;
+    const gatewayFeePercentage = data.gatewayFeePercentage !== undefined ? Number(data.gatewayFeePercentage) : 1.5;
+
+    if (sellingPrice < 0) throw new BadRequestException('Selling price cannot be negative');
+    if (supplierCost < 0) throw new BadRequestException('Supplier cost cannot be negative');
+    if (estimatedShippingCost < 0) throw new BadRequestException('Estimated shipping cost cannot be negative');
+    if (gatewayFeePercentage < 0 || gatewayFeePercentage >= 100) {
+      throw new BadRequestException('Gateway fee percentage must be between 0 and 100');
+    }
+
+    const gatewayFeeRate = gatewayFeePercentage / 100;
+    const totalSourcingCost = supplierCost + estimatedShippingCost;
+    const gatewayFeeAmount = Number((sellingPrice * gatewayFeeRate).toFixed(2));
+    const totalCost = Number((totalSourcingCost + gatewayFeeAmount).toFixed(2));
+    const netProfit = Number((sellingPrice - totalCost).toFixed(2));
+    const profitMargin = sellingPrice > 0 ? Number(((netProfit / sellingPrice) * 100).toFixed(2)) : 0;
+
+    // Break-even selling price: Price where net profit is 0
+    const breakEvenSellingPrice = gatewayFeeRate < 1 
+      ? Number((totalSourcingCost / (1 - gatewayFeeRate)).toFixed(2))
+      : totalSourcingCost;
+
+    // Recommended Safe Selling Price with target 35% margin
+    const targetMargin = 0.35;
+    const recommendedSellingPrice = (1 - gatewayFeeRate - targetMargin) > 0
+      ? Number((totalSourcingCost / (1 - gatewayFeeRate - targetMargin)).toFixed(2))
+      : Number((totalSourcingCost * 1.5).toFixed(2));
+
+    return {
+      sellingPrice,
+      supplierCost,
+      estimatedShippingCost,
+      totalSourcingCost,
+      gatewayFeePercentage,
+      gatewayFeeAmount,
+      totalCost,
+      netProfit,
+      profitMargin,
+      breakEvenSellingPrice,
+      breakEvenPrice: breakEvenSellingPrice,
+      recommendedSellingPrice,
+      recommendedPrice: recommendedSellingPrice,
+      targetMarginPercentage: 35,
+    };
   }
 
   async archive(organizationId: string, id: string) {

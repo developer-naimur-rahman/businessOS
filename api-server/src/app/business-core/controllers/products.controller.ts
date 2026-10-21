@@ -70,4 +70,10 @@ export class ProductsController {
     const organizationId = req.user.organizationId;
     return this.productsService.archive(organizationId, id);
   }
+
+  @Post('analyze-profit')
+  @RequirePermissions('catalog.view')
+  analyzeProfit(@Body() body: any) {
+    return this.productsService.analyzeProfit(body);
+  }
 }

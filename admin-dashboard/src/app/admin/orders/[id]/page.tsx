@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation"
 import { api } from "../../../../lib/api-client"
 import { 
   ArrowLeft, Package, Clock, Truck, CheckCircle2, 
-  AlertCircle, User, MapPin, Receipt, RefreshCw, Printer 
+  AlertCircle, User, MapPin, Receipt, RefreshCw, Printer, ExternalLink 
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -429,30 +429,73 @@ export default function AdminOrderDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(order.lines || []).map((line: any) => (
-                <tr key={line.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-3 font-semibold text-slate-900">
-                    {line.productNameSnapshot || line.variant?.product?.name || 'Product'}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 font-mono text-xs">
-                    {line.skuSnapshot || line.variant?.sku || 'N/A'}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700 text-right">
-                    ৳{Number(line.unitPrice).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-slate-900 font-semibold text-center">
-                    {Number(line.quantity)}
-                  </td>
-                  <td className="px-4 py-3 font-bold text-slate-900 text-right">
-                    ৳{Number(line.lineTotal).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
-                      {line.fulfillmentStatus || 'QUEUED'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {(order.lines || []).map((line: any) => {
+                const product = line.variant?.product;
+                const isDropship = Boolean(product?.isDropship);
+                const supplierName = product?.supplierName;
+                const supplierUrl = product?.supplierUrl;
+                const supplierCost = product?.supplierCost;
+
+                return (
+                  <tr key={line.id} className={`hover:bg-slate-50/60 transition-colors ${isDropship ? 'bg-amber-50/30' : ''}`}>
+                    <td className="px-4 py-3 font-semibold text-slate-900">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{line.productNameSnapshot || product?.name || 'Product'}</span>
+                          {isDropship && (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-xs">
+                              📦 Dropship Item
+                            </span>
+                          )}
+                        </div>
+                        {isDropship && (
+                          <div className="flex items-center gap-2.5 text-xs text-slate-600 font-normal mt-1 flex-wrap">
+                            {supplierName && (
+                              <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700">
+                                Supplier: <strong className="text-slate-900">{supplierName}</strong>
+                              </span>
+                            )}
+                            {supplierUrl ? (
+                              <a
+                                href={supplierUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline font-semibold bg-blue-50 px-2 py-0.5 rounded border border-blue-200"
+                              >
+                                Fulfill from Supplier <ExternalLink className="w-3 h-3 ml-0.5" />
+                              </a>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11px]">No supplier link provided</span>
+                            )}
+                            {supplierCost && (
+                              <span className="text-slate-500 text-[11px]">
+                                Wholesale Cost: ৳{Number(supplierCost).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 font-mono text-xs">
+                      {line.skuSnapshot || line.variant?.sku || 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700 text-right">
+                      ৳{Number(line.unitPrice).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-slate-900 font-semibold text-center">
+                      {Number(line.quantity)}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-slate-900 text-right">
+                      ৳{Number(line.lineTotal).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700">
+                        {line.fulfillmentStatus || 'QUEUED'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -92,6 +92,26 @@ export class CreateProductDto {
   @IsOptional()
   unitId?: string;
 
+  @IsBoolean()
+  @IsOptional()
+  isDropship?: boolean;
+
+  @IsString()
+  @IsOptional()
+  supplierName?: string;
+
+  @IsString()
+  @IsOptional()
+  supplierUrl?: string;
+
+  @IsNumber()
+  @IsOptional()
+  supplierCost?: number;
+
+  @IsNumber()
+  @IsOptional()
+  estimatedShippingCost?: number;
+
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })

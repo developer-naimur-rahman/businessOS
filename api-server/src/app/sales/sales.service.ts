@@ -120,7 +120,7 @@ export class SalesService {
         skuSnapshot: variant.sku,
       });
 
-      if (product.type === 'PRODUCT') {
+      if (product.type === 'PRODUCT' && !product.isDropship) {
         inventoryItemsToDeduct.push({
           variantId: variant.id,
           quantity,
@@ -371,7 +371,7 @@ export class SalesService {
       if (dto.status === 'CANCELLED') {
         // Safe inventory restoration: restore only physical items
         const physicalItems = sale.lines
-          .filter((l: any) => l.variant?.product?.type === 'PRODUCT')
+          .filter((l: any) => l.variant?.product?.type === 'PRODUCT' && !l.variant?.product?.isDropship)
           .map((l: any) => ({
             variantId: l.variantId,
             quantity: l.quantity,
@@ -610,7 +610,7 @@ export class SalesService {
         fulfillmentStatus: 'QUEUED' as const,
       });
 
-      if (product.type === 'PRODUCT') {
+      if (product.type === 'PRODUCT' && !product.isDropship) {
         inventoryItemsToDeduct.push({
           variantId: variant.id,
           quantity,

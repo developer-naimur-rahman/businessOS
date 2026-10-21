@@ -434,6 +434,11 @@ model Product {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   compareAtPrice      Decimal?         @db.Decimal(19, 4)
+  isDropship          Boolean          @default(false)
+  supplierName        String?
+  supplierUrl         String?
+  supplierCost        Decimal?         @db.Decimal(19, 4)
+  estimatedShippingCost Decimal?       @db.Decimal(19, 4)
   category            Category?        @relation(fields: [organizationId, categoryId], references: [organizationId, id])
   organization        Organization     @relation(fields: [organizationId], references: [id])
   unit                Unit?            @relation(fields: [organizationId, unitId], references: [organizationId, id])

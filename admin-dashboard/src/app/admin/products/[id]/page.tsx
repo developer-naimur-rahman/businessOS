@@ -4,7 +4,8 @@ import { useParams, useRouter } from "next/navigation"
 import { api } from "../../../../lib/api-client"
 import { 
   ArrowLeft, Package, Archive, Edit, Activity, Barcode, 
-  Image as ImageIcon, Box, Layers, Tag, ChevronDown, Check
+  Image as ImageIcon, Box, Layers, Tag, ChevronDown, Check,
+  TrendingUp, ExternalLink, Globe, Truck
 } from "lucide-react"
 import { MediaImage } from "../../../../components/ui/media-image"
 import { Modal } from "../../../../components/ui/modal"
@@ -26,6 +27,21 @@ export default function ProductDetailPage() {
   const [editingVariant, setEditingVariant] = useState<any>(null)
   const [variantForm, setVariantForm] = useState({
     sku: '', costPrice: 0, retailPrice: 0, posPrice: 0, isActive: true
+  })
+
+  // Edit Product Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    code: '',
+    description: '',
+    sellingPrice: 0,
+    isDropship: false,
+    supplierName: '',
+    supplierUrl: '',
+    supplierCost: 0,
+    estimatedShippingCost: 0,
+    isActive: true,
   })
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -79,6 +95,78 @@ export default function ProductDetailPage() {
       fetchProduct()
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save variant")
+    }
+  }
+
+  const productProfit = useMemo(() => {
+    if (!product) return null
+    const sp = Number(product.sellingPrice) || 0
+    const sc = Number(product.supplierCost) || 0
+    const ship = Number(product.estimatedShippingCost) || 0
+    const gatewayFeeRate = 0.015
+    const gatewayFee = sp * gatewayFeeRate
+    const totalCost = sc + ship + gatewayFee
+    const netProfit = sp - totalCost
+    const margin = sp > 0 ? (netProfit / sp) * 100 : 0
+    const breakEven = (sc + ship) / (1 - gatewayFeeRate)
+    const recPrice = (sc + ship) / (1 - gatewayFeeRate - 0.35)
+    return {
+      totalCost,
+      gatewayFee,
+      netProfit,
+      margin,
+      breakEven: Math.max(0, breakEven),
+      recPrice: Math.max(0, recPrice),
+    }
+  }, [product])
+
+  const editFormProfit = useMemo(() => {
+    const sp = Number(editForm.sellingPrice) || 0
+    const sc = Number(editForm.supplierCost) || 0
+    const ship = Number(editForm.estimatedShippingCost) || 0
+    const gatewayFeeRate = 0.015
+    const gatewayFee = sp * gatewayFeeRate
+    const totalCost = sc + ship + gatewayFee
+    const netProfit = sp - totalCost
+    const margin = sp > 0 ? (netProfit / sp) * 100 : 0
+    const breakEven = (sc + ship) / (1 - gatewayFeeRate)
+    const recPrice = (sc + ship) / (1 - gatewayFeeRate - 0.35)
+    return {
+      totalCost,
+      gatewayFee,
+      netProfit,
+      margin,
+      breakEven: Math.max(0, breakEven),
+      recPrice: Math.max(0, recPrice),
+    }
+  }, [editForm.sellingPrice, editForm.supplierCost, editForm.estimatedShippingCost])
+
+  const handleOpenEditModal = () => {
+    if (!product) return
+    setEditForm({
+      name: product.name || '',
+      code: product.code || '',
+      description: product.description || '',
+      sellingPrice: Number(product.sellingPrice || 0),
+      isDropship: Boolean(product.isDropship),
+      supplierName: product.supplierName || '',
+      supplierUrl: product.supplierUrl || '',
+      supplierCost: Number(product.supplierCost || 0),
+      estimatedShippingCost: Number(product.estimatedShippingCost || 0),
+      isActive: Boolean(product.isActive),
+    })
+    setIsEditModalOpen(true)
+  }
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await api.patch(`/business-core/products/${productId}`, editForm)
+      setIsEditModalOpen(false)
+      toast.success("Product and sourcing details updated successfully!")
+      fetchProduct()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to update product")
     }
   }
 
@@ -167,7 +255,7 @@ export default function ProductDetailPage() {
           <button onClick={handleArchive} className="control-button-secondary h-10 px-4 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-200">
             <Archive className="w-4 h-4 mr-2" /> Archive
           </button>
-          <button className="control-button-primary shadow-sm h-10 px-4">
+          <button onClick={handleOpenEditModal} className="control-button-primary shadow-sm h-10 px-4">
             <Edit className="w-4 h-4 mr-2" /> Edit Product
           </button>
         </div>
@@ -339,6 +427,97 @@ export default function ProductDetailPage() {
         {/* Right Column (Sidebar) */}
         <div className="space-y-6">
           
+          {/* Dropshipping & Sourcing Intelligence Card */}
+          <div className="surface-elevated p-6 border-l-4 border-l-amber-500">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider flex items-center">
+                <span>📦</span> <span className="ml-2">Dropshipping & Sourcing</span>
+              </h3>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                product.isDropship 
+                  ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                  : 'bg-slate-100 text-slate-600 border border-slate-200'
+              }`}>
+                {product.isDropship ? 'Dropship Product' : 'In-House Inventory'}
+              </span>
+            </div>
+
+            {product.isDropship ? (
+              <div className="space-y-4 text-sm">
+                <div>
+                  <span className="text-slate-500 text-xs block">Supplier / Vendor</span>
+                  <span className="font-semibold text-slate-900">{product.supplierName || 'Not specified'}</span>
+                </div>
+
+                {product.supplierUrl && (
+                  <div>
+                    <span className="text-slate-500 text-xs block">Supplier Link</span>
+                    <a 
+                      href={product.supplierUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold underline break-all mt-0.5"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" /> Open Direct Sourcing Page ↗
+                    </a>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Sourcing Cost</span>
+                    <span className="text-sm font-bold font-mono text-slate-900">৳{Number(product.supplierCost || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Est. Shipping</span>
+                    <span className="text-sm font-bold font-mono text-slate-900">৳{Number(product.estimatedShippingCost || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Profit Metrics */}
+                {productProfit && (
+                  <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200/70 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+                      <span className="flex items-center gap-1">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Net Profit Margin
+                      </span>
+                      <span className={productProfit.margin >= 25 ? 'text-emerald-700 font-extrabold' : 'text-amber-700 font-extrabold'}>
+                        {productProfit.margin.toFixed(1)}% (৳{productProfit.netProfit.toLocaleString()})
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>Break-Even Price:</span>
+                      <span className="font-mono font-semibold text-slate-800">৳{productProfit.breakEven.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>Rec. Safe Price (35%):</span>
+                      <span className="font-mono font-bold text-emerald-700">৳{productProfit.recPrice.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                <button 
+                  onClick={handleOpenEditModal}
+                  className="w-full text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 py-2 px-3 rounded-xl transition-colors text-center"
+                >
+                  Edit Sourcing & Sourcing Costs
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  This product is managed via physical warehouse inventory. Convert it to a dropship item to track wholesale sourcing cost, supplier link, and bypass inventory deduction.
+                </p>
+                <button 
+                  onClick={handleOpenEditModal}
+                  className="w-full text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 py-2 px-3 rounded-xl transition-colors"
+                >
+                  Configure as Dropship Product
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Overview */}
           <div className="surface-elevated p-6">
             <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wider mb-4 flex items-center">
@@ -466,6 +645,189 @@ export default function ProductDetailPage() {
         </form>
       </Modal>
 
+      {/* Edit Product Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        title="Edit Product & Sourcing Details"
+        footer={
+          <>
+            <button onClick={() => setIsEditModalOpen(false)} className="control-button-secondary h-10 px-4">Cancel</button>
+            <button onClick={handleSaveProduct} className="control-button-primary h-10 px-6">Save Changes</button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveProduct} className="space-y-4 py-2">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Product Name</label>
+            <input 
+              required 
+              value={editForm.name} 
+              onChange={e => setEditForm({ ...editForm, name: e.target.value })} 
+              type="text" 
+              className="control-input w-full h-10 mt-1" 
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Product Code / SKU</label>
+              <input 
+                value={editForm.code} 
+                onChange={e => setEditForm({ ...editForm, code: e.target.value })} 
+                type="text" 
+                className="control-input w-full h-10 mt-1" 
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-700 uppercase">Selling Price (৳)</label>
+              <input 
+                required 
+                type="number" 
+                min="0" 
+                step="0.01" 
+                value={editForm.sellingPrice} 
+                onChange={e => setEditForm({ ...editForm, sellingPrice: parseFloat(e.target.value) || 0 })} 
+                className="control-input w-full h-10 mt-1 font-mono" 
+              />
+            </div>
+          </div>
+
+          {/* Dropshipping & Sourcing Section */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="modalIsDropship"
+                  checked={editForm.isDropship}
+                  onChange={(e) => setEditForm({ ...editForm, isDropship: e.target.checked })}
+                  className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+                />
+                <label htmlFor="modalIsDropship" className="text-sm font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+                  <span>📦</span> Is this a Dropship Product?
+                </label>
+              </div>
+              {editForm.isDropship && (
+                <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                  Warehouse Stock Bypassed
+                </span>
+              )}
+            </div>
+
+            {editForm.isDropship && (
+              <div className="space-y-4 pt-2 border-t border-amber-200/60 animate-in fade-in duration-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Supplier / Vendor Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. AliExpress Seller / Daraz Wholesale"
+                      value={editForm.supplierName}
+                      onChange={(e) => setEditForm({ ...editForm, supplierName: e.target.value })}
+                      className="control-input w-full h-10 mt-1 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Supplier Product URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={editForm.supplierUrl}
+                      onChange={(e) => setEditForm({ ...editForm, supplierUrl: e.target.value })}
+                      className="control-input w-full h-10 mt-1 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Wholesale Sourcing Cost (৳)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editForm.supplierCost || ''}
+                      onChange={(e) => setEditForm({ ...editForm, supplierCost: parseFloat(e.target.value) || 0 })}
+                      className="control-input w-full h-10 mt-1 bg-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Estimated Shipping Cost (৳)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={editForm.estimatedShippingCost || ''}
+                      onChange={(e) => setEditForm({ ...editForm, estimatedShippingCost: parseFloat(e.target.value) || 0 })}
+                      className="control-input w-full h-10 mt-1 bg-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Inline Profit Calculator Widget */}
+                <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-emerald-600" /> Sourcing Intelligence
+                    </span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      editFormProfit.margin >= 25 
+                        ? 'bg-emerald-100 text-emerald-800' 
+                        : editFormProfit.margin >= 10 
+                        ? 'bg-amber-100 text-amber-800' 
+                        : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {editFormProfit.margin >= 25 ? 'Healthy Margin' : editFormProfit.margin >= 10 ? 'Moderate Margin' : 'Thin / Negative'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Net Profit</p>
+                      <p className={`text-sm font-extrabold font-mono mt-0.5 ${editFormProfit.netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        ৳{editFormProfit.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Margin</p>
+                      <p className={`text-sm font-extrabold font-mono mt-0.5 ${editFormProfit.margin >= 25 ? 'text-emerald-700' : editFormProfit.margin >= 10 ? 'text-amber-700' : 'text-rose-700'}`}>
+                        {editFormProfit.margin.toFixed(1)}%
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Break-Even</p>
+                      <p className="text-sm font-bold font-mono text-slate-800 mt-0.5">
+                        ৳{editFormProfit.breakEven.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-emerald-50/60 border border-emerald-200">
+                      <p className="text-[10px] uppercase font-bold text-emerald-800">Rec. Price (35%)</p>
+                      <p className="text-sm font-extrabold font-mono text-emerald-800 mt-0.5">
+                        ৳{editFormProfit.recPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-700 uppercase">Description</label>
+            <textarea 
+              value={editForm.description} 
+              onChange={e => setEditForm({ ...editForm, description: e.target.value })} 
+              className="control-input w-full h-24 mt-1 py-2 resize-none" 
+            />
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

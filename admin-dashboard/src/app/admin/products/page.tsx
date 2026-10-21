@@ -1,10 +1,11 @@
 "use client"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useMemo } from "react"
 import { api } from "../../../lib/api-client"
-import { Plus, Search, Filter, Edit, Trash2, Package } from "lucide-react"
+import { Plus, Search, Filter, Edit, Trash2, Package, TrendingUp, ExternalLink, Truck } from "lucide-react"
 import { MediaImage } from "../../../components/ui/media-image"
 import { Modal } from "../../../components/ui/modal"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 import { ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react"
 import { toast } from "sonner"
@@ -31,7 +32,8 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [formData, setFormData] = useState({
     name: '', code: '', description: '', type: 'PRODUCT', 
-    costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: '', categoryId: ''
+    costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: '', categoryId: '',
+    isDropship: false, supplierName: '', supplierUrl: '', supplierCost: 0, estimatedShippingCost: 0
   })
   
   // Variants State
@@ -88,6 +90,27 @@ export default function AdminProductsPage() {
     return () => clearTimeout(timer)
   }, [page, pageSize, search])
 
+  const profitAnalysis = useMemo(() => {
+    const sp = Number(formData.sellingPrice) || 0
+    const sc = Number(formData.supplierCost) || 0
+    const ship = Number(formData.estimatedShippingCost) || 0
+    const gatewayFeeRate = 0.015 // 1.5% gateway fee
+    const gatewayFee = sp * gatewayFeeRate
+    const totalCost = sc + ship + gatewayFee
+    const netProfit = sp - totalCost
+    const margin = sp > 0 ? (netProfit / sp) * 100 : 0
+    const breakEven = (sc + ship) / (1 - gatewayFeeRate)
+    const recPrice = (sc + ship) / (1 - gatewayFeeRate - 0.35)
+    return {
+      totalCost,
+      gatewayFee,
+      netProfit,
+      margin,
+      breakEven: Math.max(0, breakEven),
+      recPrice: Math.max(0, recPrice),
+    }
+  }, [formData.sellingPrice, formData.supplierCost, formData.estimatedShippingCost])
+
   const handleOpenModal = (product: any = null) => {
     if (product) {
       setEditingProduct(product)
@@ -100,7 +123,12 @@ export default function AdminProductsPage() {
         sellingPrice: Number(product.sellingPrice),
         isActive: product.isActive,
         imageUrl: product.imageUrl || '',
-        categoryId: product.categoryId || ''
+        categoryId: product.categoryId || '',
+        isDropship: Boolean(product.isDropship),
+        supplierName: product.supplierName || '',
+        supplierUrl: product.supplierUrl || '',
+        supplierCost: Number(product.supplierCost || 0),
+        estimatedShippingCost: Number(product.estimatedShippingCost || 0),
       })
       if (product.variants && product.variants.length > 1) {
         setHasVariants(true)
@@ -119,7 +147,8 @@ export default function AdminProductsPage() {
       setEditingProduct(null)
       setFormData({
         name: '', code: '', description: '', type: 'PRODUCT', 
-        costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: '', categoryId: ''
+        costPrice: 0, sellingPrice: 0, isActive: true, imageUrl: '', categoryId: '',
+        isDropship: false, supplierName: '', supplierUrl: '', supplierCost: 0, estimatedShippingCost: 0
       })
       setHasVariants(false)
       setVariants([])
@@ -211,8 +240,11 @@ export default function AdminProductsPage() {
           <p className="text-slate-500">Manage your catalog, pricing, and classifications.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => handleOpenModal()} className="control-button-primary shadow-sm h-10 px-4">
+          <Link href="/admin/products/new" className="control-button-primary shadow-xs h-10 px-4 flex items-center">
             <Plus className="w-4 h-4 mr-2" /> New Product
+          </Link>
+          <button onClick={() => handleOpenModal()} className="control-button-secondary shadow-xs h-10 px-3 text-xs">
+            Quick Modal
           </button>
         </div>
       </div>
@@ -318,7 +350,14 @@ export default function AdminProductsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900">{product.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-slate-900">{product.name}</p>
+                        {product.isDropship && (
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                            📦 Dropship
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 font-mono mt-0.5">{product.code || 'NO-SKU'}</p>
                     </td>
                     <td className="px-4 py-3 text-slate-600 font-medium">{product.category?.name || 'Uncategorized'}</td>
@@ -463,6 +502,135 @@ export default function AdminProductsPage() {
               ))}
             </div>
           )}
+          {/* Dropshipping & Sourcing Section */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isDropship"
+                  checked={formData.isDropship}
+                  onChange={(e) => setFormData({ ...formData, isDropship: e.target.checked })}
+                  className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
+                />
+                <label htmlFor="isDropship" className="text-sm font-bold text-slate-900 flex items-center gap-1.5 cursor-pointer">
+                  <span>📦</span> Is this a Dropship Product?
+                </label>
+              </div>
+              {formData.isDropship && (
+                <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                  Warehouse Stock Bypassed
+                </span>
+              )}
+            </div>
+
+            {formData.isDropship && (
+              <div className="space-y-4 pt-2 border-t border-amber-200/60 animate-in fade-in duration-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Supplier / Vendor Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. AliExpress Seller / Daraz Wholesale"
+                      value={formData.supplierName}
+                      onChange={(e) => setFormData({ ...formData, supplierName: e.target.value })}
+                      className="control-input w-full h-10 mt-1 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Supplier Product URL</label>
+                    <input
+                      type="url"
+                      placeholder="https://..."
+                      value={formData.supplierUrl}
+                      onChange={(e) => setFormData({ ...formData, supplierUrl: e.target.value })}
+                      className="control-input w-full h-10 mt-1 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Wholesale Sourcing Cost (৳)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.supplierCost || ''}
+                      onChange={(e) => setFormData({ ...formData, supplierCost: parseFloat(e.target.value) || 0 })}
+                      className="control-input w-full h-10 mt-1 bg-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 uppercase">Estimated Shipping Cost (৳)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.estimatedShippingCost || ''}
+                      onChange={(e) => setFormData({ ...formData, estimatedShippingCost: parseFloat(e.target.value) || 0 })}
+                      className="control-input w-full h-10 mt-1 bg-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Inline Profit Calculator Widget */}
+                <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2.5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <TrendingUp className="w-4 h-4 text-emerald-600" /> Product Profit & Sourcing Intelligence
+                    </span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      profitAnalysis.margin >= 25 
+                        ? 'bg-emerald-100 text-emerald-800' 
+                        : profitAnalysis.margin >= 10 
+                        ? 'bg-amber-100 text-amber-800' 
+                        : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {profitAnalysis.margin >= 25 ? 'Healthy Margin' : profitAnalysis.margin >= 10 ? 'Moderate Margin' : 'Thin / Negative'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Net Profit</p>
+                      <p className={`text-sm font-extrabold font-mono mt-0.5 ${profitAnalysis.netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                        ৳{profitAnalysis.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Margin</p>
+                      <p className={`text-sm font-extrabold font-mono mt-0.5 ${profitAnalysis.margin >= 25 ? 'text-emerald-700' : profitAnalysis.margin >= 10 ? 'text-amber-700' : 'text-rose-700'}`}>
+                        {profitAnalysis.margin.toFixed(1)}%
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <p className="text-[10px] uppercase font-bold text-slate-500">Break-Even</p>
+                      <p className="text-sm font-bold font-mono text-slate-800 mt-0.5">
+                        ৳{profitAnalysis.breakEven.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-emerald-50/60 border border-emerald-200">
+                      <p className="text-[10px] uppercase font-bold text-emerald-800">Rec. Price (35%)</p>
+                      <p className="text-sm font-extrabold font-mono text-emerald-800 mt-0.5">
+                        ৳{profitAnalysis.recPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 italic">
+                    Calculated with 1.5% gateway payment fee, sourcing cost (৳{formData.supplierCost || 0}), and estimated shipping (৳{formData.estimatedShippingCost || 0}).
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="text-xs font-semibold text-slate-700 uppercase">Description</label>
             <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="control-input w-full h-24 mt-1 py-2 resize-none" />

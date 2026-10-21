@@ -34,6 +34,7 @@ import { AnalyticsService } from './services/analytics.service';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { StorefrontConfigService } from './services/storefront-config.service';
 import { StorefrontConfigController, AdminStorefrontConfigController } from './controllers/storefront-config.controller';
+import { AdminProductsController } from './controllers/admin-products.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -41,6 +42,7 @@ import { StorefrontConfigController, AdminStorefrontConfigController } from './c
     CustomersController,
     SuppliersController,
     ProductsController,
+    AdminProductsController,
     CategoriesController,
     UnitsController,
     VariantsController,
