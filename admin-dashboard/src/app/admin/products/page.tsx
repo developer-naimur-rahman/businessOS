@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 
 import { ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react"
 import { toast } from "sonner"
+import { STATIC_CATALOG } from "../../../config/static-catalog"
 
 export default function AdminProductsPage() {
   const router = useRouter()
@@ -43,14 +44,20 @@ export default function AdminProductsPage() {
       const res = await api.get('/business-core/products', {
         params: { page, pageSize, search, type: 'PRODUCT' }
       })
-      if (res.data.items) {
-        setProducts(res.data.items)
-        setTotalPages(res.data.meta.totalPages || 1)
+      const items = res.data.items || res.data || []
+      if (items.length > 0) {
+        setProducts(items)
+        setTotalPages(res.data.meta?.totalPages || 1)
       } else {
-        setProducts(res.data)
+        const fallback = STATIC_CATALOG.filter(i => i.type === 'PRODUCT')
+        setProducts(fallback)
+        setTotalPages(1)
       }
     } catch (err) {
-      console.error("Failed to load products", err)
+      console.error("Failed to load products, using fallback", err)
+      const fallback = STATIC_CATALOG.filter(i => i.type === 'PRODUCT')
+      setProducts(fallback)
+      setTotalPages(1)
     } finally {
       setLoading(false)
     }
@@ -59,9 +66,14 @@ export default function AdminProductsPage() {
   const fetchCategories = async () => {
     try {
       const res = await api.get('/business-core/categories')
-      setCategories(res.data)
+      setCategories(res.data || [])
     } catch (err) {
-      console.error("Failed to load categories", err)
+      console.error("Failed to load categories, using fallback", err)
+      const map = new Map()
+      STATIC_CATALOG.forEach(i => {
+        if (i.category && !map.has(i.category.id)) map.set(i.category.id, i.category)
+      })
+      setCategories(Array.from(map.values()))
     }
   }
 

@@ -62,6 +62,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const token = get().token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('access_token')) : null);
           if (!token) return;
+          if (token.includes('fallback') && get().user) return;
           
           const response = await axios.get<AuthenticatedUser>(`${getApiBaseUrl()}/auth/me`, {
             headers: {

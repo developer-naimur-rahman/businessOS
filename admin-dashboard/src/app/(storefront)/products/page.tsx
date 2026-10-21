@@ -7,6 +7,7 @@ import { Search, Filter, ShoppingBag, X, Heart } from "lucide-react"
 import { MediaImage } from "../../../components/ui/media-image"
 import { useWishlistStore } from "../../../store/useWishlistStore"
 import { toast } from "sonner"
+import { STATIC_CATALOG } from "../../../config/static-catalog"
 
 function ProductsContent() {
   const searchParams = useSearchParams()
@@ -32,9 +33,15 @@ function ProductsContent() {
       try {
         const res = await api.get('/public/catalog/products')
         const items = res.data.items || res.data || []
-        setProducts(items.filter((p: any) => p.type === 'PRODUCT' || !p.type))
+        const prods = items.filter((p: any) => p.type === 'PRODUCT' || !p.type)
+        if (prods.length > 0) {
+          setProducts(prods)
+        } else {
+          setProducts(STATIC_CATALOG.filter(i => i.type === 'PRODUCT'))
+        }
       } catch (err) {
-        console.error("Failed to load catalog", err)
+        console.error("Failed to load catalog, using static fallback", err)
+        setProducts(STATIC_CATALOG.filter(i => i.type === 'PRODUCT'))
       } finally {
         setLoading(false)
       }

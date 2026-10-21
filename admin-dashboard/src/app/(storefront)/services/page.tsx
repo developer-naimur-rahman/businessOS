@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { MediaImage } from "../../../components/ui/media-image"
 import { Printer, Sparkles, ArrowRight } from "lucide-react"
+import { STATIC_CATALOG } from "../../../config/static-catalog"
 
 function ServicesContent() {
   const searchParams = useSearchParams()
@@ -18,9 +19,15 @@ function ServicesContent() {
       try {
         const res = await api.get('/public/catalog/products')
         const items = res.data.items || res.data || []
-        setServices(items.filter((p: any) => p.type === 'SERVICE'))
+        const srvs = items.filter((p: any) => p.type === 'SERVICE')
+        if (srvs.length > 0) {
+          setServices(srvs)
+        } else {
+          setServices(STATIC_CATALOG.filter(i => i.type === 'SERVICE'))
+        }
       } catch (err) {
-        console.error("Failed to load catalog", err)
+        console.error("Failed to load catalog, using static fallback", err)
+        setServices(STATIC_CATALOG.filter(i => i.type === 'SERVICE'))
       } finally {
         setLoading(false)
       }

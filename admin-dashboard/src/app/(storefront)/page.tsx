@@ -1,5 +1,6 @@
 "use client"
 import { demoContent } from "../../config/demo-content"
+import { STATIC_CATALOG } from "../../config/static-catalog"
 
 import React, { useEffect, useState } from "react"
 import { api } from "../../lib/api-client"
@@ -33,7 +34,7 @@ const getFallbackProductImage = (name: string = "", type?: string) => {
 };
 
 const ProductCard = ({ product }: { product: any }) => {
-  const imageUrl = product.imageUrl || (product.variants && product.variants.length > 0 ? product.variants[0].imageUrl : null)
+  const imageUrl = product.imageUrl || (product.variants && product.variants.length > 0 ? product.variants[0].imageUrl : null) || getFallbackProductImage(product.name, product.type)
   const price = Number(product.sellingPrice)
   
   const originalPrice = product.compareAtPrice ? Number(product.compareAtPrice) : null
@@ -208,14 +209,21 @@ export default function StorefrontHomePage() {
     async function fetchData() {
       try {
         const [productsRes, categoriesRes, configRes] = await Promise.all([
-          api.get('/storefront/catalog/products'),
-          api.get('/storefront/catalog/services'),
+          api.get('/storefront/catalog/products').catch(() => ({ data: { items: STATIC_CATALOG.filter(i => i.type === 'PRODUCT') } })),
+          api.get('/storefront/catalog/services').catch(() => ({ data: { items: STATIC_CATALOG.filter(i => i.type === 'SERVICE') } })),
           api.get('/public/storefront-config').catch(() => ({ data: null }))
         ])
         
-        
-        const productsData = productsRes.data.items || productsRes.data || [];
-        const servicesData = categoriesRes.data.items || categoriesRes.data || [];
+        let productsData = productsRes?.data?.items || productsRes?.data || [];
+        let servicesData = categoriesRes?.data?.items || categoriesRes?.data || [];
+
+        if (!Array.isArray(productsData) || productsData.length === 0) {
+          productsData = STATIC_CATALOG.filter(i => i.type === 'PRODUCT');
+        }
+        if (!Array.isArray(servicesData) || servicesData.length === 0) {
+          servicesData = STATIC_CATALOG.filter(i => i.type === 'SERVICE');
+        }
+
         setProducts([...productsData, ...servicesData]);
         
         // Extract unique product categories
@@ -225,12 +233,14 @@ export default function StorefrontHomePage() {
         
         setCategories([...prodCats, ...servCats]);
 
-        
         if (configRes?.data) {
           setConfig(configRes.data)
         }
       } catch (err) {
-        console.error("Failed to load storefront data", err)
+        console.error("Failed to load storefront data, using static catalog", err)
+        const productsData = STATIC_CATALOG.filter(i => i.type === 'PRODUCT');
+        const servicesData = STATIC_CATALOG.filter(i => i.type === 'SERVICE');
+        setProducts([...productsData, ...servicesData]);
       } finally {
         setLoading(false)
       }
