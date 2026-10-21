@@ -8,8 +8,12 @@
     ],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "target": "es2021",
-    "moduleResolution": "bundler"
+    "target": "ES2022",
+    "useDefineForClassFields": false,
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "src/**/*.ts"

@@ -8,6 +8,12 @@
     }
   ],
   "compilerOptions": {
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "target": "ES2022",
+    "useDefineForClassFields": false,
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0"
   }
 }
