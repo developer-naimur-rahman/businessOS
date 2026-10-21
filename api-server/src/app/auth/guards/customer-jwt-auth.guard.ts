@@ -10,3 +10,12 @@ export class CustomerJwtAuthGuard extends AuthGuard('customer-jwt') {
     return user;
   }
 }
+
+@Injectable()
+export class OptionalCustomerJwtAuthGuard extends AuthGuard('customer-jwt') {
+  handleRequest(err: any, user: any, info: any) {
+    // Allows guest access while attaching user if token is provided
+    return user || null;
+  }
+}
+

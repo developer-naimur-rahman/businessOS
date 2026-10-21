@@ -8,8 +8,11 @@ import {
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar
 } from 'recharts'
+import { useRouter } from "next/navigation"
+import { useAuthStore } from "../../../store/useAuthStore"
 
 export default function AnalyticsDashboardPage() {
+  const router = useRouter()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(30)
@@ -17,20 +20,31 @@ export default function AnalyticsDashboardPage() {
 
   useEffect(() => {
     const fetchAnalytics = async () => {
+      const token = 
+        useAuthStore.getState().token || 
+        (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('access_token') || localStorage.getItem('adminToken')) : null)
+      
+      if (!token) {
+        return
+      }
+
       try {
         setLoading(true)
         setError(null)
         const res = await api.get(`/business-core/analytics/dashboard?days=${days}`)
         setData(res.data)
       } catch (err: any) {
-        console.error("Failed to load analytics", err)
+        if (err?.response?.status === 401) {
+          router.push('/admin/login')
+          return
+        }
         setError(err.response?.data?.message || err.message || "Failed to load analytics data")
       } finally {
         setLoading(false)
       }
     }
     fetchAnalytics()
-  }, [days])
+  }, [days, router])
 
   if (loading) {
     return (

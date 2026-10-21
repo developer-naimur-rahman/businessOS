@@ -46,6 +46,9 @@ export class FinanceIntegrationService {
       await this.processPurchasePaymentEvent(event);
     } else if (event.eventType === 'SALE_PAYMENT' && event.aggregateType === 'SalePayment') {
       await this.processSalePaymentEvent(event);
+    } else if (event.eventType === 'ORDER_STATUS_CHANGED' || event.eventType === 'ORDER_PLACED') {
+      // Non-financial lifecycle events do not produce journal entries; acknowledge and complete
+      await this.repo.markEventCompleted(event.id);
     } else {
       throw new Error(`Unsupported event type: ${event.eventType}`);
     }

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react"
 import { api } from "../../../lib/api-client"
 import { RefreshCw, CheckCircle2, ShieldCheck, Database, ArrowRight, Activity, Plus, BookOpen } from "lucide-react"
 import { Modal } from "../../../components/ui/modal"
+import { toast } from "sonner"
 
 export default function AdminFinancePage() {
   const [accounts, setAccounts] = useState<any[]>([])
@@ -48,9 +49,9 @@ export default function AdminFinancePage() {
       // Assuming simple single-line entry creation is supported by backend for testing,
       // though typically entries need to be balanced. We will just send a balanced 2-line if needed.
       // Wait, the API requires balanced lines. We need two accounts!
-      alert("Note: Single-line entry not implemented for balanced ledger. Use sync for now.")
-    } catch (err) {
-      alert("Failed")
+      toast.info("Single-line entry not implemented for balanced ledger. Use sync for now.")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to create entry")
     } finally {
       setIsSubmitting(false)
     }

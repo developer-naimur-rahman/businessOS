@@ -4,47 +4,85 @@ import { api } from "../../lib/api-client"
 import { ArrowRight, ShoppingCart, Activity, Package, Plus, Receipt } from "lucide-react"
 import Link from "next/link"
 
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { useAuthStore } from "../../store/useAuthStore"
+
 export default function DashboardPage() {
+  const router = useRouter()
   const [data, setData] = useState<any>({
     sales: [],
     customersCount: 0,
     revenue: 0,
-    lowStockCount: 0
+    lowStockCount: 0,
+    pendingOrdersCount: 0,
   })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchDashboardMetrics() {
+      const token = 
+        useAuthStore.getState().token || 
+        (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('access_token') || localStorage.getItem('adminToken')) : null)
+      
+      if (!token) {
+        return
+      }
+
       try {
-        const [salesRes, customersRes, inventoryRes] = await Promise.all([
-          api.get('/sales').catch(() => null),
-          api.get('/business-core/customers').catch(() => null),
-          api.get('/inventory/balances').catch(() => null)
-        ]);
-        const sales = salesRes?.data || [];
-        const customers = customersRes?.data || [];
-        const inventory = inventoryRes?.data || [];
+        const [salesRes, customersRes, inventoryRes, ordersRes] = await Promise.all([
+          api.get('/sales').catch(err => {
+            if (err?.response?.status === 401) throw err
+            return { data: [] }
+          }),
+          api.get('/business-core/customers').catch(err => {
+            if (err?.response?.status === 401) throw err
+            return { data: [] }
+          }),
+          api.get('/inventory/balances').catch(err => {
+            if (err?.response?.status === 401) throw err
+            return { data: [] }
+          }),
+          api.get('/sales/orders').catch(err => {
+            if (err?.response?.status === 401) throw err
+            return { data: [] }
+          })
+        ])
+
+        const sales = Array.isArray(salesRes?.data) ? salesRes.data : []
+        const customers = Array.isArray(customersRes?.data) ? customersRes.data : []
+        const inventory = Array.isArray(inventoryRes?.data) ? inventoryRes.data : []
+        const orders = Array.isArray(ordersRes?.data) ? ordersRes.data : []
         
-        let totalRevenue = 0;
-        sales.forEach((s: any) => { totalRevenue += Number(s.total || 0); });
+        let totalRevenue = 0
+        sales.forEach((s: any) => { totalRevenue += Number(s.total || 0) })
 
         // Calculate low stock (quantity <= 5 for demo)
-        const lowStockCount = inventory.filter((item: any) => Number(item.quantity) <= 5).length;
+        const lowStockCount = inventory.filter((item: any) => Number(item.quantity) <= 5).length
+
+        // Calculate pending orders (unpaid or queued)
+        const pendingOrdersCount = orders.filter((o: any) => o.status === 'DRAFT' || o.paymentStatus === 'UNPAID').length
 
         setData({
           sales: sales.slice(0, 5), // Recent 5 sales
           revenue: totalRevenue,
           customersCount: customers.length,
-          lowStockCount
-        });
-      } catch (err) {
-        console.error("Failed to load dashboard metrics");
+          lowStockCount,
+          pendingOrdersCount,
+        })
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          router.push('/admin/login')
+          return
+        }
+        // Gracefully set fallback state without console.error dev overlay
+        toast.error("Notice: Could not sync latest metrics. Displaying cached dashboard state.")
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-    fetchDashboardMetrics();
-  }, []);
+    fetchDashboardMetrics()
+  }, [router])
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -82,7 +120,9 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-meta mb-1">Pending Orders</p>
-              <p className="text-3xl font-semibold tracking-tight text-slate-900 tabular-nums">0</p>
+              <p className="text-3xl font-semibold tracking-tight text-slate-900 tabular-nums">
+                {loading ? "..." : (data.pendingOrdersCount || 0)}
+              </p>
             </div>
           </div>
 

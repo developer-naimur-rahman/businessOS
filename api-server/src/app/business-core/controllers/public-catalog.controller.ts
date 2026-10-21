@@ -118,7 +118,7 @@ export class PublicCatalogController {
         id: body.orderId,
         organizationId: orgId,
         status: { in: ['COMPLETED', 'DRAFT'] }, // Temporarily allowing DRAFT for testing, normally COMPLETED
-        saleLines: {
+        lines: {
           some: {
             variant: {
               productId: id

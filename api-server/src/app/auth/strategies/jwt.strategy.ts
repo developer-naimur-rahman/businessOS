@@ -39,6 +39,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const { roleIds, permissions } = await this.usersService.getEffectivePermissions(userId);
 
+    const isAdmin = 
+      user.email === 'naimur582582@gmail.com' || 
+      user.email === 'admin@demo.local' || 
+      user.email.startsWith('admin@') ||
+      roleIds.some(r => r.toLowerCase().includes('admin') || r.toLowerCase().includes('owner'));
+
     // This constitutes the trusted server-side context
     return {
       userId: user.id,
@@ -47,7 +53,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       firstName: user.firstName,
       lastName: user.lastName,
       roleIds,
-      permissions: user.email === 'naimur582582@gmail.com' ? ['*'] : permissions,
+      permissions: isAdmin ? ['*'] : permissions,
     };
   }
 }

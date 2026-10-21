@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Optional } from '@nestjs/common';
 import { SalesRepository } from './sales.repository';
 import { InventoryService } from '../inventory/inventory.service';
 import { ProductsService } from '../business-core/services/products.service';
@@ -8,6 +8,8 @@ import { CustomersService } from '../business-core/services/customers.service';
 import { BranchesService } from '../operational-structure/branches/branches.service';
 import { Prisma, PaymentMethod } from '@prisma/client';
 import { PrismaClientManager } from '../common/prisma/prisma-client.manager';
+import { QuerySalesDto, UpdateOrderStatusDto, CreateCustomerCheckoutDto } from './dto/sales.dto';
+import { NotificationService } from '../common/notifications/notification.service';
 
 export interface CreateSaleDto {
   branchId: string;
@@ -45,6 +47,7 @@ export class SalesService {
     private readonly customersService: CustomersService,
     private readonly branchesService: BranchesService,
     private readonly prismaManager: PrismaClientManager,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   async createDirectSale(organizationId: string, data: CreateSaleDto, userId: string, internalOverrides?: { [variantId: string]: number }) {
@@ -293,4 +296,586 @@ export class SalesService {
       return payment;
     });
   }
+
+  async getOrders(organizationId: string, query: QuerySalesDto) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.SaleWhereInput = {
+      organizationId,
+    };
+
+    if (query.status) {
+      where.status = query.status as any;
+    }
+
+    if (query.paymentStatus) {
+      where.paymentStatus = query.paymentStatus as any;
+    }
+
+    if (query.search && query.search.trim()) {
+      const s = query.search.trim();
+      where.OR = [
+        { saleNumber: { contains: s, mode: 'insensitive' } },
+        { customer: { name: { contains: s, mode: 'insensitive' } } },
+        { customer: { phone: { contains: s, mode: 'insensitive' } } },
+        { customer: { email: { contains: s, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (query.startDate || query.endDate) {
+      where.createdAt = {};
+      if (query.startDate) where.createdAt.gte = new Date(query.startDate);
+      if (query.endDate) where.createdAt.lte = new Date(query.endDate);
+    }
+
+    const { items, total } = await this.salesRepo.findManyWithPagination(organizationId, {
+      skip,
+      take: limit,
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  async getOrderDetailsWithAudit(organizationId: string, id: string) {
+    const sale = await this.salesRepo.findById(organizationId, id);
+    if (!sale) throw new NotFoundException('Order not found');
+
+    const auditLogs = await this.salesRepo.getAuditLogsForEntity(organizationId, 'Sale', id);
+
+    return {
+      ...sale,
+      auditLogs,
+    };
+  }
+
+  async updateOrderStatus(organizationId: string, id: string, dto: UpdateOrderStatusDto, userId?: string) {
+    return this.salesRepo.runTransaction(async () => {
+      const sale = await this.salesRepo.findById(organizationId, id);
+      if (!sale) throw new NotFoundException('Order not found');
+
+      if (sale.status === 'CANCELLED') {
+        throw new BadRequestException('Order has already been cancelled and cannot be modified.');
+      }
+
+      // Check transition validity
+      if (dto.status === 'CANCELLED') {
+        // Safe inventory restoration: restore only physical items
+        const physicalItems = sale.lines
+          .filter((l: any) => l.variant?.product?.type === 'PRODUCT')
+          .map((l: any) => ({
+            variantId: l.variantId,
+            quantity: l.quantity,
+          }));
+
+        if (physicalItems.length > 0) {
+          await this.inventoryService.restoreStockForCancelledSale(
+            organizationId,
+            sale.warehouseId,
+            physicalItems,
+            sale.id,
+            userId,
+          );
+        }
+
+        const updated = await this.salesRepo.updateSaleStatusAndFulfillment(
+          organizationId,
+          id,
+          'CANCELLED',
+          'CANCELLED',
+        );
+
+        await this.salesRepo.recordAuditLog({
+          organizationId,
+          entityType: 'Sale',
+          entityId: sale.id,
+          action: 'ORDER_CANCELLED',
+          oldData: { status: sale.status },
+          newData: {
+            status: 'CANCELLED',
+            note: dto.note || 'Order cancelled by administrator',
+            courier: dto.courier,
+            trackingCode: dto.trackingCode,
+          },
+          userId: userId || null,
+        });
+
+        await this.prismaManager.client.outboxEvent.create({
+          data: {
+            organizationId,
+            eventType: 'ORDER_STATUS_CHANGED',
+            aggregateType: 'Sale',
+            aggregateId: sale.id,
+            payload: { saleId: sale.id, status: 'CANCELLED', previousStatus: sale.status },
+          },
+        });
+
+        return updated;
+      }
+
+      if (dto.status === 'COMPLETED') {
+        const updated = await this.salesRepo.updateSaleStatusAndFulfillment(
+          organizationId,
+          id,
+          'COMPLETED',
+          dto.fulfillmentStatus || 'COMPLETED',
+        );
+
+        await this.salesRepo.recordAuditLog({
+          organizationId,
+          entityType: 'Sale',
+          entityId: sale.id,
+          action: 'ORDER_COMPLETED',
+          oldData: { status: sale.status },
+          newData: {
+            status: 'COMPLETED',
+            fulfillmentStatus: dto.fulfillmentStatus || 'COMPLETED',
+            note: dto.note,
+            courier: dto.courier,
+            trackingCode: dto.trackingCode,
+          },
+          userId: userId || null,
+        });
+
+        await this.prismaManager.client.outboxEvent.create({
+          data: {
+            organizationId,
+            eventType: 'ORDER_STATUS_CHANGED',
+            aggregateType: 'Sale',
+            aggregateId: sale.id,
+            payload: { saleId: sale.id, status: 'COMPLETED', previousStatus: sale.status },
+          },
+        });
+
+        return updated;
+      }
+
+      // If status is DRAFT (processing / shipping fulfillment updates)
+      const updated = await this.salesRepo.updateSaleStatusAndFulfillment(
+        organizationId,
+        id,
+        'DRAFT',
+        dto.fulfillmentStatus,
+      );
+
+      await this.salesRepo.recordAuditLog({
+        organizationId,
+        entityType: 'Sale',
+        entityId: sale.id,
+        action: 'ORDER_STATUS_UPDATED',
+        oldData: { status: sale.status },
+        newData: {
+          status: 'DRAFT',
+          fulfillmentStatus: dto.fulfillmentStatus,
+          note: dto.note,
+          courier: dto.courier,
+          trackingCode: dto.trackingCode,
+        },
+        userId: userId || null,
+      });
+
+      await this.prismaManager.client.outboxEvent.create({
+        data: {
+          organizationId,
+          eventType: 'ORDER_STATUS_CHANGED',
+          aggregateType: 'Sale',
+          aggregateId: sale.id,
+          payload: {
+            saleId: sale.id,
+            status: 'DRAFT',
+            fulfillmentStatus: dto.fulfillmentStatus,
+          },
+        },
+      });
+
+      this.notificationService?.notifyOrderStatusChange({
+        organizationId,
+        orderId: sale.id,
+        saleNumber: sale.saleNumber || sale.id,
+        customerName: sale.customer?.name,
+        customerPhone: sale.customer?.phone,
+        customerEmail: sale.customer?.email,
+        status: dto.status,
+        fulfillmentStatus: dto.fulfillmentStatus,
+        courier: dto.courier,
+        trackingCode: dto.trackingCode,
+        note: dto.note,
+      }).catch(() => {});
+
+      return updated;
+    });
+  }
+
+  async createOnlineOrder(organizationId: string, customerId: string, data: CreateCustomerCheckoutDto) {
+    if (data.idempotencyKey) {
+      const existing = await this.salesRepo.findByIdempotencyKey(organizationId, data.idempotencyKey);
+      if (existing) {
+        return existing;
+      }
+    }
+
+    const rawLines = data.items || data.lines || [];
+    if (rawLines.length === 0) {
+      throw new BadRequestException('Order must have at least one line item.');
+    }
+
+    // Default storefront branch & warehouse
+    const branch = await this.branchesService.findAll(organizationId).then(b => b[0]);
+    if (!branch) {
+      throw new BadRequestException('No active branch found for online sales.');
+    }
+    const warehouse = await this.warehousesService.findAll(organizationId).then(w => w.find(item => item.branchId === branch.id) || w[0]);
+    if (!warehouse) {
+      throw new BadRequestException('No active warehouse found for online sales.');
+    }
+
+    // Resolve variant IDs
+    const resolvedLines: Array<{ variantId: string; quantity: number; discount: number; unitPrice?: number }> = [];
+
+    for (const item of rawLines) {
+      let variantId = item.variantId;
+      if (!variantId && item.productId) {
+        // Find or create default variant
+        const existingVariant = await this.prismaManager.client.productVariant.findFirst({
+          where: { organizationId, productId: item.productId },
+        });
+
+        if (existingVariant) {
+          variantId = existingVariant.id;
+        } else {
+          const product = await this.productsService.findOne(organizationId, item.productId);
+          const genSku = `${product.name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6) || 'VAR'}-${Date.now().toString().slice(-4)}`;
+          const createdVariant = await this.prismaManager.client.productVariant.create({
+            data: {
+              organizationId,
+              productId: item.productId,
+              sku: genSku,
+              name: 'Standard',
+              sellingPrice: product.sellingPrice,
+              costPrice: product.costPrice || 0,
+            },
+          });
+          variantId = createdVariant.id;
+        }
+      }
+
+      if (!variantId) {
+        throw new BadRequestException('Each item must specify either a productId or variantId.');
+      }
+
+      resolvedLines.push({
+        variantId,
+        quantity: Number(item.quantity) || 1,
+        discount: Number(item.discount) || 0,
+        unitPrice: item.unitPrice ? Number(item.unitPrice) : undefined,
+      });
+    }
+
+    let subtotal = new Prisma.Decimal(0);
+    const saleLinesToCreate = [];
+    const inventoryItemsToDeduct = [];
+
+    for (const line of resolvedLines) {
+      const quantity = new Prisma.Decimal(line.quantity);
+      if (quantity.lte(0)) throw new BadRequestException('Quantity must be greater than zero.');
+
+      const variant = await this.variantsService.findOne(organizationId, line.variantId);
+      const product = await this.productsService.findOne(organizationId, variant.productId);
+      if (!product.isActive) throw new BadRequestException(`Product ${product.name} is inactive.`);
+
+      const unitPrice = line.unitPrice !== undefined ? new Prisma.Decimal(line.unitPrice) : ((variant as any).posPrice ?? (variant as any).retailPrice ?? product.sellingPrice);
+      const lineSubtotal = unitPrice.mul(quantity);
+      const discount = line.discount ? new Prisma.Decimal(line.discount) : new Prisma.Decimal(0);
+      const lineTotal = lineSubtotal.sub(discount);
+      subtotal = subtotal.add(lineTotal);
+
+      saleLinesToCreate.push({
+        variantId: variant.id,
+        quantity,
+        unitPrice,
+        discount,
+        lineSubtotal,
+        lineTotal,
+        productNameSnapshot: product.name,
+        skuSnapshot: variant.sku,
+        fulfillmentStatus: 'QUEUED' as const,
+      });
+
+      if (product.type === 'PRODUCT') {
+        inventoryItemsToDeduct.push({
+          variantId: variant.id,
+          quantity,
+        });
+      }
+    }
+
+    const couponDiscount = data.discountAmount ? new Prisma.Decimal(data.discountAmount) : new Prisma.Decimal(0);
+    const grandTotal = subtotal.sub(couponDiscount).gte(0) ? subtotal.sub(couponDiscount) : new Prisma.Decimal(0);
+    let paymentStatus: 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' = 'UNPAID';
+    const paymentsToCreate = [];
+
+    if (data.paymentMethod === 'MOBILE_BANKING' || data.paymentProvider === 'bKash' || data.paymentProvider === 'Nagad' || data.transactionId) {
+      const provider = data.paymentProvider || 'bKash';
+      const reference = `[${provider}] TrxID: ${data.transactionId || 'PENDING'} | Sender: ${data.senderPhone || data.customerPhone || 'N/A'}`;
+      paymentsToCreate.push({
+        organizationId,
+        method: 'MOBILE_BANKING' as const,
+        amount: grandTotal,
+        reference,
+      });
+      paymentStatus = 'UNPAID'; // Requires manual admin verification of TrxID
+    } else if (data.paymentMethod === 'BANK') {
+      const reference = `[BANK] TrxID: ${data.transactionId || 'PENDING'} | Sender: ${data.senderPhone || data.customerPhone || 'N/A'}`;
+      paymentsToCreate.push({
+        organizationId,
+        method: 'BANK' as const,
+        amount: grandTotal,
+        reference,
+      });
+      paymentStatus = 'UNPAID';
+    } else if (data.paymentAmount && Number(data.paymentAmount) > 0 && data.paymentMethod && data.paymentMethod !== 'CASH') {
+      const amount = new Prisma.Decimal(data.paymentAmount);
+      paymentsToCreate.push({
+        organizationId,
+        method: data.paymentMethod,
+        amount,
+        reference: 'Storefront Online Payment',
+      });
+      if (amount.greaterThanOrEqualTo(grandTotal)) {
+        paymentStatus = 'PAID';
+      } else {
+        paymentStatus = 'PARTIALLY_PAID';
+      }
+    }
+
+    return this.salesRepo.runTransaction(async () => {
+      if (data.idempotencyKey) {
+        const existingTxCheck = await this.salesRepo.findByIdempotencyKey(organizationId, data.idempotencyKey);
+        if (existingTxCheck) return existingTxCheck;
+      }
+
+      const saleNumber = await this.salesRepo.generateSaleNumber(organizationId);
+
+      const sale = await this.salesRepo.createSale({
+        organizationId,
+        branchId: branch.id,
+        warehouseId: warehouse.id,
+        customerId,
+        status: 'DRAFT', // Online orders start as DRAFT until delivered/fulfilled
+        paymentStatus,
+        saleNumber,
+        subtotal,
+        discount: couponDiscount,
+        total: grandTotal,
+        idempotencyKey: data.idempotencyKey,
+        lines: {
+          create: saleLinesToCreate,
+        },
+        payments: {
+          create: paymentsToCreate,
+        },
+      });
+
+      // Deduct inventory so items are reserved and stock invariants are maintained
+      if (inventoryItemsToDeduct.length > 0) {
+        const systemUser = await this.prismaManager.client.user.findFirst({
+          where: { organizationId },
+        });
+        if (systemUser) {
+          await this.inventoryService.deductStockForSale(
+            organizationId,
+            warehouse.id,
+            inventoryItemsToDeduct,
+            sale.id,
+            systemUser.id,
+          );
+        }
+      }
+
+      // Record audit log for order placement
+      await this.salesRepo.recordAuditLog({
+        organizationId,
+        entityType: 'Sale',
+        entityId: sale.id,
+        action: 'ORDER_PLACED',
+        newData: {
+          status: 'DRAFT',
+          fulfillmentStatus: 'QUEUED',
+          paymentStatus,
+          paymentMethod: data.paymentMethod || 'CASH',
+          paymentProvider: data.paymentProvider || (data.paymentMethod === 'MOBILE_BANKING' ? 'bKash' : null),
+          senderPhone: data.senderPhone || null,
+          transactionId: data.transactionId || null,
+          couponCode: data.couponCode || null,
+          discountAmount: couponDiscount.toString(),
+          shippingAddress: data.shippingAddress,
+          customerPhone: data.customerPhone,
+          notes: data.customerNotes,
+          total: grandTotal.toString(),
+        },
+      });
+
+      // Emit outbox event
+      await this.prismaManager.client.outboxEvent.create({
+        data: {
+          organizationId,
+          eventType: 'ORDER_PLACED',
+          aggregateType: 'Sale',
+          aggregateId: sale.id,
+          payload: {
+            saleId: sale.id,
+            saleNumber: sale.saleNumber,
+            total: grandTotal.toString(),
+            customerId,
+          },
+        },
+      });
+
+      return sale;
+    });
+  }
+
+  async trackOrder(organizationId: string, identifier: string, phone?: string, customerId?: string) {
+    const sale = await this.prismaManager.client.sale.findFirst({
+      where: {
+        organizationId,
+        OR: [
+          { id: identifier },
+          { saleNumber: identifier },
+        ],
+      },
+      include: {
+        lines: { include: { variant: { include: { product: true } } } },
+        payments: true,
+        customer: true,
+      },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Order not found.');
+    }
+
+    // Security Verification: prevent order enumeration
+    const isCustomerOwner = customerId && sale.customerId === customerId;
+
+    if (!isCustomerOwner) {
+      if (!phone || !phone.trim()) {
+        throw new BadRequestException('Phone number verification required to track this order.');
+      }
+
+      const cleanInputPhone = phone.replace(/[\s\-\+\(\)]/g, '').slice(-10);
+      const customerPhone = (sale.customer?.phone || '').replace(/[\s\-\+\(\)]/g, '').slice(-10);
+
+      // Also check phone recorded in audit logs during checkout
+      const auditLogs = await this.salesRepo.getAuditLogsForEntity(organizationId, 'Sale', sale.id);
+      const placedLog = auditLogs.find(l => l.action === 'ORDER_PLACED');
+      const recordedPhone = (placedLog?.newData as any)?.customerPhone || '';
+      const cleanRecordedPhone = recordedPhone.replace(/[\s\-\+\(\)]/g, '').slice(-10);
+
+      const matchesCustomerPhone = customerPhone && customerPhone === cleanInputPhone;
+      const matchesRecordedPhone = cleanRecordedPhone && cleanRecordedPhone === cleanInputPhone;
+
+      if (!matchesCustomerPhone && !matchesRecordedPhone) {
+        throw new NotFoundException('Order verification failed. Phone number does not match.');
+      }
+    }
+
+    const auditLogs = await this.salesRepo.getAuditLogsForEntity(organizationId, 'Sale', sale.id);
+
+    return {
+      id: sale.id,
+      saleNumber: sale.saleNumber,
+      saleDate: sale.saleDate,
+      status: sale.status,
+      paymentStatus: sale.paymentStatus,
+      subtotal: sale.subtotal,
+      discount: sale.discount,
+      total: sale.total,
+      customer: {
+        name: sale.customer?.name || 'Customer',
+        phone: sale.customer?.phone ? sale.customer.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : undefined,
+      },
+      lines: sale.lines.map(l => ({
+        id: l.id,
+        productName: l.productNameSnapshot || l.variant?.product?.name || 'Product',
+        sku: l.skuSnapshot || l.variant?.sku,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        lineTotal: l.lineTotal,
+        fulfillmentStatus: l.fulfillmentStatus || 'QUEUED',
+      })),
+      payments: sale.payments.map(p => ({
+        id: p.id,
+        method: p.method,
+        amount: p.amount,
+        paymentDate: p.paymentDate,
+      })),
+      timeline: auditLogs.map(log => ({
+        id: log.id,
+        action: log.action,
+        status: (log.newData as any)?.status || (log.oldData as any)?.status,
+        fulfillmentStatus: (log.newData as any)?.fulfillmentStatus,
+        note: (log.newData as any)?.note || (log.newData as any)?.message,
+        courier: (log.newData as any)?.courier,
+        trackingCode: (log.newData as any)?.trackingCode,
+        createdAt: log.createdAt,
+      })),
+    };
+  }
+
+  async verifyPayment(organizationId: string, id: string, userId?: string) {
+    return this.salesRepo.runTransaction(async () => {
+      const sale = await this.salesRepo.findById(organizationId, id);
+      if (!sale) throw new NotFoundException('Order not found');
+
+      if (sale.paymentStatus === 'PAID') {
+        return sale;
+      }
+
+      const updated = await this.salesRepo.updatePaymentStatus(organizationId, id, 'PAID');
+
+      if (sale.payments && sale.payments.length > 0) {
+        const firstPayment = sale.payments[0];
+        await this.prismaManager.client.salePayment.update({
+          where: { id: firstPayment.id },
+          data: {
+            amount: sale.total,
+            reference: `${firstPayment.reference || ''} [VERIFIED]`.trim(),
+          },
+        });
+      } else {
+        await this.prismaManager.client.salePayment.create({
+          data: {
+            organizationId,
+            saleId: sale.id,
+            amount: sale.total,
+            method: 'MOBILE_BANKING',
+            reference: 'Verified by Admin',
+          },
+        });
+      }
+
+      await this.salesRepo.recordAuditLog({
+        organizationId,
+        entityType: 'Sale',
+        entityId: sale.id,
+        action: 'PAYMENT_VERIFIED',
+        oldData: { paymentStatus: sale.paymentStatus },
+        newData: { paymentStatus: 'PAID', verifiedBy: userId || 'Admin' },
+        userId: userId || null,
+      });
+
+      return updated;
+    });
+  }
 }
+

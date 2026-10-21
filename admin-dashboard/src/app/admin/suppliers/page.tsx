@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
 import { Plus, Search, Filter, MoreHorizontal, Truck, Phone, Mail, Edit } from "lucide-react"
 import { Modal } from "../../../components/ui/modal"
+import { toast } from "sonner"
 
 export default function AdminSuppliersPage() {
   const [suppliers, setSuppliers] = useState<any[]>([])
@@ -49,13 +50,15 @@ export default function AdminSuppliersPage() {
     try {
       if (editingSupplier) {
         await api.put(`/business-core/suppliers/${editingSupplier.id}`, formData)
+        toast.success("Supplier updated successfully")
       } else {
         await api.post('/business-core/suppliers', formData)
+        toast.success("Supplier created successfully")
       }
       setIsModalOpen(false)
       fetchSuppliers()
-    } catch (err) {
-      alert("Failed to save supplier")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save supplier")
     }
   }
 

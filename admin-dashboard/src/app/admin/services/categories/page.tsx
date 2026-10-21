@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 import { api } from "../../../../lib/api-client"
 import { Plus, Search, MoreHorizontal, FolderTree, Edit } from "lucide-react"
 import { Modal } from "../../../../components/ui/modal"
+import { toast } from "sonner"
 
 export default function AdminServiceCategoriesPage() {
   const [categories, setCategories] = useState<any[]>([])
@@ -46,13 +47,15 @@ export default function AdminServiceCategoriesPage() {
       const dataToSave = { ...formData, type: 'SERVICE' }
       if (editingCategory) {
         await api.put(`/business-core/categories/${editingCategory.id}`, dataToSave)
+        toast.success("Service category updated successfully")
       } else {
         await api.post('/business-core/categories', dataToSave)
+        toast.success("Service category created successfully")
       }
       setIsModalOpen(false)
       fetchCategories()
-    } catch (err) {
-      alert("Failed to save category")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save category")
     }
   }
 

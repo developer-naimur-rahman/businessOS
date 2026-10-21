@@ -175,8 +175,12 @@ export default function AccountPage() {
                 <div key={order.id} className="bg-white border border-slate-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(`/order/${order.id}`)}>
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="font-semibold text-slate-900">Order {order.invoiceNumber || `#${order.id.slice(0,8)}`}</span>
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                      <span className="font-semibold text-slate-900">Order {order.saleNumber || order.invoiceNumber || `#${order.id.slice(0,8)}`}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        order.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
+                        order.status === 'CANCELLED' ? 'bg-rose-100 text-rose-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
                         {order.status}
                       </span>
                     </div>
@@ -185,9 +189,9 @@ export default function AccountPage() {
                     </p>
                   </div>
                   <div className="text-right flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto">
-                    <p className="font-semibold text-slate-900 mb-0 md:mb-2 text-lg">৳{Number(order.totalAmount || 0).toLocaleString()}</p>
+                    <p className="font-semibold text-slate-900 mb-0 md:mb-2 text-lg">৳{Number(order.total || order.totalAmount || 0).toLocaleString()}</p>
                     <button className="text-sm font-medium text-blue-600 hover:underline">
-                      View Details
+                      View Details & Track
                     </button>
                   </div>
                 </div>

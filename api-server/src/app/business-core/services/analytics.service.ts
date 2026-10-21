@@ -156,16 +156,21 @@ export class AnalyticsService {
     }
 
     // Customer Alerts
-    const customersWithBalance: any[] = await this.prisma.$queryRaw`
-      SELECT c.name, 
-             COALESCE(SUM(s.total), 0) as "totalBilled", 
-             COALESCE((SELECT SUM(amount) FROM "SalePayment" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "customerId" = c.id)), 0) as "totalPaid"
-      FROM "Customer" c
-      LEFT JOIN "Sale" s ON s."customerId" = c.id
-      WHERE c."organizationId" = ${organizationId}
-      GROUP BY c.id, c.name
-      HAVING COALESCE(SUM(s.total), 0) - COALESCE((SELECT SUM(amount) FROM "SalePayment" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "customerId" = c.id)), 0) > 1000
-    `;
+    let customersWithBalance: any[] = [];
+    try {
+      customersWithBalance = await this.prisma.$queryRaw`
+        SELECT c.name, 
+               COALESCE(SUM(s.total), 0) as "totalBilled", 
+               COALESCE((SELECT SUM(amount) FROM "SalePayment" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "customerId" = c.id)), 0) as "totalPaid"
+        FROM "Customer" c
+        LEFT JOIN "Sale" s ON s."customerId" = c.id
+        WHERE c."organizationId" = ${organizationId}
+        GROUP BY c.id, c.name
+        HAVING COALESCE(SUM(s.total), 0) - COALESCE((SELECT SUM(amount) FROM "SalePayment" WHERE "saleId" IN (SELECT id FROM "Sale" WHERE "customerId" = c.id)), 0) > 1000
+      `;
+    } catch (e) {
+      customersWithBalance = [];
+    }
 
     if (Array.isArray(customersWithBalance) && customersWithBalance.length > 0) {
       alerts.push({

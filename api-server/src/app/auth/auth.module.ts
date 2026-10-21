@@ -10,6 +10,8 @@ import { CustomerAuthService } from './customer-auth.service';
 import { CustomerAuthController } from './customer-auth.controller';
 import { CustomerJwtStrategy } from './strategies/customer-jwt.strategy';
 
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
+
 @Module({
   imports: [
     IamModule,
@@ -20,7 +22,7 @@ import { CustomerJwtStrategy } from './strategies/customer-jwt.strategy';
       signOptions: { expiresIn: (process.env.JWT_EXPIRATION || '1d') as any },
     }),
   ],
-  providers: [AuthService, JwtStrategy, CustomerAuthService, CustomerJwtStrategy],
+  providers: [AuthService, JwtStrategy, CustomerAuthService, CustomerJwtStrategy, RateLimitGuard],
   controllers: [AuthController, CustomerAuthController],
   exports: [AuthService, CustomerAuthService],
 })

@@ -7,10 +7,13 @@ import { BusinessCoreModule } from '../business-core/business-core.module';
 import { StorageModule } from '../storage/storage.module';
 import { SalesModule } from '../sales/sales.module';
 
+import { PublicFeaturesController } from './public-features.controller';
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
+
 @Module({
   imports: [PrismaModule, BusinessCoreModule, StorageModule, SalesModule],
-  controllers: [StorefrontController],
-  providers: [QuoteEngineService, StorefrontService],
+  controllers: [StorefrontController, PublicFeaturesController],
+  providers: [QuoteEngineService, StorefrontService, RateLimitGuard],
   exports: [QuoteEngineService, StorefrontService],
 })
 export class StorefrontModule {}

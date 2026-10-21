@@ -7,6 +7,7 @@ import { ReceiptTemplate } from "../../../components/pos/ReceiptTemplate"
 import { A4InvoiceTemplate } from "../../../components/pos/A4InvoiceTemplate"
 import { VariantSelectorModal } from "../../../components/pos/VariantSelectorModal"
 import { stringToColor } from "../../../lib/colorUtils"
+import { toast } from "sonner"
 
 export default function AdminPOSPage() {
   const [products, setProducts] = useState<any[]>([])
@@ -161,7 +162,7 @@ export default function AdminPOSPage() {
 
   const handleCheckout = async (paymentMethod: 'CASH' | 'CARD') => {
     if (cart.length === 0 || !branchId || !warehouseId) {
-      alert("Missing branch or warehouse selection.");
+      toast.warning("Missing branch or warehouse selection.");
       return;
     }
     setIsProcessing(true)
@@ -193,11 +194,12 @@ export default function AdminPOSPage() {
         })
       }
       
+      toast.success("Sale completed successfully")
       setCompletedSale(enrichedSale)
     } catch (err: any) {
       console.error("Sale error:", err.response?.data || err);
       const msg = err.response?.data?.message || err.response?.data?.error || "Failed to process sale";
-      alert(`Error: ${Array.isArray(msg) ? msg.join(', ') : msg}`)
+      toast.error(`Error: ${Array.isArray(msg) ? msg.join(', ') : msg}`)
     } finally {
       setIsProcessing(false)
     }

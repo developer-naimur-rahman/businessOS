@@ -1,14 +1,14 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Request, NotFoundException } from '@nestjs/common';
 import { SalesService } from './sales.service';
-import { CustomerJwtAuthGuard } from '../auth/guards/customer-jwt-auth.guard';
+import { CustomerJwtAuthGuard, OptionalCustomerJwtAuthGuard } from '../auth/guards/customer-jwt-auth.guard';
+import { CreateCustomerCheckoutDto, TrackOrderDto } from './dto/sales.dto';
+import { RateLimit, RateLimitGuard } from '../common/guards/rate-limit.guard';
+import { FinanceIntegrationService } from '../finance-integration/finance-integration.service';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-import { FinanceIntegrationService } from '../finance-integration/finance-integration.service';
-
 @Controller('public/orders')
-@UseGuards(CustomerJwtAuthGuard)
 export class CustomerSalesController {
   constructor(
     private readonly salesService: SalesService,
@@ -24,84 +24,120 @@ export class CustomerSalesController {
   }
 
   @Post('checkout')
-  async checkout(@Request() req, @Body() data: any) {
+  @UseGuards(OptionalCustomerJwtAuthGuard, RateLimitGuard)
+  @RateLimit({ limit: 15, ttlSeconds: 60 })
+  async checkout(@Request() req, @Body() data: CreateCustomerCheckoutDto) {
     const orgId = await this.getDefaultOrganizationId();
-    const customerId = req.user.customerId;
-    
-    // Fallback branch/warehouse for online orders
-    // In a real system, this would be derived from e-commerce settings
-    const branch = await prisma.branch.findFirst({ where: { organizationId: orgId }});
-    const warehouse = await prisma.warehouse.findFirst({ where: { organizationId: orgId, branchId: branch?.id }});
-    
-    if (!branch || !warehouse) {
-      throw new Error('Storefront not fully configured (missing branch/warehouse)');
+    let customerId = req.user?.customerId;
+
+    // Guest checkout auto-linking: find or create customer record
+    if (!customerId) {
+      const phone = data.customerPhone || data.customer?.phone || data.senderPhone;
+      const name = data.customer?.name || (phone ? `Customer ${phone.slice(-4)}` : 'Storefront Guest');
+      const email = data.customer?.email;
+
+      if (phone) {
+        let existingCustomer = await prisma.customer.findFirst({
+          where: { organizationId: orgId, phone },
+        });
+
+        if (!existingCustomer) {
+          existingCustomer = await prisma.customer.create({
+            data: {
+              organizationId: orgId,
+              name,
+              phone,
+              email,
+              address: data.shippingAddress || data.customer?.address,
+            },
+          });
+        }
+        customerId = existingCustomer.id;
+      }
     }
 
-    const saleData = {
-      customerId,
-      branchId: branch.id,
-      warehouseId: warehouse.id,
-      lines: data.lines ? data.lines.map((line: any) => ({
-        variantId: line.variantId,
-        quantity: line.quantity,
-        discount: line.discount || 0,
-      })) : [],
-      payments: data.payments || [],
-    };
+    const sale = await this.salesService.createOnlineOrder(orgId, customerId, data);
 
-    const sale = await this.salesService.createDirectSale(orgId, saleData as any, null);
-    
     this.financeIntegrationService.processPendingOutboxEvents(orgId)
       .catch(err => console.error("Failed to process finance outbox events:", err));
-      
-    return sale;
+
+    return {
+      ...sale,
+      invoiceNumber: sale.saleNumber,
+      totalAmount: sale.total,
+    };
+  }
+
+  @Post('track')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 30, ttlSeconds: 60 })
+  async trackOrder(@Body() body: TrackOrderDto) {
+    const orgId = await this.getDefaultOrganizationId();
+    return this.salesService.trackOrder(orgId, body.identifier, body.phone);
   }
 
   @Get()
+  @UseGuards(CustomerJwtAuthGuard)
   async getMyOrders(@Request() req) {
     const orgId = await this.getDefaultOrganizationId();
     const customerId = req.user.customerId;
-    
+
     const orders = await prisma.sale.findMany({
       where: {
         organizationId: orgId,
-        customerId
+        customerId,
       },
       include: {
         lines: {
-          include: { variant: { include: { product: true } } }
+          include: { variant: { include: { product: true } } },
         },
-        payments: true
+        payments: true,
       },
-      orderBy: { saleDate: 'desc' }
+      orderBy: { saleDate: 'desc' },
     });
-    
-    return orders;
+
+    return orders.map(order => ({
+      ...order,
+      invoiceNumber: order.saleNumber,
+      totalAmount: order.total,
+    }));
   }
 
   @Get(':id')
+  @UseGuards(CustomerJwtAuthGuard)
   async getOrderById(@Request() req, @Param('id') id: string) {
     const orgId = await this.getDefaultOrganizationId();
     const customerId = req.user.customerId;
-    
+
     const order = await prisma.sale.findFirst({
       where: {
         id,
         organizationId: orgId,
-        customerId
+        customerId,
       },
       include: {
         lines: {
-          include: { variant: { include: { product: true } } }
+          include: { variant: { include: { product: true } } },
         },
-        payments: true
-      }
+        payments: true,
+      },
     });
 
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    
-    return order;
+
+    return {
+      ...order,
+      invoiceNumber: order.saleNumber,
+      totalAmount: order.total,
+    };
+  }
+
+  @Get(':id/track')
+  @UseGuards(CustomerJwtAuthGuard)
+  async trackMyOrder(@Request() req, @Param('id') id: string) {
+    const orgId = await this.getDefaultOrganizationId();
+    return this.salesService.trackOrder(orgId, id, undefined, req.user.customerId);
   }
 }

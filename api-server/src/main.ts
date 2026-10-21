@@ -6,6 +6,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
+import { GlobalExceptionFilter } from './app/common/filters/global-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,7 +16,8 @@ async function bootstrap() {
   });
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
-  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidUnknownValues: false }));
+  app.useGlobalFilters(new GlobalExceptionFilter());
   const port = process.env.PORT || 3333;
   await app.listen(port, '0.0.0.0');
   Logger.log(`🚀 Application is running on: http://localhost:${port}/${globalPrefix}`);

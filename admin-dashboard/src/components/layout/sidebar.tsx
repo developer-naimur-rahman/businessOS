@@ -6,10 +6,17 @@ import { usePathname } from "next/navigation"
 import { 
   LayoutDashboard, ShoppingCart, Users, Settings, 
   Package, Boxes, Store, Factory, ArrowRightLeft,
-  TerminalSquare, TrendingUp
+  TerminalSquare, TrendingUp, X, GitBranch, Warehouse,
+  ShoppingBag, Sliders, Truck, MessageSquare,
+  Receipt, CircleDollarSign
 } from "lucide-react"
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean
+  onClose?: () => void
+}
+
+export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname()
 
   const groups = [
@@ -22,19 +29,28 @@ export function Sidebar() {
       ]
     },
     {
-      label: "Sales & Fulfillment",
+      label: "Finance & Accounts",
       items: [
-        { name: "Sales History", href: "/admin/sales", icon: ShoppingCart },
-        { name: "Customers", href: "/admin/customers", icon: Users },
+        { name: "Daily Expenses", href: "/admin/expenses", icon: Receipt },
+        { name: "Cash Register / Till", href: "/admin/cash-register", icon: CircleDollarSign },
+        { name: "GL & Finance Sync", href: "/admin/finance", icon: ArrowRightLeft },
       ]
     },
     {
-      label: "Inventory & Supply",
+      label: "Sales & Orders",
+      items: [
+        { name: "Online Orders", href: "/admin/orders", icon: Truck },
+        { name: "Sales History", href: "/admin/sales", icon: ShoppingCart },
+        { name: "Customers", href: "/admin/customers", icon: Users },
+        { name: "Purchases & PO", href: "/admin/purchases", icon: ShoppingBag },
+      ]
+    },
+    {
+      label: "Catalog & Inventory",
       items: [
         { name: "Products", href: "/admin/products", icon: Package },
         { name: "Services", href: "/admin/services", icon: Package },
-        { name: "Service Price List", href: "/admin/services/price-list", icon: Package },
-        { name: "Service Categories", href: "/admin/services/categories", icon: Package },
+        { name: "Service Price List", href: "/admin/services/price-list", icon: Sliders },
         { name: "Store Categories", href: "/admin/categories", icon: Package },
         { name: "Units", href: "/admin/units", icon: Package },
         { name: "Stock Levels", href: "/admin/inventory", icon: Boxes },
@@ -42,28 +58,41 @@ export function Sidebar() {
       ]
     },
     {
-      label: "Platform",
+      label: "Operations & Platform",
       items: [
+        { name: "Branches", href: "/admin/branches", icon: GitBranch },
+        { name: "Warehouses", href: "/admin/warehouses", icon: Warehouse },
+        { name: "Storefront CMS", href: "/admin/storefront", icon: Store },
+        { name: "Reviews Moderation", href: "/admin/reviews", icon: MessageSquare },
         { name: "Design Studio", href: "/admin/design-studio", icon: Store },
         { name: "Media Library", href: "/admin/media", icon: Store },
-        { name: "Finance Sync", href: "/admin/finance", icon: ArrowRightLeft },
       ]
     }
   ]
 
-  return (
-    <aside className="w-64 flex-shrink-0 flex flex-col h-full bg-slate-50/50">
-      <div className="h-14 flex items-center px-6 border-b border-transparent">
-        <div className="w-6 h-6 bg-slate-900 rounded-md flex items-center justify-center mr-3 shadow-sm">
-          <span className="text-white font-bold text-[10px]">OS</span>
+  const sidebarContent = (
+    <div className="flex flex-col h-full bg-slate-50/80 border-r border-slate-200/80">
+      <div className="h-14 flex items-center justify-between px-5 border-b border-slate-200/60">
+        <div className="flex items-center">
+          <div className="w-7 h-7 bg-slate-900 rounded-lg flex items-center justify-center mr-3 shadow-sm">
+            <span className="text-white font-extrabold text-[11px]">OS</span>
+          </div>
+          <span className="font-bold text-sm tracking-tight text-slate-900">My Business OS</span>
         </div>
-        <span className="font-semibold text-sm tracking-tight text-slate-900">My Business OS</span>
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="md:hidden w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-900 rounded-full hover:bg-slate-200/60"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
       
-      <div className="flex-1 overflow-y-auto custom-scrollbar py-6 px-3 space-y-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar py-5 px-3 space-y-6">
         {groups.map((group) => (
           <div key={group.label}>
-            <h3 className="px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            <h3 className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
               {group.label}
             </h3>
             <div className="space-y-0.5">
@@ -75,10 +104,11 @@ export function Sidebar() {
                     key={item.name}
                     href={item.href}
                     data-active={isActive}
+                    onClick={onClose}
                     className="sidebar-item"
                   >
                     <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-slate-900' : 'text-slate-400'}`} strokeWidth={isActive ? 2.5 : 2} />
-                    {item.name}
+                    <span>{item.name}</span>
                   </Link>
                 )
               })}
@@ -91,12 +121,35 @@ export function Sidebar() {
         <Link 
           href="/admin/settings"
           data-active={pathname.startsWith("/admin/settings")}
+          onClick={onClose}
           className="sidebar-item"
         >
           <Settings className={`w-[18px] h-[18px] ${pathname.startsWith("/admin/settings") ? 'text-slate-900' : 'text-slate-400'}`} strokeWidth={2} />
-          System Settings
+          <span>System Settings</span>
         </Link>
       </div>
-    </aside>
+    </div>
+  )
+
+  return (
+    <>
+      {/* Desktop Persistent Sidebar */}
+      <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-full">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Modal Drawer Sidebar */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden animate-in fade-in duration-200">
+          <div 
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs"
+            onClick={onClose} 
+          />
+          <aside className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white z-50 shadow-2xl animate-in slide-in-from-left duration-300">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   )
 }

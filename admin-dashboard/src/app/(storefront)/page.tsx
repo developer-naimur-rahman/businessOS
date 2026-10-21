@@ -4,9 +4,11 @@ import { demoContent } from "../../config/demo-content"
 import React, { useEffect, useState } from "react"
 import { api } from "../../lib/api-client"
 import Link from "next/link"
-import { ArrowRight, Star, ChevronLeft, ChevronRight, ShoppingCart, ShieldCheck, Truck, RefreshCcw, HeadphonesIcon, Flame } from "lucide-react"
+import { ArrowRight, Star, ChevronLeft, ChevronRight, ShoppingCart, ShieldCheck, Truck, RefreshCcw, HeadphonesIcon, Flame, Heart } from "lucide-react"
 import { MediaImage } from "../../components/ui/media-image"
 import { useCartStore } from "../../store/useCartStore"
+import { useWishlistStore } from "../../store/useWishlistStore"
+import { toast } from "sonner"
 
 const getFallbackProductImage = (name: string = "", type?: string) => {
   const n = name.toLowerCase();
@@ -38,6 +40,8 @@ const ProductCard = ({ product }: { product: any }) => {
   const hasDiscount = originalPrice && originalPrice > price
   const discountPct = hasDiscount ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0
   const addItem = useCartStore(state => state.addItem)
+  const isWishlisted = useWishlistStore(state => state.isInWishlist(product.id))
+  const toggleWishlist = useWishlistStore(state => state.toggleItem)
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -46,9 +50,29 @@ const ProductCard = ({ product }: { product: any }) => {
       name: product.name,
       price: price,
       quantity: 1,
-      type: "product"
+      type: "product",
+      imageUrl: imageUrl
     });
-    alert("Added to cart")
+    toast.success(`Added "${product.name}" to cart!`)
+  }
+
+  const handleToggleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const added = toggleWishlist({
+      id: product.id,
+      name: product.name,
+      price: price,
+      compareAtPrice: originalPrice,
+      imageUrl: imageUrl,
+      category: product.category?.name,
+      type: product.type,
+    });
+    if (added) {
+      toast.success(`Added "${product.name}" to wishlist!`);
+    } else {
+      toast.info(`Removed "${product.name}" from wishlist.`);
+    }
   }
 
   return (
@@ -58,6 +82,13 @@ const ProductCard = ({ product }: { product: any }) => {
           -{discountPct}%
         </div>
       )}
+      <button
+        onClick={handleToggleWishlist}
+        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur text-slate-400 hover:text-rose-500 hover:bg-white flex items-center justify-center shadow-sm z-20 transition-all hover:scale-110"
+        title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+      >
+        <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-500 text-rose-500' : ''}`} />
+      </button>
       <div className="aspect-[4/5] bg-slate-50 relative overflow-hidden group-hover:bg-slate-100 transition-colors">
         <MediaImage 
           asset={imageUrl} 
@@ -135,6 +166,43 @@ export default function StorefrontHomePage() {
   const [config, setConfig] = useState<any>(null)
   const [currentStoreSlide, setCurrentStoreSlide] = useState(0)
   const [currentServiceSlide, setCurrentServiceSlide] = useState(0)
+  const [timeLeft, setTimeLeft] = useState<{ hours: string; minutes: string; seconds: string }>({
+    hours: "08",
+    minutes: "30",
+    seconds: "00",
+  })
+
+  useEffect(() => {
+    const getTargetTime = () => {
+      if (config?.flashSaleEnd) {
+        const end = new Date(config.flashSaleEnd).getTime()
+        if (end > Date.now()) return end
+      }
+      const now = new Date()
+      const target = new Date(now)
+      target.setHours(23, 59, 59, 999)
+      return target.getTime()
+    }
+
+    const targetTime = getTargetTime()
+
+    const updateCountdown = () => {
+      const diff = Math.max(0, targetTime - Date.now())
+      const hours = Math.floor(diff / (1000 * 60 * 60))
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+
+      setTimeLeft({
+        hours: String(hours).padStart(2, "0"),
+        minutes: String(minutes).padStart(2, "0"),
+        seconds: String(seconds).padStart(2, "0"),
+      })
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [config?.flashSaleEnd])
 
   useEffect(() => {
     async function fetchData() {
@@ -342,11 +410,15 @@ export default function StorefrontHomePage() {
                 <p className="text-rose-100 text-lg">Grab these amazing deals before they're gone!</p>
               </div>
               
-              {/* Countdown Fake Timer */}
+              {/* Dynamic Live Countdown Timer */}
               <div className="flex items-center gap-3 text-center">
-                {[ {l: '02', u: 'HOURS'}, {l: '45', u: 'MINS'}, {l: '30', u: 'SECS'} ].map((t, i) => (
-                  <div key={i} className="bg-white/10 backdrop-blur rounded-xl p-3 min-w-[70px]">
-                    <div className="text-2xl font-bold">{t.l}</div>
+                {[
+                  { l: timeLeft.hours, u: 'HOURS' },
+                  { l: timeLeft.minutes, u: 'MINS' },
+                  { l: timeLeft.seconds, u: 'SECS' }
+                ].map((t, i) => (
+                  <div key={i} className="bg-white/10 backdrop-blur rounded-xl p-3 min-w-[70px] border border-white/10 shadow-sm">
+                    <div className="text-2xl font-bold tabular-nums">{t.l}</div>
                     <div className="text-[10px] uppercase tracking-wider text-rose-200">{t.u}</div>
                   </div>
                 ))}

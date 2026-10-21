@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
 import { Plus, Search, MoreHorizontal, Scale, Edit } from "lucide-react"
 import { Modal } from "../../../components/ui/modal"
+import { toast } from "sonner"
 
 export default function AdminUnitsPage() {
   const [units, setUnits] = useState<any[]>([])
@@ -45,13 +46,15 @@ export default function AdminUnitsPage() {
     try {
       if (editingUnit) {
         await api.put(`/business-core/units/${editingUnit.id}`, formData)
+        toast.success("Unit updated successfully")
       } else {
         await api.post('/business-core/units', formData)
+        toast.success("Unit created successfully")
       }
       setIsModalOpen(false)
       fetchUnits()
-    } catch (err) {
-      alert("Failed to save unit")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save unit")
     }
   }
 

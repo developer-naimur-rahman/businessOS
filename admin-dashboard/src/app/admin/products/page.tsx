@@ -7,6 +7,7 @@ import { Modal } from "../../../components/ui/modal"
 import { useRouter } from "next/navigation"
 
 import { ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react"
+import { toast } from "sonner"
 
 export default function AdminProductsPage() {
   const router = useRouter()
@@ -128,19 +129,21 @@ export default function AdminProductsPage() {
           status: v.status
         }))
       } else if (hasVariants && variants.length === 0) {
-        alert("Please add at least one variant, or disable 'Has Multiple Variants'")
+        toast.warning("Please add at least one variant, or disable 'Has Multiple Variants'")
         return
       }
 
       if (editingProduct) {
         await api.patch(`/business-core/products/${editingProduct.id}`, submitData)
+        toast.success("Product updated successfully")
       } else {
         await api.post('/business-core/products', submitData)
+        toast.success("Product created successfully")
       }
       setIsModalOpen(false)
       fetchProducts()
-    } catch (err) {
-      alert("Failed to save product")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save product")
     }
   }
 
@@ -148,9 +151,10 @@ export default function AdminProductsPage() {
     if (!confirm('Are you sure you want to archive this product?')) return
     try {
       await api.delete(`/business-core/products/${id}`)
+      toast.success("Product archived successfully")
       fetchProducts()
-    } catch (err) {
-      alert("Failed to archive product")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to archive product")
     }
   }
 
@@ -178,9 +182,10 @@ export default function AdminProductsPage() {
       })
       setSelectedIds(new Set())
       setIsBulkActionMenuOpen(false)
+      toast.success(`Bulk ${action.toLowerCase()} completed successfully`)
       fetchProducts()
-    } catch (err) {
-      alert('Bulk action failed')
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Bulk action failed')
     }
   }
 

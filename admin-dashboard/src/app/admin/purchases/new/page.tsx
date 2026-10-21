@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Save, Package, ArrowLeft, Trash2, Search } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function NewPurchasePage() {
   const router = useRouter()
@@ -74,7 +75,7 @@ export default function NewPurchasePage() {
 
   const handleSaveDraft = async () => {
     if (!form.supplierId || !form.warehouseId || lines.length === 0) {
-      alert("Please select a supplier, warehouse, and add at least one item.")
+      toast.warning("Please select a supplier, warehouse, and add at least one item.")
       return
     }
 
@@ -99,14 +100,15 @@ export default function NewPurchasePage() {
 
       if (res.ok) {
         const data = await res.json()
+        toast.success("Purchase draft created successfully")
         router.push(`/admin/purchases/${data.id}`)
       } else {
         const err = await res.json()
-        alert(err.message || "Failed to create purchase")
+        toast.error(err.message || "Failed to create purchase")
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e)
-      alert("An error occurred")
+      toast.error(e.message || "An error occurred while creating purchase")
     } finally {
       setLoading(false)
     }

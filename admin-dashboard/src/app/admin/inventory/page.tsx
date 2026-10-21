@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 import { api } from "../../../lib/api-client"
 import { Search, ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft, Package, History } from "lucide-react"
 import { Modal } from "../../../components/ui/modal"
+import { toast } from "sonner"
 
 export default function AdminInventoryPage() {
   const [balances, setBalances] = useState<any[]>([])
@@ -80,9 +81,10 @@ export default function AdminInventoryPage() {
         })
       }
       setModalType(null)
+      toast.success("Inventory operation completed successfully")
       fetchInventory()
-    } catch (err) {
-      alert("Operation failed")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Operation failed")
     } finally {
       setIsSubmitting(false)
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { Plus, Edit, Trash2, Shield } from 'lucide-react';
 import { Modal } from '../ui/modal';
+import { toast } from 'sonner';
 
 export function StaffSettings() {
   const [users, setUsers] = useState<any[]>([]);
@@ -47,9 +48,10 @@ export function StaffSettings() {
       });
       setIsUserModalOpen(false);
       setFormData({ name: '', email: '', password: '', roleIds: [] });
+      toast.success("User created successfully");
       fetchAll();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Error creating user");
+      toast.error(err.response?.data?.message || "Error creating user");
     }
   };
 
@@ -58,9 +60,10 @@ export function StaffSettings() {
     try {
       await api.post('/iam/roles', roleFormData);
       setIsRoleModalOpen(false);
+      toast.success("Role created successfully");
       fetchAll();
-    } catch (err) {
-      alert("Error creating role");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error creating role");
     }
   };
 

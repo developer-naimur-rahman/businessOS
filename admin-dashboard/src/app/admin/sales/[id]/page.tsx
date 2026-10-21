@@ -2,13 +2,16 @@
 import React, { useState, useEffect, use } from "react"
 import { api } from "../../../../lib/api-client"
 import { Button } from "../../../../components/ui/button"
-import { ArrowLeft, Printer, CreditCard } from "lucide-react"
+import { ArrowLeft, Printer, CreditCard, FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { ReceiptTemplate } from "../../../../components/pos/ReceiptTemplate"
+import { A4InvoiceTemplate } from "../../../../components/pos/A4InvoiceTemplate"
 
 export default function SaleReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [sale, setSale] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [printMode, setPrintMode] = useState<'NONE' | 'RECEIPT' | 'A4'>('NONE')
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("CASH")
@@ -60,6 +63,16 @@ export default function SaleReceiptPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  useEffect(() => {
+    if (printMode !== 'NONE') {
+      const timer = setTimeout(() => {
+        window.print()
+        setPrintMode('NONE')
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [printMode])
+
   if (loading) return <div className="p-8 text-center text-slate-500">Loading receipt...</div>
   if (!sale) return <div className="p-8 text-center text-destructive">Receipt not found</div>
 
@@ -73,14 +86,23 @@ export default function SaleReceiptPage({ params }: { params: Promise<{ id: stri
         <Button variant="ghost" onClick={() => router.push("/admin/sales")} className="text-slate-500 hover:text-slate-900">
           <ArrowLeft className="w-4 h-4 mr-2" /> Back to History
         </Button>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {canReceivePayment && (
             <Button onClick={() => setShowPaymentModal(true)} className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm interaction-bounce">
               <CreditCard className="w-4 h-4 mr-2" /> Receive Payment
             </Button>
           )}
-          <Button onClick={() => window.print()} className="bg-slate-900 text-white hover:bg-slate-800 shadow-sm interaction-bounce">
-            <Printer className="w-4 h-4 mr-2" /> Print Receipt
+          <Button 
+            onClick={() => setPrintMode('RECEIPT')} 
+            className="bg-slate-800 text-white hover:bg-slate-900 shadow-sm interaction-bounce text-xs font-semibold"
+          >
+            <Printer className="w-3.5 h-3.5 mr-1.5" /> 80mm POS Receipt
+          </Button>
+          <Button 
+            onClick={() => setPrintMode('A4')} 
+            className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm interaction-bounce text-xs font-semibold"
+          >
+            <FileText className="w-3.5 h-3.5 mr-1.5" /> A4 Invoice
           </Button>
         </div>
       </div>
@@ -241,6 +263,20 @@ export default function SaleReceiptPage({ params }: { params: Promise<{ id: stri
               </Button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 80mm Receipt Mode Printout */}
+      {printMode === 'RECEIPT' && (
+        <div className="fixed inset-0 bg-white z-[9999] flex items-center justify-center">
+          <ReceiptTemplate sale={sale} />
+        </div>
+      )}
+
+      {/* A4 Invoice Mode Printout */}
+      {printMode === 'A4' && (
+        <div className="fixed inset-0 bg-white z-[9999] p-8">
+          <A4InvoiceTemplate sale={sale} />
         </div>
       )}
     </div>

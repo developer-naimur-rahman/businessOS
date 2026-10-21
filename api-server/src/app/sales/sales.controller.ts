@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Param, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { SalesService, CreateSaleDto, AddSalePaymentDto } from './sales.service';
+import { QuerySalesDto, UpdateOrderStatusDto } from './dto/sales.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrganizationContextGuard } from '../common/guards/organization-context.guard';
@@ -16,8 +17,55 @@ export class SalesController {
 
   @Get()
   @RequirePermissions('sales.view')
-  async getSales(@Request() req) {
-    return this.salesService.getSales(req.user.organizationId);
+  async getSales(@Request() req, @Query() query: QuerySalesDto) {
+    return this.salesService.getOrders(req.user.organizationId, query);
+  }
+
+  @Get('orders')
+  @RequirePermissions('sales.view')
+  async getOrders(@Request() req, @Query() query: QuerySalesDto) {
+    return this.salesService.getOrders(req.user.organizationId, query);
+  }
+
+  @Get('orders/:id')
+  @RequirePermissions('sales.view')
+  async getOrderDetails(@Request() req, @Param('id') id: string) {
+    return this.salesService.getOrderDetailsWithAudit(req.user.organizationId, id);
+  }
+
+  @Patch('orders/:id/status')
+  @RequirePermissions('sales.create')
+  async updateOrderStatus(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() body: UpdateOrderStatusDto,
+  ) {
+    const updated = await this.salesService.updateOrderStatus(
+      req.user.organizationId,
+      id,
+      body,
+      req.user.id,
+    );
+
+    this.financeIntegrationService.processPendingOutboxEvents(req.user.organizationId)
+      .catch(err => console.error("Failed to process finance outbox events:", err));
+
+    return updated;
+  }
+
+  @Patch('orders/:id/verify-payment')
+  @RequirePermissions('sales.create')
+  async verifyPayment(@Request() req, @Param('id') id: string) {
+    const verified = await this.salesService.verifyPayment(
+      req.user.organizationId,
+      id,
+      req.user.id,
+    );
+
+    this.financeIntegrationService.processPendingOutboxEvents(req.user.organizationId)
+      .catch(err => console.error("Failed to process finance outbox events:", err));
+
+    return verified;
   }
 
   @Get(':id')
@@ -50,3 +98,4 @@ export class SalesController {
     return payment;
   }
 }
+

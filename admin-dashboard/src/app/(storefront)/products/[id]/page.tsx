@@ -2,10 +2,12 @@
 import React, { useEffect, useState } from "react"
 import { api } from "../../../../lib/api-client"
 import Link from "next/link"
-import { ArrowLeft, Check, Truck, ShieldCheck, Plus, Minus, Star } from "lucide-react"
+import { ArrowLeft, Check, Truck, ShieldCheck, Plus, Minus, Star, Heart } from "lucide-react"
 import { MediaImage } from "../../../../components/ui/media-image"
 import { useParams } from "next/navigation"
 import { useCartStore } from "../../../../store/useCartStore"
+import { useWishlistStore } from "../../../../store/useWishlistStore"
+import { toast } from "sonner"
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -13,6 +15,8 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
   const addItem = useCartStore((state) => state.addItem)
+  const isWishlisted = useWishlistStore((state) => state.isInWishlist(product?.id || ''))
+  const toggleWishlist = useWishlistStore((state) => state.toggleItem)
 
   useEffect(() => {
     async function fetchProduct() {
@@ -71,11 +75,11 @@ export default function ProductDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20">
         
-        {/* Product Image Gallery (Demo) */}
+        {/* Product Image Gallery */}
         <div className="space-y-4">
           <div className="bg-slate-100 aspect-square rounded-3xl overflow-hidden border border-slate-200/50 shadow-sm relative group">
             <MediaImage 
-              asset={null} 
+              asset={product.imageUrl} 
               fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=1200&auto=format&fit=crop" 
               className="w-full h-full object-cover mix-blend-multiply transition-transform duration-700 group-hover:scale-[1.02]" 
             />
@@ -137,7 +141,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
               <button 
                 onClick={() => {
                   addItem({
@@ -145,12 +149,41 @@ export default function ProductDetailPage() {
                     name: product.name,
                     price: Number(product.sellingPrice),
                     quantity: quantity,
-                    type: product.type
+                    type: product.type,
+                    imageUrl: product.imageUrl,
                   })
+                  toast.success(`Added ${quantity}x "${product.name}" to cart!`)
                 }}
-                className="control-button-primary h-14 rounded-full text-base flex-1 shadow-md hover:shadow-lg interactive-item"
+                className="control-button-primary h-14 rounded-full text-base flex-1 w-full shadow-md hover:shadow-lg interactive-item"
               >
                 Add to Cart — ৳{(Number(product.sellingPrice) * quantity).toLocaleString()}
+              </button>
+
+              <button
+                onClick={() => {
+                  const added = toggleWishlist({
+                    id: product.id,
+                    name: product.name,
+                    price: Number(product.sellingPrice),
+                    compareAtPrice: product.compareAtPrice ? Number(product.compareAtPrice) : null,
+                    imageUrl: product.imageUrl,
+                    category: product.category?.name,
+                    type: product.type,
+                  })
+                  if (added) {
+                    toast.success(`Added "${product.name}" to wishlist!`)
+                  } else {
+                    toast.info(`Removed "${product.name}" from wishlist.`)
+                  }
+                }}
+                className={`h-14 w-14 shrink-0 rounded-full border-2 flex items-center justify-center transition-all ${
+                  isWishlisted
+                    ? 'bg-rose-50 border-rose-300 text-rose-500 shadow-sm'
+                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-rose-500'
+                }`}
+                title={isWishlisted ? "Remove from wishlist" : "Save to wishlist"}
+              >
+                <Heart className={`w-6 h-6 ${isWishlisted ? 'fill-rose-500' : ''}`} />
               </button>
             </div>
           </div>
@@ -201,13 +234,13 @@ export default function ProductDetailPage() {
                     
                     try {
                       await api.post(`/public/catalog/products/${product.id}/reviews`, { rating, orderId, comment });
-                      alert('Review submitted successfully!');
+                      toast.success('Review submitted successfully!');
                       form.reset();
                       // Refresh product data to show new review
                       const res = await api.get(`/public/catalog/products/${product.id}`);
                       setProduct(res.data);
                     } catch (err: any) {
-                      alert(err.response?.data?.message || 'Failed to submit review. Are you sure you purchased this product?');
+                      toast.error(err.response?.data?.message || 'Failed to submit review. Are you sure you purchased this product?');
                     }
                   }}
                   className="space-y-4"

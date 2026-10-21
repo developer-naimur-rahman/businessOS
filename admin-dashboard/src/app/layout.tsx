@@ -1,5 +1,6 @@
 import './global.css';
 import { Inter } from 'next/font/google';
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${inter.className} h-full antialiased`} suppressHydrationWarning>
         {children}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

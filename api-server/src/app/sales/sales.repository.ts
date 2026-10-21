@@ -105,4 +105,106 @@ export class SalesRepository {
     const currentNumber = sequence.nextSequence - 1;
     return `${prefix}-${year}-${currentNumber.toString().padStart(6, '0')}`;
   }
+
+  async findManyWithPagination(
+    organizationId: string,
+    options: {
+      skip: number;
+      take: number;
+      where?: Prisma.SaleWhereInput;
+      orderBy?: Prisma.SaleOrderByWithRelationInput;
+    }
+  ) {
+    const where: Prisma.SaleWhereInput = {
+      organizationId,
+      ...(options.where || {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.client.sale.findMany({
+        where,
+        skip: options.skip,
+        take: options.take,
+        orderBy: options.orderBy || { createdAt: 'desc' },
+        include: {
+          lines: { include: { variant: { include: { product: true } } } },
+          payments: true,
+          customer: true,
+          branch: true,
+        },
+      }),
+      this.client.sale.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  async updateSaleStatusAndFulfillment(
+    organizationId: string,
+    id: string,
+    status: 'DRAFT' | 'COMPLETED' | 'CANCELLED',
+    fulfillmentStatus?: 'PENDING_FILES' | 'QUEUED' | 'PROCESSING' | 'READY_FOR_PICKUP' | 'COMPLETED' | 'CANCELLED'
+  ) {
+    return this.client.sale.update({
+      where: { id, organizationId },
+      data: {
+        status,
+        updatedAt: new Date(),
+        ...(fulfillmentStatus
+          ? {
+              lines: {
+                updateMany: {
+                  where: { saleId: id },
+                  data: { fulfillmentStatus },
+                },
+              },
+            }
+          : {}),
+      },
+      include: {
+        lines: { include: { variant: { include: { product: true } } } },
+        payments: true,
+        customer: true,
+      },
+    });
+  }
+
+  async recordAuditLog(data: {
+    organizationId: string;
+    entityType: string;
+    entityId: string;
+    action: string;
+    oldData?: any;
+    newData?: any;
+    userId?: string;
+    ipAddress?: string;
+  }) {
+    return this.client.auditLog.create({
+      data: {
+        organizationId: data.organizationId,
+        entityType: data.entityType,
+        entityId: data.entityId,
+        action: data.action,
+        oldData: data.oldData || undefined,
+        newData: data.newData || undefined,
+        userId: data.userId || null,
+        ipAddress: data.ipAddress || null,
+      },
+    });
+  }
+
+  async getAuditLogsForEntity(organizationId: string, entityType: string, entityId: string) {
+    return this.client.auditLog.findMany({
+      where: {
+        organizationId,
+        entityType,
+        entityId,
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+  }
 }
+

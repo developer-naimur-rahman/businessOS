@@ -9,11 +9,14 @@ import { OperationalStructureModule } from '../operational-structure/operational
 import { FinanceIntegrationModule } from '../finance-integration/finance-integration.module';
 
 import { CustomerSalesController } from './customer-sales.controller';
+import { RateLimitGuard } from '../common/guards/rate-limit.guard';
+import { NotificationService } from '../common/notifications/notification.service';
 
 @Module({
   imports: [PrismaModule, InventoryModule, BusinessCoreModule, OperationalStructureModule, FinanceIntegrationModule],
   controllers: [SalesController, CustomerSalesController],
-  providers: [SalesService, SalesRepository],
-  exports: [SalesService],
+  providers: [SalesService, SalesRepository, RateLimitGuard, NotificationService],
+  exports: [SalesService, NotificationService],
 })
 export class SalesModule {}
+

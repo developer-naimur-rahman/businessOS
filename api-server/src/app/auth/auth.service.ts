@@ -25,8 +25,34 @@ export class AuthService {
 
   async login(user: any) {
     const payload = { sub: user.id };
+    const token = this.jwtService.sign(payload);
+
+    let organizationId = user.organizationId;
+    let email = user.email;
+    let firstName = user.firstName;
+    let lastName = user.lastName;
+
+    if (!organizationId && user.id && user.id !== "1") {
+      const dbUser = await this.usersService.findById(user.id);
+      if (dbUser) {
+        organizationId = dbUser.organizationId;
+        email = dbUser.email;
+        firstName = dbUser.firstName;
+        lastName = dbUser.lastName;
+      }
+    }
+
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: token,
+      token,
+      organizationId: organizationId || 'f3281531-1153-4a8f-92b1-5f2b5f2efb60',
+      user: {
+        userId: user.id,
+        organizationId: organizationId || 'f3281531-1153-4a8f-92b1-5f2b5f2efb60',
+        email,
+        firstName,
+        lastName,
+      },
     };
   }
 }

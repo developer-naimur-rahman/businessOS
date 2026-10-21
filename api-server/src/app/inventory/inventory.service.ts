@@ -255,5 +255,33 @@ export class InventoryService {
     }
     return movements;
   }
+
+  async restoreStockForCancelledSale(
+    organizationId: string,
+    warehouseId: string,
+    items: Array<{ variantId: string; quantity: Prisma.Decimal | number }>,
+    saleId: string,
+    userId?: string,
+  ) {
+    const movements = [];
+    for (const item of items) {
+      await this.balancesRepo.upsertStock(organizationId, warehouseId, item.variantId, item.quantity);
+      
+      const movement = await this.movementsRepo.createMovement({
+        data: {
+          organizationId,
+          warehouseId,
+          variantId: item.variantId,
+          type: MovementType.RECEIPT,
+          quantity: item.quantity,
+          referenceType: 'SALE_CANCELLED',
+          referenceId: saleId,
+          createdByUserId: userId || null,
+        },
+      });
+      movements.push(movement);
+    }
+    return movements;
+  }
 }
 

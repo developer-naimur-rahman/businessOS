@@ -9,6 +9,7 @@ import {
 import { MediaImage } from "../../../../components/ui/media-image"
 import { Modal } from "../../../../components/ui/modal"
 import Link from "next/link"
+import { toast } from "sonner"
 
 export default function ProductDetailPage() {
   const params = useParams()
@@ -74,9 +75,10 @@ export default function ProductDetailPage() {
     try {
       await api.patch(`/business-core/variants/${editingVariant.id}`, variantForm)
       setIsVariantModalOpen(false)
+      toast.success("Variant saved successfully")
       fetchProduct()
-    } catch (err) {
-      alert("Failed to save variant")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save variant")
     }
   }
 
@@ -84,9 +86,10 @@ export default function ProductDetailPage() {
     if (!confirm('Are you sure you want to archive this product? This action cannot be fully undone.')) return
     try {
       await api.delete(`/business-core/products/${productId}`)
+      toast.success("Product archived successfully")
       router.push('/admin/products')
-    } catch (err) {
-      alert("Failed to archive product")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to archive product")
     }
   }
 

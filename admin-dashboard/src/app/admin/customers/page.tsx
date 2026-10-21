@@ -4,6 +4,7 @@ import { api } from "../../../lib/api-client"
 import { Plus, Search, Filter, UserCircle2, Phone, Mail, Edit, Building2, Eye, MapPin, X, CheckCircle2, AlertCircle } from "lucide-react"
 import { Modal } from "../../../components/ui/modal"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('en-BD', { style: 'currency', currency: 'BDT', minimumFractionDigits: 0 }).format(amount)
@@ -75,10 +76,11 @@ export default function AdminCustomersPage() {
         await api.post('/business-core/customers', formData)
       }
       setIsModalOpen(false)
+      toast.success(editingCustomer ? "Customer updated successfully" : "Customer created successfully")
       fetchCustomers()
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save customer", err)
-      alert("Failed to save customer")
+      toast.error(err.response?.data?.message || "Failed to save customer")
     } finally {
       setSaving(false)
     }

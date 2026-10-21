@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, FileText, Download, Edit, CreditCard, Box } from 'lucide-react'
 import { api } from '../../../../lib/api-client'
+import { toast } from 'sonner'
 
 export default function PurchaseDetailPage() {
   const params = useParams()
@@ -41,9 +42,10 @@ export default function PurchaseDetailPage() {
     setCompleting(true)
     try {
       await api.post(`/purchases/${params.id}/complete`, { notes: 'Completed from admin' })
+      toast.success('Purchase completed successfully')
       fetchPurchase()
     } catch (e: any) {
-      alert(e.response?.data?.message || 'Failed to complete purchase')
+      toast.error(e.response?.data?.message || 'Failed to complete purchase')
     } finally {
       setCompleting(false)
     }
@@ -57,6 +59,7 @@ export default function PurchaseDetailPage() {
         ...paymentForm,
         paymentDate: new Date(paymentForm.paymentDate).toISOString()
       })
+      toast.success('Payment added successfully')
       fetchPurchase()
       setPaymentForm({
         ...paymentForm,
@@ -64,7 +67,7 @@ export default function PurchaseDetailPage() {
         reference: ''
       })
     } catch (e: any) {
-      alert(e.response?.data?.message || 'Failed to add payment')
+      toast.error(e.response?.data?.message || 'Failed to add payment')
     } finally {
       setAddingPayment(false)
     }
