@@ -117,6 +117,7 @@ export default function DropshippingHubPage() {
     setAnalyzing(true)
     try {
       const res = await api.post("/admin/dropshipping/ai-analyze", formData)
+      setAnalysisResult(res.data)
       if (res.data?.engineUsed === 'AI_GEMINI') {
         toast.success("AI Analysis Complete (Powered by Google Gemini ✨)")
       } else {
