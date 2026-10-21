@@ -5,24 +5,7 @@ import { useAuthStore } from "../../../store/useAuthStore"
 import { useRouter } from "next/navigation"
 import { api } from "../../../lib/api-client"
 import { toast } from "sonner"
-import { Lock, Mail, ArrowRight, ShieldCheck, KeyRound, User, Eye, EyeOff, Sparkles, Store } from "lucide-react"
-
-interface DemoUser {
-  role: string
-  label: string
-  email: string
-  password: string
-  pin: string
-  badgeColor: string
-}
-
-const DEMO_ACCOUNTS: DemoUser[] = [
-  { role: "admin", label: "Super Admin", email: "admin@demo.local", password: "password", pin: "5825825825iW.", badgeColor: "bg-purple-100 text-purple-700 border-purple-200" },
-  { role: "manager", label: "Store Manager", email: "manager@demo.local", password: "password", pin: "manager1", badgeColor: "bg-blue-100 text-blue-700 border-blue-200" },
-  { role: "sales", label: "POS Cashier", email: "sales@demo.local", password: "password", pin: "sales123", badgeColor: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  { role: "inventory", label: "Stock Keeper", email: "inventory@demo.local", password: "password", pin: "inv12345", badgeColor: "bg-amber-100 text-amber-700 border-amber-200" },
-  { role: "staff", label: "Counter Staff", email: "staff@demo.local", password: "password", pin: "staff123", badgeColor: "bg-slate-100 text-slate-700 border-slate-200" }
-]
+import { Lock, Mail, ArrowRight, KeyRound, User, Eye, EyeOff, Store } from "lucide-react"
 
 export default function AdminLogin() {
   const [activeTab, setActiveTab] = useState<"email" | "pin">("email")
@@ -143,33 +126,21 @@ export default function AdminLogin() {
     }
   }
 
-  // Quick Demo Account Pre-filler
-  const handleSelectDemoAccount = (acc: DemoUser) => {
-    if (activeTab === "email") {
-      setEmail(acc.email)
-      setPassword(acc.password)
-    } else {
-      setPin(acc.pin)
-    }
-    setError("")
-    toast.info(`Selected ${acc.label} credentials`)
-  }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 py-8 relative overflow-hidden">
       {/* Decorative Glow */}
       <div className="absolute top-1/4 -left-20 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-[430px] p-6 sm:p-8 bg-white/95 backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl relative z-10">
+      <div className="w-full max-w-[420px] p-7 sm:p-9 bg-white/95 backdrop-blur-xl rounded-3xl border border-white/20 shadow-2xl relative z-10">
         
         {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-gradient-to-tr from-slate-900 to-indigo-900 rounded-2xl mx-auto mb-3 flex items-center justify-center shadow-lg text-white">
+        <div className="text-center mb-7">
+          <div className="w-14 h-14 bg-gradient-to-tr from-slate-900 to-indigo-900 rounded-2xl mx-auto mb-3.5 flex items-center justify-center shadow-lg text-white">
             <Store className="w-7 h-7 text-sky-400" />
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">BusinessOS Workspace</h1>
-          <p className="text-xs text-slate-500 mt-1">Unified Retail, Physical Shop & Admin Portal</p>
+          <p className="text-xs text-slate-500 mt-1">Sign in with your staff account or unlock terminal</p>
         </div>
 
         {/* Tab Switcher */}
@@ -207,26 +178,22 @@ export default function AdminLogin() {
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-slate-400" /> Staff Email
               </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  required
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-all text-slate-900"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. staff@demo.local"
-                  disabled={loading}
-                  autoFocus
-                />
-              </div>
+              <input
+                type="email"
+                required
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-all text-slate-900"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. staff@demo.local"
+                disabled={loading}
+                autoFocus
+              />
             </div>
 
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-slate-400" /> Password
-                </label>
-              </div>
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-slate-400" /> Password
+              </label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -280,7 +247,6 @@ export default function AdminLogin() {
                 <span className="flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-slate-400" /> Cashier PIN / Security Code
                 </span>
-                <span className="text-[10px] text-slate-400 lowercase font-normal">e.g. sales123, 5678, manager1</span>
               </label>
               <input
                 type="password"
@@ -317,41 +283,8 @@ export default function AdminLogin() {
           </form>
         )}
 
-        {/* Demo Switcher Quick Chips */}
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-amber-500" /> Demo Staff Switcher
-            </span>
-            <span className="text-[10px] text-slate-400">Click to fill</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1.5">
-            {DEMO_ACCOUNTS.map((acc) => (
-              <button
-                key={acc.role}
-                type="button"
-                onClick={() => handleSelectDemoAccount(acc)}
-                className="flex items-center justify-between p-2 rounded-lg border border-slate-200/80 hover:border-indigo-300 bg-slate-50/70 hover:bg-indigo-50/50 transition-all text-left group"
-              >
-                <div>
-                  <p className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors">
-                    {acc.label}
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-mono">
-                    {activeTab === "email" ? acc.email.split("@")[0] : `PIN: ${acc.pin}`}
-                  </p>
-                </div>
-                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${acc.badgeColor}`}>
-                  {acc.role.toUpperCase()}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Footer Link */}
-        <div className="mt-5 text-center">
+        <div className="mt-8 pt-5 text-center border-t border-slate-100">
           <a href="/" className="text-xs font-semibold text-slate-400 hover:text-slate-700 transition-colors">
             &larr; Return to Storefront
           </a>
