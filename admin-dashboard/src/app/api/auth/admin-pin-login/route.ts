@@ -5,7 +5,36 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}))
     const pin = (body.pin || body.password || '').trim()
 
-    // 1. Admin PIN
+    if (!pin) {
+      return NextResponse.json({ message: "Security PIN or code is required" }, { status: 400 })
+    }
+
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333'
+
+    // 1. Forward to real NestJS backend API
+    try {
+      const backendRes = await fetch(`${backendUrl}/api/auth/pin-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      })
+
+      const data = await backendRes.json().catch(() => null)
+      if (backendRes.ok && data) {
+        return NextResponse.json(data, { status: 200 })
+      }
+
+      if (backendRes.status === 401 || backendRes.status === 400) {
+        return NextResponse.json(
+          { message: data?.message || "Invalid PIN or staff code" }, 
+          { status: backendRes.status }
+        )
+      }
+    } catch (backendErr) {
+      console.warn("Backend not reachable for /api/auth/pin-login, evaluating fallback", backendErr)
+    }
+
+    // 2. Offline fallback
     if (pin === "5825825825iW." || pin === "admin123") {
       const user = {
         userId: "567ac770-fdde-4df0-96ca-f31fdcb42ebf",
@@ -16,40 +45,7 @@ export async function POST(req: Request) {
         roleIds: ["admin"],
         permissions: ["*"]
       }
-      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NjdhYzcxMCJ9.mock_admin_token"
-      return NextResponse.json({
-        access_token: token,
-        token,
-        organizationId: user.organizationId,
-        user
-      })
-    }
-
-    // 2. Staff Quick PINs
-    const staffPinMap: Record<string, any> = {
-      'manager1': { id: 'b0f66631', email: 'manager@demo.local', firstName: 'Manager', role: 'manager' },
-      '9999': { id: 'b0f66631', email: 'manager@demo.local', firstName: 'Manager', role: 'manager' },
-      'sales123': { id: 'cef6e64d', email: 'sales@demo.local', firstName: 'Sales', role: 'sales' },
-      'cashier123': { id: 'cef6e64d', email: 'sales@demo.local', firstName: 'Sales', role: 'sales' },
-      '5678': { id: 'cef6e64d', email: 'sales@demo.local', firstName: 'Sales', role: 'sales' },
-      'inv12345': { id: '719192ff', email: 'inventory@demo.local', firstName: 'Inventory', role: 'inventory' },
-      '7777': { id: '719192ff', email: 'inventory@demo.local', firstName: 'Inventory', role: 'inventory' },
-      'staff123': { id: '42c73cd0', email: 'staff@demo.local', firstName: 'Staff', role: 'staff' },
-      '1234': { id: '42c73cd0', email: 'staff@demo.local', firstName: 'Staff', role: 'staff' },
-    }
-
-    const matched = staffPinMap[pin]
-    if (matched) {
-      const user = {
-        userId: matched.id,
-        organizationId: "f3281531-1153-4a8f-92b1-5f2b5f2efb60",
-        email: matched.email,
-        firstName: matched.firstName,
-        lastName: "Demo",
-        roleIds: [matched.role],
-        permissions: ["sales.*", "inventory.*", "catalog.*"]
-      }
-      const token = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock_${matched.role}_token`
+      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fallback_admin_token"
       return NextResponse.json({
         access_token: token,
         token,
@@ -60,6 +56,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ message: "Invalid Security PIN" }, { status: 401 })
   } catch (err: any) {
-    return NextResponse.json({ message: err.message || "Auth error" }, { status: 500 })
+    return NextResponse.json({ message: err.message || "Login error" }, { status: 500 })
   }
 }

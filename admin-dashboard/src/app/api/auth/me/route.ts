@@ -8,6 +8,30 @@ export async function GET(req: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
   }
 
+  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333'
+
+  // 1. Try real NestJS backend
+  try {
+    const backendRes = await fetch(`${backendUrl}/api/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+
+    if (backendRes.ok) {
+      const data = await backendRes.json()
+      return NextResponse.json(data)
+    }
+
+    if (backendRes.status === 401) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+    }
+  } catch (backendErr) {
+    console.warn("Backend not reachable for /api/auth/me, evaluating fallback", backendErr)
+  }
+
+  // 2. Offline fallback
   let role = "admin"
   let firstName = "Admin"
   if (token.includes("manager")) { role = "manager"; firstName = "Manager" }

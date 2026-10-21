@@ -58,6 +58,22 @@ export class AuthService {
       }
     }
 
+    let roleIds = ['admin'];
+    let permissions = ['*'];
+
+    if (user.id && user.id !== "1") {
+      try {
+        const eff = await this.usersService.getEffectivePermissions(user.id);
+        if (eff) {
+          roleIds = eff.roleIds || ['admin'];
+          permissions = eff.permissions || ['*'];
+        }
+      } catch {
+        roleIds = ['admin'];
+        permissions = ['*'];
+      }
+    }
+
     return {
       access_token: token,
       token,
@@ -68,6 +84,8 @@ export class AuthService {
         email,
         firstName,
         lastName,
+        roleIds,
+        permissions,
       },
     };
   }
