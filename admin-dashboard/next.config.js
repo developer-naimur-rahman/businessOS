@@ -14,6 +14,15 @@ const nextConfig = {
       }
     ],
   },
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://127.0.0.1:3333';
+    return [
+      {
+        source: '/backend-api/:path*',
+        destination: `${backendUrl}/api/:path*`,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

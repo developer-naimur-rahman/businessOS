@@ -5,6 +5,7 @@ import { PageHeader } from "../../../components/layout/page-header"
 import { DataTable } from "../../../components/ui/data-table"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { getApiBaseUrl } from "../../../lib/utils"
 
 export default function DesignStudioLibrary() {
   const [designs, setDesigns] = useState([])
@@ -67,7 +68,7 @@ export default function DesignStudioLibrary() {
           <button onClick={() => router.push(`/admin/design-studio/${item.id}`)} className="text-blue-600 hover:underline">Edit</button>
           <button onClick={() => handleDuplicate(item.id)} className="text-slate-600 hover:underline">Duplicate</button>
           <button onClick={() => handleDelete(item.id)} className="text-red-600 hover:underline">Delete</button>
-          <a href={`http://localhost:3333/api/design-studio/designs/${item.id}/pdf`} target="_blank" className="text-primary hover:underline font-medium">Download PDF</a>
+          <a href={`${getApiBaseUrl()}/design-studio/designs/${item.id}/pdf`} target="_blank" className="text-primary hover:underline font-medium">Download PDF</a>
         </div>
       )
     }

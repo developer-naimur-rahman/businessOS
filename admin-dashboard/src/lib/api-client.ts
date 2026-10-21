@@ -1,11 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
-
-// Next.js rewrites can be used later, but for now we'll assume the API is on the same host or use env
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333/api';
+import { getApiBaseUrl } from './utils';
 
 export const api = axios.create({
-  baseURL: API_URL,
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -13,6 +11,9 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    // Dynamically adjust baseURL if running in browser to match current device's network origin
+    config.baseURL = getApiBaseUrl();
+
     // Read from Zustand store first, with fallback to localStorage
     const token = 
       useAuthStore.getState().token || 

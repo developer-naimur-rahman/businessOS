@@ -8,6 +8,7 @@ import { Label } from "../../../../components/ui/label"
 import { DataTable } from "../../../../components/ui/data-table"
 import { toast } from "sonner"
 import { Save, Printer, Download } from "lucide-react"
+import { getApiBaseUrl } from "../../../../lib/utils"
 
 export default function PriceListPage() {
   const [services, setServices] = useState<any[]>([])
@@ -106,7 +107,7 @@ export default function PriceListPage() {
     if (!token) return toast.error("Not authenticated")
     
     const qs = buildQueryString()
-    const url = `http://localhost:3333/api/business-core/price-list/pdf?${qs}`
+    const url = `${getApiBaseUrl()}/business-core/price-list/pdf?${qs}`
     
     // We fetch it securely then trigger download to pass auth headers
     toast.loading("Generating PDF...", { id: "pdf-gen" })
@@ -136,7 +137,7 @@ export default function PriceListPage() {
     if (!token) return toast.error("Not authenticated")
     
     const qs = buildQueryString()
-    const url = `http://localhost:3333/api/business-core/price-list/pdf?${qs}`
+    const url = `${getApiBaseUrl()}/business-core/price-list/pdf?${qs}`
     
     toast.loading("Generating preview...", { id: "pdf-prev" })
     fetch(url, {

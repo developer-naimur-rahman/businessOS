@@ -3,8 +3,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import axios from 'axios';
 
-// Directly use the API_URL to avoid circular dependency with api-client
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333/api';
+import { getApiBaseUrl } from '../lib/utils';
 
 export interface AuthenticatedUser {
   userId: string;
@@ -64,7 +63,7 @@ export const useAuthStore = create<AuthState>()(
           const token = get().token || (typeof window !== 'undefined' ? (localStorage.getItem('token') || localStorage.getItem('access_token')) : null);
           if (!token) return;
           
-          const response = await axios.get<AuthenticatedUser>(`${API_URL}/auth/me`, {
+          const response = await axios.get<AuthenticatedUser>(`${getApiBaseUrl()}/auth/me`, {
             headers: {
               Authorization: `Bearer ${token}`
             }
