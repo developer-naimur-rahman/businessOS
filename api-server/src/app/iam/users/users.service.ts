@@ -65,6 +65,10 @@ export class UsersService {
 
     for (const ur of userWithRoles.userRoles) {
       roleIds.add(ur.roleId);
+      if (ur.role?.name) {
+        roleIds.add(ur.role.name);
+        roleIds.add(ur.role.name.toLowerCase());
+      }
       for (const rp of ur.role.permissions) {
         permissions.add(rp.permission.action);
       }

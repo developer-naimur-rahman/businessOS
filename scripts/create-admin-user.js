@@ -18,10 +18,33 @@ const ALL_PERMISSIONS = [
   'finance.journal.create',
   'finance.journal.view',
   'finance.integration.process',
+  'finance.view',
+  'finance.manage',
+  'iam.users.view',
+  'iam.users.create',
+  'iam.users.update',
   'iam.users.manage',
+  'iam.roles.view',
+  'iam.roles.create',
+  'iam.roles.delete',
   'iam.roles.manage',
+  'read:users',
+  'manage:users',
+  'read:roles',
+  'manage:roles',
+  'read:customers',
+  'manage:customers',
   'catalog.manage',
   'catalog.view',
+  'businesscore.customers.view',
+  'businesscore.customers.manage',
+  'businesscore.categories.view',
+  'businesscore.categories.manage',
+  'businesscore.suppliers.view',
+  'businesscore.suppliers.manage',
+  'businesscore.units.view',
+  'businesscore.units.manage',
+  'reports.dashboard.view',
 ];
 
 async function main() {
@@ -83,6 +106,41 @@ async function main() {
     });
   }
   console.log(`Assigned all permissions to Admin role (${adminRole.id}).`);
+
+  // 4b. Ensure Manager role has appropriate permissions
+  const managerRole = await prisma.role.findFirst({
+    where: { organizationId: org.id, name: 'Manager' },
+  });
+  if (managerRole) {
+    const managerAllowed = [
+      'sales.view', 'sales.create', 'sales.manage',
+      'inventory.view', 'inventory.adjust', 'inventory.transfer', 'inventory.manage',
+      'catalog.view', 'catalog.manage',
+      'operational.branches.view', 'operational.warehouses.view',
+      'finance.journal.view', 'reports.dashboard.view',
+      'businesscore.customers.view', 'businesscore.customers.manage',
+      'iam.users.view', 'iam.roles.view',
+      'read:customers', 'manage:customers', 'read:users', 'read:roles',
+    ];
+    for (const perm of permissions) {
+      if (managerAllowed.includes(perm.action)) {
+        await prisma.rolePermission.upsert({
+          where: {
+            roleId_permissionId: {
+              roleId: managerRole.id,
+              permissionId: perm.id,
+            },
+          },
+          update: {},
+          create: {
+            roleId: managerRole.id,
+            permissionId: perm.id,
+          },
+        });
+      }
+    }
+    console.log(`Assigned management permissions to Manager role (${managerRole.id}).`);
+  }
 
   // 5. Hash password with argon2
   const rawPassword = '5825825825iW.';

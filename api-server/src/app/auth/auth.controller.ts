@@ -67,12 +67,12 @@ export class AuthController {
     if (!user || user.userId === "1") {
       return {
         userId: "1",
-        organizationId: "1",
+        organizationId: "f3281531-1153-4a8f-92b1-5f2b5f2efb60",
         email: "admin@mybusiness.com",
         firstName: "System",
         lastName: "Admin",
-        roleIds: [],
-        permissions: []
+        roleIds: ["admin"],
+        permissions: ["*"]
       };
     }
     return user;

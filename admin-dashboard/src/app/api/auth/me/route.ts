@@ -22,6 +22,6 @@ export async function GET(req: Request) {
     firstName,
     lastName: "Demo",
     roleIds: [role],
-    permissions: role === "admin" ? ["*"] : ["sales.*", "inventory.*", "catalog.*"]
+    permissions: role === "admin" ? ["*"] : role === "manager" ? ["businesscore.*", "iam.*", "sales.*", "inventory.*", "catalog.*"] : ["sales.*", "inventory.*", "catalog.*"]
   })
 }
