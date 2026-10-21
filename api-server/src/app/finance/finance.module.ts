@@ -8,7 +8,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
 @Module({
   imports: [PrismaModule],
   controllers: [FinanceController, ExpensesController],
-  providers: [FinanceService, FinanceRepository],
-  exports: [FinanceService, FinanceRepository],
+  providers: [FinanceService, FinanceRepository, ExpensesController],
+  exports: [FinanceService, FinanceRepository, ExpensesController],
 })
 export class FinanceModule {}

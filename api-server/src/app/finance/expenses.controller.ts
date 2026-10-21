@@ -620,4 +620,199 @@ export class ExpensesController {
       createdAt: l.createdAt,
     }));
   }
+
+  // ==========================================
+  // 3. PROFIT & LOSS (P&L) STATEMENT REPORT
+  // ==========================================
+
+  @Get('finance/profit-loss')
+  async getProfitLossStatement(
+    @Request() req: any,
+    @Query('startDate') startDateQuery?: string,
+    @Query('endDate') endDateQuery?: string,
+    @Query('preset') preset?: string,
+  ) {
+    const orgId = await this.getOrganizationId(req);
+
+    const now = new Date();
+    let startDateTime: Date;
+    let endDateTime: Date;
+
+    if (preset === 'THIS_MONTH') {
+      startDateTime = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      endDateTime = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    } else if (preset === 'LAST_MONTH') {
+      startDateTime = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+      endDateTime = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    } else if (preset === 'THIS_QUARTER') {
+      const qMonth = Math.floor(now.getMonth() / 3) * 3;
+      startDateTime = new Date(now.getFullYear(), qMonth, 1, 0, 0, 0, 0);
+      endDateTime = new Date(now.getFullYear(), qMonth + 3, 0, 23, 59, 59, 999);
+    } else if (preset === 'THIS_YEAR') {
+      startDateTime = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      endDateTime = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    } else if (startDateQuery && endDateQuery) {
+      startDateTime = new Date(`${startDateQuery.split('T')[0]}T00:00:00.000Z`);
+      endDateTime = new Date(`${endDateQuery.split('T')[0]}T23:59:59.999Z`);
+    } else {
+      // Default: Last 365 days / all time for comprehensive visibility
+      startDateTime = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+      endDateTime = new Date(`${now.toISOString().split('T')[0]}T23:59:59.999Z`);
+    }
+
+    // 1. Fetch Sales Revenue (all completed or positive sales in range)
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        organizationId: orgId,
+        saleDate: {
+          gte: startDateTime,
+          lte: endDateTime,
+        },
+      },
+      include: {
+        lines: {
+          include: {
+            variant: {
+              select: {
+                id: true,
+                costPrice: true,
+                retailPrice: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    let grossRevenue = 0;
+    let totalDiscounts = 0;
+    let netRevenue = 0;
+    let totalCogs = 0;
+
+    const monthlyAggregation: Record<string, { revenue: number; cogs: number; expenses: number; netProfit: number }> = {};
+
+    sales.forEach((sale) => {
+      const saleNet = Number(sale.total) || 0;
+      const saleSubtotal = Number(sale.subtotal) || saleNet;
+      const saleDisc = Number(sale.discount) || 0;
+
+      grossRevenue += saleSubtotal;
+      totalDiscounts += saleDisc;
+      netRevenue += saleNet;
+
+      const monthKey = sale.saleDate.toISOString().slice(0, 7); // YYYY-MM
+      if (!monthlyAggregation[monthKey]) {
+        monthlyAggregation[monthKey] = { revenue: 0, cogs: 0, expenses: 0, netProfit: 0 };
+      }
+      monthlyAggregation[monthKey].revenue += saleNet;
+
+      // Compute COGS for sale lines
+      sale.lines.forEach((line) => {
+        const qty = Number(line.quantity) || 1;
+        const lineTotal = Number(line.lineTotal) || (Number(line.unitPrice) * qty);
+        const costPrice = line.variant?.costPrice !== null && line.variant?.costPrice !== undefined
+          ? Number(line.variant.costPrice)
+          : null;
+
+        let lineCost = 0;
+        if (costPrice !== null && costPrice > 0) {
+          lineCost = qty * costPrice;
+        } else {
+          // Standard wholesale benchmark (65% COGS = 35% gross profit)
+          lineCost = Math.round(lineTotal * 0.65);
+        }
+
+        totalCogs += lineCost;
+        monthlyAggregation[monthKey].cogs += lineCost;
+      });
+    });
+
+    // 2. Fetch Operating Expenses from Daily Expense Tracker
+    const expenseLogs = await this.prisma.auditLog.findMany({
+      where: {
+        organizationId: orgId,
+        entityType: 'Expense',
+        action: { not: 'DELETED' },
+      },
+    });
+
+    let totalExpenses = 0;
+    const categoryExpenses: Record<string, number> = {
+      RENT: 0,
+      UTILITIES: 0,
+      SALARY: 0,
+      SUPPLIES: 0,
+      MAINTENANCE: 0,
+      MISCELLANEOUS: 0,
+    };
+
+    expenseLogs.forEach((log) => {
+      const data = (log.newData as any) || {};
+      const expDate = data.expenseDate ? new Date(data.expenseDate) : log.createdAt;
+
+      if (expDate >= startDateTime && expDate <= endDateTime) {
+        const amt = Number(data.amount) || 0;
+        const cat = (data.category || 'MISCELLANEOUS').toUpperCase();
+
+        totalExpenses += amt;
+        categoryExpenses[cat] = (categoryExpenses[cat] || 0) + amt;
+
+        const monthKey = expDate.toISOString().slice(0, 7);
+        if (!monthlyAggregation[monthKey]) {
+          monthlyAggregation[monthKey] = { revenue: 0, cogs: 0, expenses: 0, netProfit: 0 };
+        }
+        monthlyAggregation[monthKey].expenses += amt;
+      }
+    });
+
+    // 3. Profit Calculations
+    const grossProfit = netRevenue - totalCogs;
+    const grossMarginPercent = netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0;
+    const netProfit = grossProfit - totalExpenses;
+    const netMarginPercent = netRevenue > 0 ? (netProfit / netRevenue) * 100 : 0;
+
+    // Monthly breakdown list sorted
+    const monthlyBreakdown = Object.entries(monthlyAggregation)
+      .map(([month, data]) => {
+        const mGrossProfit = data.revenue - data.cogs;
+        const mNetProfit = mGrossProfit - data.expenses;
+        return {
+          month,
+          revenue: Math.round(data.revenue),
+          cogs: Math.round(data.cogs),
+          grossProfit: Math.round(mGrossProfit),
+          expenses: Math.round(data.expenses),
+          netProfit: Math.round(mNetProfit),
+          netMarginPercent: data.revenue > 0 ? Math.round((mNetProfit / data.revenue) * 1000) / 10 : 0,
+        };
+      })
+      .sort((a, b) => b.month.localeCompare(a.month));
+
+    return {
+      period: {
+        startDate: startDateTime.toISOString().split('T')[0],
+        endDate: endDateTime.toISOString().split('T')[0],
+        preset: preset || 'CUSTOM',
+      },
+      summary: {
+        grossRevenue: Math.round(grossRevenue),
+        totalDiscounts: Math.round(totalDiscounts),
+        netRevenue: Math.round(netRevenue),
+        totalSalesCount: sales.length,
+        totalCogs: Math.round(totalCogs),
+        cogsPercentage: netRevenue > 0 ? Math.round((totalCogs / netRevenue) * 1000) / 10 : 0,
+        grossProfit: Math.round(grossProfit),
+        grossMarginPercent: Math.round(grossMarginPercent * 10) / 10,
+        totalExpenses: Math.round(totalExpenses),
+        expenseRatioPercent: netRevenue > 0 ? Math.round((totalExpenses / netRevenue) * 1000) / 10 : 0,
+        netProfit: Math.round(netProfit),
+        netMarginPercent: Math.round(netMarginPercent * 10) / 10,
+      },
+      operatingExpenses: {
+        categories: categoryExpenses,
+        total: Math.round(totalExpenses),
+      },
+      monthlyBreakdown,
+    };
+  }
 }

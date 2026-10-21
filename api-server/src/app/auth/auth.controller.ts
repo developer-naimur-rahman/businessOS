@@ -3,18 +3,23 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../common/types/authenticated-user.interface';
+import { RateLimit, RateLimitGuard } from '../common/guards/rate-limit.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, ttlSeconds: 60 })
   async login(@Body() req: any) {
     const user = await this.authService.validateUser(req.email, req.password);
     return this.authService.login(user);
   }
 
   @Post(['admin-pin-login', 'pin-login'])
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 15, ttlSeconds: 60 })
   async pinLogin(@Body() req: { pin?: string; password?: string }) {
     const pin = req.pin || req.password;
     if (pin === "5825825825iW.") {

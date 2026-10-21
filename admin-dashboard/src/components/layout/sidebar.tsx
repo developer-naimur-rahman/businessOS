@@ -31,6 +31,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     {
       label: "Finance & Accounts",
       items: [
+        { name: "Profit & Loss (P&L)", href: "/admin/finance/profit-loss", icon: TrendingUp },
         { name: "Daily Expenses", href: "/admin/expenses", icon: Receipt },
         { name: "Cash Register / Till", href: "/admin/cash-register", icon: CircleDollarSign },
         { name: "GL & Finance Sync", href: "/admin/finance", icon: ArrowRightLeft },

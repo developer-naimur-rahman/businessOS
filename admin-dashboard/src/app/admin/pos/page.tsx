@@ -59,40 +59,145 @@ export default function AdminPOSPage() {
     fetchCatalog()
   }, [])
 
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Focus search with Ctrl+K or /
-      if ((e.ctrlKey && e.key === 'k') || e.key === '/') {
-        e.preventDefault()
-        searchInputRef.current?.focus()
+  // Audio feedback synthesizer for barcode scanner
+  const playScanBeep = (isSuccess = true) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+
+      if (isSuccess) {
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(880, ctx.currentTime) // High pleasant chime (A5)
+        gain.gain.setValueAtTime(0.12, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start()
+        osc.stop(ctx.currentTime + 0.12)
+      } else {
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(300, ctx.currentTime) // Low warning beep
+        gain.gain.setValueAtTime(0.15, ctx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start()
+        osc.stop(ctx.currentTime + 0.25)
       }
-      // Escape to close modal / clear search
-      if (e.key === 'Escape') {
-        if (completedSale) {
-           handleNewSale()
-        } else if (searchQuery) {
-           setSearchQuery('')
-           searchInputRef.current?.blur()
+    } catch {
+      // AudioContext blocked by browser policy until interaction
+    }
+  }
+
+  // Fast Barcode & SKU Processing Engine
+  const processBarcodeScan = async (rawCode: string) => {
+    const code = rawCode.trim()
+    if (!code) return
+
+    const lower = code.toLowerCase()
+
+    // 1. Search in-memory products first (instant 0ms response)
+    for (const product of products) {
+      if (!product.isActive) continue
+      const variants = product.variants?.filter((v: any) => v.status === 'ACTIVE') || []
+      for (const variant of variants) {
+        if (
+          variant.sku?.toLowerCase() === lower ||
+          variant.barcodes?.some((b: any) => b.barcode.toLowerCase() === lower) ||
+          (product.code && product.code.toLowerCase() === lower)
+        ) {
+          addToCart(variant, product)
+          playScanBeep(true)
+          toast.success(`Scanned: ${product.name} (SKU: ${variant.sku})`)
+          setSearchQuery('')
+          return true
         }
       }
     }
+
+    // 2. Query backend fast barcode API if not loaded in memory
+    try {
+      const res = await api.get(`/public/catalog/barcodes/${encodeURIComponent(code)}`)
+      if (res.data?.found && res.data.variant && res.data.product) {
+        const { variant, product } = res.data
+        addToCart(variant, product)
+        playScanBeep(true)
+        toast.success(`Scanned: ${res.data.name || product.name}`)
+        setSearchQuery('')
+        return true
+      }
+    } catch {
+      // Non-blocking
+    }
+
+    playScanBeep(false)
+    toast.error(`Barcode / SKU "${code}" not found in catalog.`)
+    return false
+  }
+
+  // Hardware USB Barcode Scanner Keyboard Listener
+  useEffect(() => {
+    let scanBuffer = ''
+    let lastKeyTime = Date.now()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Focus search with Ctrl+K or /
+      if ((e.ctrlKey && e.key === 'k') || (e.key === '/' && document.activeElement !== searchInputRef.current)) {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        return
+      }
+
+      // Escape to close modal / clear search
+      if (e.key === 'Escape') {
+        if (completedSale) {
+          handleNewSale()
+        } else if (searchQuery) {
+          setSearchQuery('')
+          searchInputRef.current?.blur()
+        }
+        return
+      }
+
+      const now = Date.now()
+      const diff = now - lastKeyTime
+      lastKeyTime = now
+
+      const isInput = document.activeElement === searchInputRef.current
+
+      if (e.key === 'Enter') {
+        if (scanBuffer.length >= 2 && (diff < 120 || isInput)) {
+          e.preventDefault()
+          processBarcodeScan(scanBuffer)
+          scanBuffer = ''
+          return
+        }
+        scanBuffer = ''
+      } else if (e.key.length === 1) {
+        if (diff > 120 && !isInput) {
+          scanBuffer = e.key
+        } else {
+          scanBuffer += e.key
+        }
+      }
+    }
+
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [completedSale, searchQuery])
+  }, [completedSale, searchQuery, products])
 
   // Trigger browser print when printMode changes
   useEffect(() => {
     if (printMode !== 'NONE') {
-      // Small timeout to allow DOM to render the specific template before printing
       setTimeout(() => {
         window.print()
-        // Reset print mode after print dialog closes (some browsers block JS during print, some don't, so we reset immediately after triggering)
         setPrintMode('NONE')
       }, 100)
     }
   }, [printMode])
-
 
   const handleProductClick = (product: any) => {
     const activeVariants = product.variants?.filter((v: any) => v.status === 'ACTIVE') || []
@@ -228,40 +333,47 @@ export default function AdminPOSPage() {
         <div className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-0 md:pl-6 pt-6">
           
           {/* POS Header / Search */}
-          <div className="flex items-center gap-4 mb-4 shrink-0">
+          <div className="flex items-center gap-3 mb-4 shrink-0">
             <div className="relative flex-1 group">
               <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-600 transition-colors" />
               <input 
                 ref={searchInputRef}
                 type="text" 
-                placeholder="Search products or scan barcode (Press '/' to focus)" 
+                placeholder="Scan barcode gun or type product name / SKU (Press '/' to focus)" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && searchQuery.trim()) {
-                    const query = searchQuery.trim().toLowerCase();
-                    for (const product of products) {
-                      if (!product.isActive) continue;
-                      const variants = product.variants?.filter((v: any) => v.status === 'ACTIVE') || [];
-                      for (const variant of variants) {
-                        if (
-                          variant.sku?.toLowerCase() === query || 
-                          variant.barcodes?.some((b: any) => b.barcode.toLowerCase() === query)
-                        ) {
-                          addToCart(variant, product);
-                          setSearchQuery('');
-                          return;
-                        }
-                      }
-                    }
+                    e.preventDefault();
+                    processBarcodeScan(searchQuery.trim());
                   }
                 }}
-                className="w-full h-14 pl-12 pr-12 bg-white border border-slate-200 rounded-2xl text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                className="w-full h-14 pl-12 pr-12 bg-white border border-slate-200 rounded-2xl text-base md:text-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                 autoFocus
               />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+              <button 
+                type="button"
+                onClick={() => {
+                  if (searchQuery.trim()) {
+                    processBarcodeScan(searchQuery.trim());
+                  } else {
+                    searchInputRef.current?.focus();
+                    toast.info("Scanner Ready: Scan barcode with your USB barcode gun or type code above.");
+                  }
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                title="Scan barcode"
+              >
                 <ScanLine className="w-5 h-5" />
               </button>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2 px-3.5 py-3 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shrink-0">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span>Barcode Scanner Ready</span>
             </div>
           </div>
 

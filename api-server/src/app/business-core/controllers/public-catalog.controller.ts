@@ -180,4 +180,186 @@ export class PublicCatalogController {
       type: c.type
     }));
   }
+
+  // ==========================================
+  // FAST BARCODE & SKU LOOKUP FOR RETAIL POS
+  // ==========================================
+
+  @Get('barcodes/:code')
+  async lookupBarcode(@Param('code') rawCode: string) {
+    if (!rawCode || typeof rawCode !== 'string') {
+      throw new BadRequestException('Barcode or SKU is required.');
+    }
+
+    const orgId = await this.getDefaultOrganizationId();
+    const code = rawCode.trim();
+
+    // 1. Search in ProductVariantBarcode table
+    const barcodeRecord = await prisma.productVariantBarcode.findFirst({
+      where: {
+        organizationId: orgId,
+        barcode: { equals: code, mode: 'insensitive' },
+        isActive: true,
+      },
+      include: {
+        variant: {
+          include: {
+            product: true,
+            attributes: {
+              include: {
+                attributeValue: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (barcodeRecord && barcodeRecord.variant && barcodeRecord.variant.product?.isActive) {
+      const v = barcodeRecord.variant;
+      const p = v.product;
+      const price = Number(v.posPrice || v.retailPrice || p.sellingPrice || 0);
+      const attrs = v.attributes?.map((a: any) => a.attributeValue?.value).filter(Boolean).join(' / ');
+      const name = attrs ? `${p.name} - ${attrs}` : p.name;
+
+      return {
+        found: true,
+        matchType: 'BARCODE',
+        barcode: code,
+        variantId: v.id,
+        productId: p.id,
+        name,
+        productName: p.name,
+        sku: v.sku,
+        sellingPrice: price,
+        costPrice: Number(v.costPrice || 0),
+        product: {
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          imageUrl: p.imageUrl,
+          type: p.type,
+        },
+        variant: {
+          id: v.id,
+          sku: v.sku,
+          retailPrice: Number(v.retailPrice || 0),
+          posPrice: Number(v.posPrice || v.retailPrice || 0),
+        },
+      };
+    }
+
+    // 2. Search in ProductVariant by SKU
+    const variantRecord = await prisma.productVariant.findFirst({
+      where: {
+        organizationId: orgId,
+        sku: { equals: code, mode: 'insensitive' },
+        status: 'ACTIVE',
+      },
+      include: {
+        product: true,
+        attributes: {
+          include: {
+            attributeValue: true,
+          },
+        },
+      },
+    });
+
+    if (variantRecord && variantRecord.product && variantRecord.product.isActive) {
+      const v = variantRecord;
+      const p = v.product;
+      const price = Number(v.posPrice || v.retailPrice || p.sellingPrice || 0);
+      const attrs = v.attributes?.map((a: any) => a.attributeValue?.value).filter(Boolean).join(' / ');
+      const name = attrs ? `${p.name} - ${attrs}` : p.name;
+
+      return {
+        found: true,
+        matchType: 'SKU',
+        barcode: code,
+        variantId: v.id,
+        productId: p.id,
+        name,
+        productName: p.name,
+        sku: v.sku,
+        sellingPrice: price,
+        costPrice: Number(v.costPrice || 0),
+        product: {
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          imageUrl: p.imageUrl,
+          type: p.type,
+        },
+        variant: {
+          id: v.id,
+          sku: v.sku,
+          retailPrice: Number(v.retailPrice || 0),
+          posPrice: Number(v.posPrice || v.retailPrice || 0),
+        },
+      };
+    }
+
+    // 3. Search in Product by code
+    const productRecord = await prisma.product.findFirst({
+      where: {
+        organizationId: orgId,
+        code: { equals: code, mode: 'insensitive' },
+        isActive: true,
+      },
+      include: {
+        variants: {
+          where: { status: 'ACTIVE' },
+          include: {
+            attributes: {
+              include: {
+                attributeValue: true,
+              },
+            },
+          },
+          take: 1,
+        },
+      },
+    });
+
+    if (productRecord && productRecord.variants.length > 0) {
+      const p = productRecord;
+      const v = p.variants[0];
+      const price = Number(v.posPrice || v.retailPrice || p.sellingPrice || 0);
+      const attrs = v.attributes?.map((a: any) => a.attributeValue?.value).filter(Boolean).join(' / ');
+      const name = attrs ? `${p.name} - ${attrs}` : p.name;
+
+      return {
+        found: true,
+        matchType: 'PRODUCT_CODE',
+        barcode: code,
+        variantId: v.id,
+        productId: p.id,
+        name,
+        productName: p.name,
+        sku: v.sku,
+        sellingPrice: price,
+        costPrice: Number(v.costPrice || 0),
+        product: {
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          imageUrl: p.imageUrl,
+          type: p.type,
+        },
+        variant: {
+          id: v.id,
+          sku: v.sku,
+          retailPrice: Number(v.retailPrice || 0),
+          posPrice: Number(v.posPrice || v.retailPrice || 0),
+        },
+      };
+    }
+
+    return {
+      found: false,
+      barcode: code,
+      message: `No product or variant found matching barcode or SKU '${code}'.`,
+    };
+  }
 }

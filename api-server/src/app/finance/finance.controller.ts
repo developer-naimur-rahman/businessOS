@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Body, Request, UseGuards, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Request, UseGuards, Param, Query } from '@nestjs/common';
 import { FinanceService, CreateJournalEntryDto } from './finance.service';
+import { ExpensesController } from './expenses.controller';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrganizationContextGuard } from '../common/guards/organization-context.guard';
@@ -8,7 +9,10 @@ import { PermissionsGuard } from '../iam/guards/permissions.guard';
 @Controller('finance')
 @UseGuards(JwtAuthGuard, OrganizationContextGuard, PermissionsGuard)
 export class FinanceController {
-  constructor(private readonly financeService: FinanceService) {}
+  constructor(
+    private readonly financeService: FinanceService,
+    private readonly expensesController: ExpensesController,
+  ) {}
 
   @Get('accounts')
   @RequirePermissions('finance.view')
@@ -20,6 +24,17 @@ export class FinanceController {
   @RequirePermissions('finance.view')
   async getJournalEntries(@Request() req) {
     return this.financeService.getJournalEntries(req.user.organizationId);
+  }
+
+  @Get('profit-loss')
+  @RequirePermissions('finance.view')
+  async getProfitLoss(
+    @Request() req,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('preset') preset?: string,
+  ) {
+    return this.expensesController.getProfitLossStatement(req, startDate, endDate, preset);
   }
 
   @Post('journal-entries')
