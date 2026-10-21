@@ -35,17 +35,21 @@ export default function DropshippingHubPage() {
     imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop",
   })
 
-  // Quick Preset Templates for Instant 1-Click Testing
+  const [urlInput, setUrlInput] = useState("")
+  const [extractingUrl, setExtractingUrl] = useState(false)
+  const [presetCategory, setPresetCategory] = useState<string>("ALL")
+
+  // 12 Curated Winning Product Presets for Bangladesh Dropshipping
   const presets = [
     {
-      name: "🖨️ Skybuy Thermal Printer",
+      name: "🖨️ Skybuy Thermal Pocket Printer",
       platform: "SKYBUY_CHINA" as const,
       price: 680,
       weight: 260,
       target: 1890,
       ad: 220,
       cod: 14,
-      cat: "Gadgets & Printing",
+      cat: "Gadgets",
       url: "https://skybuybd.com/item/mini-pocket-printer-58mm",
       img: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop",
     },
@@ -57,7 +61,7 @@ export default function DropshippingHubPage() {
       target: 1190,
       ad: 180,
       cod: 16,
-      cat: "Home & Kitchen",
+      cat: "Kitchen",
       url: "https://daraz.com.bd/products/kitchen-chopper-i12345.html",
       img: "https://images.unsplash.com/photo-1590794056226-79ef3a8147e1?q=80&w=800&auto=format&fit=crop",
     },
@@ -69,21 +73,117 @@ export default function DropshippingHubPage() {
       target: 1250,
       ad: 190,
       cod: 12,
-      cat: "Lifestyle & Decor",
+      cat: "Lifestyle",
       url: "https://skybuybd.com/item/sunset-lamp-16colors",
       img: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?q=80&w=800&auto=format&fit=crop",
     },
     {
-      name: "🎧 TWS Wireless Earbuds Pro",
+      name: "🎧 TWS Gaming Wireless Earbuds",
       platform: "LOCAL_WHOLESALE" as const,
       price: 490,
       weight: 160,
       target: 1490,
       ad: 240,
       cod: 15,
-      cat: "Electronics & Audio",
+      cat: "Audio",
       url: "https://aliexpress.com/item/10050098231.html",
       img: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "⌚ Smart Watch Ultra 2 Ocean Strap",
+      platform: "SKYBUY_CHINA" as const,
+      price: 950,
+      weight: 240,
+      target: 2590,
+      ad: 260,
+      cod: 14,
+      cat: "Wearables",
+      url: "https://skybuybd.com/item/smart-watch-ultra-2-49mm",
+      img: "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "🎙️ K9 Dual Wireless Clip Microphone",
+      platform: "SKYBUY_CHINA" as const,
+      price: 430,
+      weight: 130,
+      target: 1350,
+      ad: 190,
+      cod: 13,
+      cat: "Gadgets",
+      url: "https://skybuybd.com/item/k9-wireless-lavalier-microphone",
+      img: "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "🚗 15W Qi Magnetic Fast Car Charger",
+      platform: "SKYBUY_CHINA" as const,
+      price: 720,
+      weight: 190,
+      target: 1950,
+      ad: 210,
+      cod: 13,
+      cat: "Gadgets",
+      url: "https://skybuybd.com/item/magnetic-wireless-car-charger-mount",
+      img: "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "🚁 Foldable 4K Obstacle Drone",
+      platform: "SKYBUY_CHINA" as const,
+      price: 1450,
+      weight: 380,
+      target: 3850,
+      ad: 290,
+      cod: 15,
+      cat: "Gadgets",
+      url: "https://skybuybd.com/item/e88-pro-4k-dual-camera-drone",
+      img: "https://images.unsplash.com/photo-1507582020474-9a35b7d455d9?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "🪒 Vintage T9 Metal Beard Trimmer",
+      platform: "RESELLING_BD" as const,
+      price: 360,
+      weight: 290,
+      target: 1090,
+      ad: 160,
+      cod: 15,
+      cat: "Personal Care",
+      url: "https://daraz.com.bd/products/t9-trimmer-hair-clipper-i999.html",
+      img: "https://images.unsplash.com/photo-1621607512214-68297480165e?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "🎒 Anti-Theft Water-Resistant Bag",
+      platform: "SKYBUY_CHINA" as const,
+      price: 780,
+      weight: 650,
+      target: 2190,
+      ad: 230,
+      cod: 14,
+      cat: "Lifestyle",
+      url: "https://skybuybd.com/item/bopai-anti-theft-laptop-backpack",
+      img: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "💆 Cervical Spine Neck Acupressure",
+      platform: "RESELLING_BD" as const,
+      price: 290,
+      weight: 280,
+      target: 990,
+      ad: 170,
+      cod: 12,
+      cat: "Personal Care",
+      url: "https://daraz.com.bd/products/neck-shoulder-relaxer-i888.html",
+      img: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop",
+    },
+    {
+      name: "🔦 10,000 Lumens Zoom LED Flashlight",
+      platform: "SKYBUY_CHINA" as const,
+      price: 440,
+      weight: 310,
+      target: 1390,
+      ad: 190,
+      cod: 13,
+      cat: "Gadgets",
+      url: "https://skybuybd.com/item/xhp50-tactical-led-flashlight",
+      img: "https://images.unsplash.com/photo-1541689592655-f5f52825a3b8?q=80&w=800&auto=format&fit=crop",
     },
   ]
 
@@ -101,6 +201,37 @@ export default function DropshippingHubPage() {
       imageUrl: preset.img,
     })
     toast.success(`Loaded preset template: ${preset.name}`)
+  }
+
+  const handleExtractFromUrl = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!urlInput.trim()) {
+      toast.error("Please paste a product or supplier link")
+      return
+    }
+
+    setExtractingUrl(true)
+    try {
+      const res = await api.post("/admin/dropshipping/extract-from-url", { url: urlInput })
+      const data = res.data
+      setFormData({
+        productName: data.productName || "Extracted Supplier Item",
+        sourcePlatform: data.sourcePlatform || "SKYBUY_CHINA",
+        supplierPriceBdt: data.supplierPriceBdt || 650,
+        weightGrams: data.weightGrams || 250,
+        targetSellingPrice: data.targetSellingPrice || 1850,
+        categoryHint: data.categoryHint || "General",
+        estimatedAdSpendPerOrder: 220,
+        codReturnRatePercent: 14,
+        supplierUrl: data.supplierUrl || urlInput,
+        imageUrl: data.imageUrl || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=800&auto=format&fit=crop",
+      })
+      toast.success(`✨ AI Extracted: ${data.productName}! Ready to analyze.`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to extract product from URL")
+    } finally {
+      setExtractingUrl(false)
+    }
   }
 
   const handleRunAnalysis = async (e?: React.FormEvent) => {
@@ -322,22 +453,104 @@ export default function DropshippingHubPage() {
           
           {/* Left: Input Form */}
           <div className="lg:col-span-5 space-y-5">
-            {/* Presets Bar */}
+            {/* 1-Click AI URL Auto-Extractor Card */}
+            <div className="surface-elevated p-4 bg-gradient-to-br from-indigo-50/80 via-white to-purple-50/40 border border-indigo-200/80 rounded-2xl space-y-2.5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-600 animate-pulse" /> 1-Click AI Auto-Extract from Link
+                </span>
+                <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+                  Skybuy • AliExpress • Daraz
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleExtractFromUrl()
+                    }
+                  }}
+                  placeholder="Paste any product link e.g. https://skybuybd.com/item/..."
+                  className="control-input flex-1 text-xs bg-white font-mono placeholder:text-slate-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleExtractFromUrl}
+                  disabled={extractingUrl || !urlInput.trim()}
+                  className="h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0"
+                >
+                  {extractingUrl ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Extracting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>AI Extract</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                <HelpCircle className="w-3 h-3 text-slate-400" />
+                Gemini AI will read title, image, and calculate wholesale & safe retail prices automatically.
+              </p>
+            </div>
+
+            {/* Presets Bar with 12 Winning Products & Category Filters */}
             <div className="surface-elevated p-4 space-y-2.5">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                ⚡ 1-Click Preset Winning Product Templates
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {presets.map((preset, idx) => (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                  ⚡ 12 Winning Product Presets (BD Market)
+                </span>
+                <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Verified Niches
+                </span>
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="flex flex-wrap gap-1">
+                {["ALL", "Gadgets", "Kitchen", "Lifestyle", "Wearables", "Personal Care"].map((cat) => (
                   <button
-                    key={idx}
+                    key={cat}
                     type="button"
-                    onClick={() => handleApplyPreset(preset)}
-                    className="p-2 text-left rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-indigo-50/50 hover:border-indigo-300 transition-all text-xs font-semibold text-slate-800 truncate"
+                    onClick={() => setPresetCategory(cat)}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors ${
+                      presetCategory === cat
+                        ? "bg-indigo-600 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                   >
-                    {preset.name}
+                    {cat}
                   </button>
                 ))}
+              </div>
+
+              {/* Presets Grid */}
+              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                {presets
+                  .filter((p) => presetCategory === "ALL" || p.cat === presetCategory)
+                  .map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleApplyPreset(preset)}
+                      className="p-2 text-left rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-indigo-50/60 hover:border-indigo-300 transition-all text-xs text-slate-800 flex flex-col justify-between group"
+                    >
+                      <p className="font-semibold truncate text-[11px] group-hover:text-indigo-600">
+                        {preset.name}
+                      </p>
+                      <div className="flex items-center justify-between mt-1 text-[10px] text-slate-500 font-mono">
+                        <span>Cost: ৳{preset.price}</span>
+                        <span className="font-bold text-emerald-600">Sell: ৳{preset.target}</span>
+                      </div>
+                    </button>
+                  ))}
               </div>
             </div>
 

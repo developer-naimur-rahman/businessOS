@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useAuthStore } from "../../store/useAuthStore"
 import { Sidebar } from "./sidebar"
 import { Header } from "./header"
+import { AdminAiCopilot } from "../ai-copilot/admin-ai-copilot"
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const { user, token, isHydrated, fetchProfile } = useAuthStore()
@@ -99,6 +100,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
           </div>
         </main>
       </div>
+      <AdminAiCopilot />
     </div>
   )
 }

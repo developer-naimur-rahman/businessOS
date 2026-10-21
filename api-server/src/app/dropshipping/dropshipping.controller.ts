@@ -18,6 +18,22 @@ export class DropshippingController {
     return this.dropshippingService.analyzeProduct(user.organizationId, user.userId, dto);
   }
 
+  @Post('extract-from-url')
+  async extractFromUrl(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { url: string; platformHint?: string },
+  ) {
+    return this.dropshippingService.extractProductFromUrl(body.url, body.platformHint);
+  }
+
+  @Post('ai-copilot')
+  async copilotChat(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { message: string },
+  ) {
+    return this.dropshippingService.copilotChat(user.organizationId, body.message);
+  }
+
   @Get('watchlist')
   async getWatchlist(@CurrentUser() user: AuthenticatedUser) {
     return this.dropshippingService.getWatchlist(user.organizationId);

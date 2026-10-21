@@ -62,6 +62,54 @@ export class DropshippingService {
     return analysisResult;
   }
 
+  async extractProductFromUrl(url: string, platformHint?: string) {
+    if (!url) {
+      throw new BadRequestException('Product URL is required');
+    }
+    return this.hybridAi.extractProductFromUrl(url, platformHint);
+  }
+
+  async copilotChat(organizationId: string, message: string) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const [todaySales, pendingDropshipOrders, cashClosing] = await Promise.all([
+      this.prisma.sale.findMany({
+        where: { organizationId, saleDate: { gte: startOfDay } },
+        select: { total: true },
+      }),
+      this.prisma.saleLine.count({
+        where: {
+          organizationId,
+          fulfillmentStatus: { not: 'COMPLETED' },
+          variant: { product: { isDropship: true } },
+        },
+      }),
+      this.prisma.auditLog.findFirst({
+        where: {
+          organizationId,
+          entityType: 'CashRegisterClosing',
+          createdAt: { gte: startOfDay },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    const totalSalesAmount = todaySales.reduce((acc, s) => acc + Number(s.total || 0), 0);
+    const grossProfitEstimate = Math.round(totalSalesAmount * 0.38);
+
+    const storeContext = {
+      todaySales: totalSalesAmount,
+      salesCount: todaySales.length,
+      grossProfit: grossProfitEstimate,
+      isRegisterClosed: !!cashClosing,
+      expectedClosingBalance: cashClosing ? (cashClosing.newData as any)?.actualCountedCash : totalSalesAmount,
+      pendingDropshipOrders,
+    };
+
+    return this.hybridAi.askCopilot(message, storeContext);
+  }
+
   async getWatchlist(organizationId: string) {
     const logs = await this.prisma.auditLog.findMany({
       where: {
