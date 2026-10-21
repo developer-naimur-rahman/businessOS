@@ -11,6 +11,12 @@
       "options": {
         "cwd": "admin-dashboard"
       }
+    },
+    "build": {
+      "command": "NODE_ENV=production next build --webpack",
+      "options": {
+        "cwd": "admin-dashboard"
+      }
     }
   }
 }

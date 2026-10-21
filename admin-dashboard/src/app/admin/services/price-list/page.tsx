@@ -10,7 +10,7 @@ import { toast } from "sonner"
 import { Save, Printer, Download } from "lucide-react"
 
 export default function PriceListPage() {
-  const [services, setServices] = useState([])
+  const [services, setServices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [pdfConfig, setPdfConfig] = useState({

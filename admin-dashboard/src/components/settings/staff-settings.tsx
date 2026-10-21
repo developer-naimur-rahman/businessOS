@@ -39,11 +39,17 @@ export function StaffSettings() {
   const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/iam/users', formData);
+      const parts = formData.name.trim().split(' ');
+      await api.post('/iam/users', {
+        ...formData,
+        firstName: parts[0] || '',
+        lastName: parts.slice(1).join(' ') || '',
+      });
       setIsUserModalOpen(false);
+      setFormData({ name: '', email: '', password: '', roleIds: [] });
       fetchAll();
-    } catch (err) {
-      alert("Error creating user");
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Error creating user");
     }
   };
 
@@ -113,7 +119,9 @@ export function StaffSettings() {
           <tbody className="divide-y divide-slate-100">
             {users.map(u => (
               <tr key={u.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium">{u.name}</td>
+                <td className="px-4 py-3 font-medium">
+                  {u.firstName ? `${u.firstName} ${u.lastName || ''}`.trim() : (u.name || u.email)}
+                </td>
                 <td className="px-4 py-3 text-slate-600">{u.email}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1 flex-wrap">

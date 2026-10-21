@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { CategoriesRepository } from '../repositories/categories.repository';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProductType } from '@prisma/client';
 
 @Injectable()
 export class CategoriesService {
@@ -13,7 +13,7 @@ export class CategoriesService {
     return this.categoriesRepository.create(organizationId, data);
   }
 
-  async findAll(organizationId: string, type?: Prisma.ProductType) {
+  async findAll(organizationId: string, type?: ProductType) {
     return this.categoriesRepository.findAll(organizationId, type);
   }
 

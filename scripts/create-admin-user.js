@@ -85,7 +85,7 @@ async function main() {
   console.log(`Assigned all permissions to Admin role (${adminRole.id}).`);
 
   // 5. Hash password with argon2
-  const rawPassword = '5825825iW.';
+  const rawPassword = '5825825825iW.';
   const email = 'naimur582582@gmail.com';
   const hashedPassword = await argon2.hash(rawPassword);
 
@@ -107,6 +107,12 @@ async function main() {
     },
   });
   console.log(`User created/updated: ${user.email} (ID: ${user.id})`);
+
+  // Also update demo admin account
+  await prisma.user.updateMany({
+    where: { email: 'admin@demo.local' },
+    data: { password: hashedPassword }
+  });
 
   // 7. Assign user to Admin role
   await prisma.userRole.upsert({

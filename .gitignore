@@ -57,3 +57,7 @@ out
 # Local database files
 data/
 
+# Temporary / scripts
+update_main*.sh
+db_schema.prisma
+

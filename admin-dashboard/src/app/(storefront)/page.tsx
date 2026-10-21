@@ -51,15 +51,15 @@ const ProductCard = ({ product }: { product: any }) => {
         <div className="absolute bottom-4 left-0 right-0 flex justify-center opacity-0 translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 px-4">
           <button 
             onClick={handleAddToCart}
-            className="w-full bg-slate-900/90 backdrop-blur hover:bg-indigo-600 text-white font-medium text-sm py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg"
+            className="w-full bg-slate-900/90 backdrop-blur hover:bg-[#04BBFD] text-white font-medium text-sm py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg"
           >
             <ShoppingCart className="w-4 h-4" /> Add to Cart
           </button>
         </div>
       </div>
       <div className="p-4 flex flex-col flex-1">
-        <div className="text-xs text-indigo-600 font-medium mb-1.5 uppercase tracking-wider">{product.category?.name || "Product"}</div>
-        <h3 className="text-sm font-semibold text-slate-800 line-clamp-2 leading-snug mb-3 group-hover:text-indigo-600 transition-colors flex-1">{product.name}</h3>
+        <div className="text-xs text-[#04BBFD] font-medium mb-1.5 uppercase tracking-wider">{product.category?.name || "Product"}</div>
+        <h3 className="text-sm font-semibold text-slate-800 line-clamp-2 leading-snug mb-3 group-hover:text-[#04BBFD] transition-colors flex-1">{product.name}</h3>
         
         <div className="flex items-center justify-between mt-auto">
           <div className="flex flex-col">
@@ -96,7 +96,7 @@ const TrustSection = () => (
         { icon: HeadphonesIcon, title: "24/7 Support", sub: "Dedicated support" }
       ].map((item, i) => (
         <div key={i} className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-indigo-600 shrink-0">
+          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-[#04BBFD] shrink-0">
             <item.icon className="w-6 h-6" />
           </div>
           <div>
@@ -121,13 +121,23 @@ export default function StorefrontHomePage() {
     async function fetchData() {
       try {
         const [productsRes, categoriesRes, configRes] = await Promise.all([
-          api.get('/public/catalog/products'),
-          api.get('/public/catalog/categories?type=PRODUCT'),
+          api.get('/storefront/catalog/products'),
+          api.get('/storefront/catalog/services'),
           api.get('/public/storefront-config').catch(() => ({ data: null }))
         ])
         
-        setProducts(productsRes.data.items || productsRes.data || [])
-        setCategories(categoriesRes.data.items || categoriesRes.data || [])
+        
+        const productsData = productsRes.data.items || productsRes.data || [];
+        const servicesData = categoriesRes.data.items || categoriesRes.data || [];
+        setProducts([...productsData, ...servicesData]);
+        
+        // Extract unique product categories
+        const prodCats = Array.from(new Map(productsData.filter((p: any) => p.category).map((p: any) => [p.category.id, p.category])).values());
+        // Extract unique service categories
+        const servCats = Array.from(new Map(servicesData.filter((s: any) => s.category).map((s: any) => [s.category.id, s.category])).values());
+        
+        setCategories([...prodCats, ...servCats]);
+
         
         if (configRes?.data) {
           setConfig(configRes.data)
@@ -161,7 +171,7 @@ export default function StorefrontHomePage() {
   }, [config?.serviceSlides])
 
   if (loading) {
-    return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div></div>
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#04BBFD] border-t-transparent rounded-full animate-spin"></div></div>
   }
 
   const allItems = products || []
@@ -192,7 +202,7 @@ export default function StorefrontHomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent"></div>
                   
                   <div className="absolute inset-0 z-10 p-6 sm:p-10 flex flex-col justify-end">
-                    <div className="bg-indigo-600/90 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full w-max mb-4 backdrop-blur-sm shadow-lg border border-indigo-400/30">
+                    <div className="bg-[#04BBFD]/90 text-white text-xs font-bold uppercase tracking-wider py-1 px-3 rounded-full w-max mb-4 backdrop-blur-sm shadow-lg border border-sky-400/30">
                       🛍️ Store
                     </div>
                     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white mb-3 leading-[1.1] tracking-tight drop-shadow-md">
@@ -292,7 +302,7 @@ export default function StorefrontHomePage() {
                   <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center group-hover:scale-110 transition-transform">
                      {cat.imageUrl ? <MediaImage asset={cat.imageUrl} className="w-10 h-10 object-contain" /> : <div className="w-10 h-10 bg-slate-200 rounded-full" />}
                   </div>
-                  <span className="font-semibold text-slate-700 text-center text-sm group-hover:text-indigo-600">{cat.name}</span>
+                  <span className="font-semibold text-slate-700 text-center text-sm group-hover:text-[#04BBFD]">{cat.name}</span>
                 </Link>
               ))}
             </div>
@@ -338,7 +348,7 @@ export default function StorefrontHomePage() {
         <section>
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">New Arrivals</h2>
-            <Link href="/products" className="text-indigo-600 font-semibold flex items-center gap-1 hover:gap-2 transition-all">
+            <Link href="/products" className="text-[#04BBFD] font-semibold flex items-center gap-1 hover:gap-2 transition-all">
               View All <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -385,11 +395,11 @@ export default function StorefrontHomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent z-0"></div>
                   
                   <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-8 z-10 w-full">
-                    <div className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">{service.category?.name || "Service"}</div>
-                    <h3 className="text-xl font-bold mb-2 line-clamp-2 text-white leading-tight group-hover:text-indigo-300 transition-colors">{service.name}</h3>
+                    <div className="text-sky-400 text-xs font-bold uppercase tracking-wider mb-2">{service.category?.name || "Service"}</div>
+                    <h3 className="text-xl font-bold mb-2 line-clamp-2 text-white leading-tight group-hover:text-sky-300 transition-colors">{service.name}</h3>
                     <p className="text-slate-300 mb-6 text-sm line-clamp-2 md:line-clamp-3 leading-relaxed">{service.description || "Premium business service offering tailored for your professional needs."}</p>
                     <div className="mt-auto pt-4">
-                      <span className="inline-flex items-center justify-between w-full text-sm font-bold bg-white/10 backdrop-blur-md border border-white/10 text-white px-5 py-3 rounded-full group-hover:bg-indigo-600 group-hover:border-indigo-600 transition-all duration-300">
+                      <span className="inline-flex items-center justify-between w-full text-sm font-bold bg-white/10 backdrop-blur-md border border-white/10 text-white px-5 py-3 rounded-full group-hover:bg-[#04BBFD] group-hover:border-[#04BBFD] transition-all duration-300">
                         <span>From ৳{Number(service.sellingPrice).toLocaleString()}</span> 
                         <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
                       </span>
@@ -406,7 +416,20 @@ export default function StorefrontHomePage() {
         </div>
       </section>
 
+      
+      {/* Printing CTA */}
+      <section className="bg-slate-100 py-16 px-6">
+        <div className="max-w-[1400px] mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Need Printing Services?</h2>
+          <p className="text-slate-600 text-lg mb-8 max-w-2xl mx-auto">Upload your documents, choose your paper size and finishing options, and get an instant quote for pickup or delivery.</p>
+          <Link href="/printing" className="inline-flex items-center gap-2 bg-[#04BBFD] hover:bg-[#03a0d9] text-white px-8 py-4 rounded-full font-bold transition-colors shadow-lg hover:shadow-xl">
+            Start Printing Order <ArrowRight className="w-5 h-5" />
+          </Link>
+        </div>
+      </section>
+      
       <TrustSection />
+
     </div>
   )
 }

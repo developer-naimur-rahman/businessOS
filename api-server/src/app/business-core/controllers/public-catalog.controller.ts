@@ -117,7 +117,7 @@ export class PublicCatalogController {
       where: {
         id: body.orderId,
         organizationId: orgId,
-        status: { in: ['COMPLETED', 'DELIVERED', 'DRAFT'] }, // Temporarily allowing DRAFT for testing, normally COMPLETED
+        status: { in: ['COMPLETED', 'DRAFT'] }, // Temporarily allowing DRAFT for testing, normally COMPLETED
         saleLines: {
           some: {
             variant: {
@@ -140,7 +140,7 @@ export class PublicCatalogController {
       where: {
         organizationId: orgId,
         productId: id,
-        authorName: purchase.customer?.name || 'Verified Buyer'
+        authorName: (purchase as any).customer?.name || 'Verified Buyer'
       }
     });
 
@@ -154,7 +154,7 @@ export class PublicCatalogController {
         productId: id,
         rating: body.rating,
         comment: body.comment,
-        authorName: purchase.customer?.name || 'Verified Buyer'
+        authorName: (purchase as any).customer?.name || 'Verified Buyer'
       }
     });
 

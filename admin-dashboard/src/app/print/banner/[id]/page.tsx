@@ -5,17 +5,21 @@ import { DesignState, defaultDesignState } from "../../../../components/design-s
 import { DesignCanvas } from "../../../../components/design-studio/primitives"
 import { TEMPLATES } from "../../../../components/design-studio/TemplateRegistry"
 
-export default function BannerPrintPage({ params }: { params: { id: string } }) {
+export default function BannerPrintPage({ params }: { params: Promise<{ id: string }> }) {
   const [state, setState] = useState<DesignState | null>(null)
   
+  // Use React.use to unwrap the params promise
+  const resolvedParams = React.use(params)
+
   useEffect(() => {
     fetchDesign()
-  }, [params.id])
+  }, [resolvedParams.id])
 
   const fetchDesign = async () => {
     try {
       const res = await api.get('/design-studio/designs')
-      const design = res.data.find((x: any) => x.id === params.id)
+      const design = res.data.find((x: any) => x.id === resolvedParams.id)
+
       
       if (design && design.settings && design.settings.version) {
         setState({

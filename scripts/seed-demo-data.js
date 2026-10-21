@@ -32,6 +32,8 @@ async function main() {
   };
 
   log('Creating Demo Accounts...');
+  const org = await prisma.organization.findFirst();
+  const orgId = org ? org.id : '1';
   const roles = [
     { name: 'Admin', email: 'admin@demo.local', pin: 'admin123' },
     { name: 'Manager', email: 'manager@demo.local', pin: 'manager1' },
@@ -45,7 +47,7 @@ async function main() {
       log(`Creating account: ${role.email}`);
       await prisma.user.create({
         data: {
-          organizationId: '1',
+          organizationId: orgId,
           email: role.email,
           firstName: role.name,
           lastName: 'Demo',
@@ -109,7 +111,7 @@ async function main() {
   }
 
   log('Ensuring Products exist...');
-  const productsResponse = await get('/products?pageSize=100');
+  const productsResponse = await get('/business-core/products?pageSize=100');
   const existingProducts = productsResponse.items || productsResponse;
   const prodMap = {};
   for (const p of existingProducts) prodMap[p.name] = p;
@@ -314,7 +316,6 @@ async function main() {
     const daysAgo = Math.floor(Math.random() * 90);
     const randomDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
     await prisma.sale.update({ where: { id: s.id }, data: { createdAt: randomDate }});
-    await prisma.saleLine.updateMany({ where: { saleId: s.id }, data: { createdAt: randomDate }});
     await prisma.salePayment.updateMany({ where: { saleId: s.id }, data: { createdAt: randomDate }});
   }
   
@@ -330,7 +331,7 @@ async function main() {
   for(const je of jes) {
     const daysAgo = Math.floor(Math.random() * 90);
     const randomDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
-    await prisma.journalEntry.update({ where: { id: je.id }, data: { date: randomDate, createdAt: randomDate }});
+    await prisma.journalEntry.update({ where: { id: je.id }, data: { accountingDate: randomDate, createdAt: randomDate }});
   }
   
   const ims = await prisma.inventoryMovement.findMany();

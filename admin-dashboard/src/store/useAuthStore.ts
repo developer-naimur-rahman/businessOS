@@ -1,5 +1,6 @@
+"use client"
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import axios from 'axios';
 
 // Directly use the API_URL to avoid circular dependency with api-client
@@ -24,37 +25,37 @@ interface AuthState {
   fetchProfile: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      token: null,
-      user: null,
-      setToken: (token) => set({ token }),
-      setUser: (user) => set({ user }),
-      logout: () => {
-        set({ token: null, user: null });
-        window.location.href = '/admin/login';
-      },
-      fetchProfile: async () => {
-        try {
-          const token = get().token;
-          if (!token) return;
-          
-          const response = await axios.get<AuthenticatedUser>(`${API_URL}/auth/me`, {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          });
-          set({ user: response.data });
-        } catch (error) {
-          console.error('Failed to fetch profile', error);
-          get().logout();
-        }
-      },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({ token: state.token, user: state.user }), // Persist both token and user
+const dummyStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  token: null,
+  user: null,
+  setToken: (token) => set({ token }),
+  setUser: (user) => set({ user }),
+  logout: () => {
+    set({ token: null, user: null });
+    if (typeof window !== 'undefined') {
+      window.location.href = '/admin/login';
     }
-  )
-);
+  },
+  fetchProfile: async () => {
+    try {
+      const token = get().token;
+      if (!token) return;
+      
+      const response = await axios.get<AuthenticatedUser>(`${API_URL}/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      set({ user: response.data });
+    } catch (error) {
+      console.error('Failed to fetch profile', error);
+      get().logout();
+    }
+  },
+}));

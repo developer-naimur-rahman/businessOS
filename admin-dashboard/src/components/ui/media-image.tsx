@@ -28,7 +28,7 @@ export function MediaImage({
   const [error, setError] = useState(false);
   const src = resolveMediaUrl(asset, fallbackUrl);
 
-  const displayAlt = alt || asset?.alt || asset?.title || "Media image";
+  const displayAlt = alt || (typeof asset === 'object' && asset !== null ? (asset as MediaAsset).alt || (asset as MediaAsset).title : undefined) || "Media image";
 
   if (!src || error) {
     return (

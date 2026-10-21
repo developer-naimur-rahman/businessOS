@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProductType } from '@prisma/client';
 
 @Injectable()
 export class CategoriesRepository {
@@ -15,7 +15,7 @@ export class CategoriesRepository {
     });
   }
 
-  async findAll(organizationId: string, type?: Prisma.ProductType) {
+  async findAll(organizationId: string, type?: ProductType) {
     return this.prisma.category.findMany({
       where: { 
         organizationId,

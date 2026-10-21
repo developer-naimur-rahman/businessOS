@@ -13,7 +13,8 @@ export default function StorefrontProductsPage() {
     async function fetchCatalog() {
       try {
         const res = await api.get('/public/catalog/products')
-        setProducts(res.data.items || res.data || [])
+        const items = res.data.items || res.data || []
+        setProducts(items.filter((p: any) => p.type === 'PRODUCT' || !p.type))
       } catch (err) {
         console.error("Failed to load catalog", err)
       } finally {

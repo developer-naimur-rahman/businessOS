@@ -47,7 +47,7 @@ export class SalesService {
     private readonly prismaManager: PrismaClientManager,
   ) {}
 
-  async createDirectSale(organizationId: string, data: CreateSaleDto, userId: string) {
+  async createDirectSale(organizationId: string, data: CreateSaleDto, userId: string, internalOverrides?: { [variantId: string]: number }) {
     if (data.idempotencyKey) {
       const existing = await this.salesRepo.findByIdempotencyKey(organizationId, data.idempotencyKey);
       if (existing) {
@@ -93,7 +93,10 @@ export class SalesService {
       const product = await this.productsService.findOne(organizationId, variant.productId);
       if (!product.isActive) throw new BadRequestException(`Product ${product.name} is inactive.`);
       // Assuming variant has sellingPrice, but let's just use product's if variant doesn't have it (or variant overrides it)
-      const unitPrice = (variant as any).posPrice ?? (variant as any).retailPrice ?? product.sellingPrice;
+      let unitPrice = (variant as any).posPrice ?? (variant as any).retailPrice ?? product.sellingPrice;
+      if (internalOverrides && internalOverrides[line.variantId] !== undefined) {
+        unitPrice = new Prisma.Decimal(internalOverrides[line.variantId]);
+      }
       const lineSubtotal = unitPrice.mul(quantity);
       const discount = line.discount ? new Prisma.Decimal(line.discount) : new Prisma.Decimal(0);
       

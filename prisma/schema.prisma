@@ -50,6 +50,7 @@ model Organization {
   users                     User[]
   variantAttributes         VariantAttribute[]
   warehouses                Warehouse[]
+  storageObjects            StorageObject[]
 }
 
 model BusinessUnit {
@@ -331,7 +332,7 @@ model AuditLog {
 }
 
 model Customer {
-  id             String       @id @default(uuid())
+  id             String          @id @default(uuid())
   organizationId String
   code           String?
   name           String
@@ -339,18 +340,19 @@ model Customer {
   email          String?
   address        String?
   password       String?
-  status         String       @default("ACTIVE")
+  status         String          @default("ACTIVE")
   notes          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   avatarUrl      String?
   city           String?
   companyName    String?
   country        String?
-  customerType   String       @default("INDIVIDUAL")
+  customerType   String          @default("INDIVIDUAL")
   taxId          String?
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization    @relation(fields: [organizationId], references: [id])
   sales          Sale[]
+  storageObjects StorageObject[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, code])
@@ -412,31 +414,32 @@ model Category {
 }
 
 model Product {
-  id              String           @id @default(uuid())
-  organizationId  String
-  categoryId      String?
-  unitId          String?
-  type            ProductType      @default(PRODUCT)
-  code            String?
-  name            String
-  description     String?
-  imageUrl        String?
-  sellingPrice    Decimal          @default(0) @db.Decimal(19, 4)
-  costPrice       Decimal?         @db.Decimal(19, 4)
-  isActive        Boolean          @default(true)
-  displayOrder    Int              @default(0)
-  status          ProductStatus    @default(DRAFT)
-  isOnlineVisible Boolean          @default(false)
-  isPosVisible    Boolean          @default(true)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  compareAtPrice  Decimal?         @db.Decimal(19, 4)
-  category        Category?        @relation(fields: [organizationId, categoryId], references: [organizationId, id])
-  organization    Organization     @relation(fields: [organizationId], references: [id])
-  unit            Unit?            @relation(fields: [organizationId, unitId], references: [organizationId, id])
-  media           ProductMedia[]
-  variants        ProductVariant[]
-  reviews         Review[]
+  id                  String           @id @default(uuid())
+  organizationId      String
+  categoryId          String?
+  unitId              String?
+  type                ProductType      @default(PRODUCT)
+  code                String?
+  name                String
+  description         String?
+  imageUrl            String?
+  sellingPrice        Decimal          @default(0) @db.Decimal(19, 4)
+  costPrice           Decimal?         @db.Decimal(19, 4)
+  isActive            Boolean          @default(true)
+  displayOrder        Int              @default(0)
+  status              ProductStatus    @default(DRAFT)
+  isOnlineVisible     Boolean          @default(false)
+  isPosVisible        Boolean          @default(true)
+  serviceConfigSchema Json?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  compareAtPrice      Decimal?         @db.Decimal(19, 4)
+  category            Category?        @relation(fields: [organizationId, categoryId], references: [organizationId, id])
+  organization        Organization     @relation(fields: [organizationId], references: [id])
+  unit                Unit?            @relation(fields: [organizationId, unitId], references: [organizationId, id])
+  media               ProductMedia[]
+  variants            ProductVariant[]
+  reviews             Review[]
 
   @@unique([organizationId, id])
   @@unique([organizationId, code])
@@ -569,20 +572,23 @@ model Sale {
 }
 
 model SaleLine {
-  id                  String         @id @default(uuid())
-  organizationId      String         @default("org-123")
-  saleId              String
-  variantId           String         @default("var-123")
-  quantity            Decimal        @db.Decimal(19, 4)
-  unitPrice           Decimal        @db.Decimal(19, 4)
-  discount            Decimal        @default(0) @db.Decimal(19, 4)
-  lineSubtotal        Decimal        @db.Decimal(19, 4)
-  lineTotal           Decimal        @db.Decimal(19, 4)
-  productNameSnapshot String         @default("")
-  skuSnapshot         String         @default("")
-  organization        Organization   @relation(fields: [organizationId], references: [id])
-  sale                Sale           @relation(fields: [organizationId, saleId], references: [organizationId, id], onDelete: Cascade)
-  variant             ProductVariant @relation(fields: [organizationId, variantId], references: [organizationId, id])
+  id                    String                    @id @default(uuid())
+  organizationId        String                    @default("org-123")
+  saleId                String
+  variantId             String                    @default("var-123")
+  quantity              Decimal                   @db.Decimal(19, 4)
+  unitPrice             Decimal                   @db.Decimal(19, 4)
+  discount              Decimal                   @default(0) @db.Decimal(19, 4)
+  lineSubtotal          Decimal                   @db.Decimal(19, 4)
+  lineTotal             Decimal                   @db.Decimal(19, 4)
+  productNameSnapshot   String                    @default("")
+  skuSnapshot           String                    @default("")
+  configurationSnapshot Json?
+  fulfillmentStatus     ServiceFulfillmentStatus?
+  storageObjects        StorageObject[]
+  organization          Organization              @relation(fields: [organizationId], references: [id])
+  sale                  Sale                      @relation(fields: [organizationId, saleId], references: [organizationId, id], onDelete: Cascade)
+  variant               ProductVariant            @relation(fields: [organizationId, variantId], references: [organizationId, id])
 }
 
 model SalePayment {
@@ -885,4 +891,40 @@ enum MediaType {
 enum PurchaseStatus {
   DRAFT
   COMPLETED
+}
+
+model StorageObject {
+  id             String     @id @default(uuid())
+  organizationId String
+  customerId     String?
+  saleLineId     String?
+  filename       String
+  mimeType       String
+  sizeBytes      Int
+  storageKey     String
+  accessType     AccessTier @default(PRIVATE_CUSTOMER)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  customer     Customer?    @relation(fields: [organizationId, customerId], references: [organizationId, id])
+  saleLine     SaleLine?    @relation(fields: [saleLineId], references: [id])
+
+  @@index([organizationId, saleLineId])
+  @@index([organizationId, customerId])
+}
+
+enum AccessTier {
+  PUBLIC
+  PRIVATE_CUSTOMER
+  INTERNAL
+}
+
+enum ServiceFulfillmentStatus {
+  PENDING_FILES
+  QUEUED
+  PROCESSING
+  READY_FOR_PICKUP
+  COMPLETED
+  CANCELLED
 }

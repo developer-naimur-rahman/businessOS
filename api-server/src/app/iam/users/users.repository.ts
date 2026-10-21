@@ -27,13 +27,14 @@ export class UsersRepository {
   }
 
   async create(organizationId: string, data: any) {
+    const parts = (data.name || '').trim().split(' ');
     return this.prisma.user.create({
       data: {
         organizationId,
         email: data.email,
         password: data.password,
-        firstName: data.firstName,
-        lastName: data.lastName,
+        firstName: data.firstName || parts[0] || '',
+        lastName: data.lastName || parts.slice(1).join(' ') || '',
       },
     });
   }
