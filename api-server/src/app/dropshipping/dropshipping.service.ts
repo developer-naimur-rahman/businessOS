@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { Decimal } from '@prisma/client/runtime/library';
+import { HybridIntelligenceService } from '../common/services/hybrid-intelligence.service';
 
 export interface DropshipAnalyzeDto {
   productName: string;
@@ -30,203 +31,19 @@ export interface DropshipImportDto {
 
 @Injectable()
 export class DropshippingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private hybridAi: HybridIntelligenceService,
+  ) {}
 
   async analyzeProduct(organizationId: string, userId: string, dto: DropshipAnalyzeDto) {
-    const {
-      productName,
-      sourcePlatform,
-      supplierUrl = '',
-      supplierPriceBdt,
-      weightGrams = 250,
-      targetSellingPrice,
-      categoryHint = 'General',
-      estimatedAdSpendPerOrder = 200,
-      codReturnRatePercent = 15,
-      imageUrl = '',
-    } = dto;
-
-    if (!productName || !targetSellingPrice || supplierPriceBdt === undefined) {
+    if (!dto.productName || !dto.targetSellingPrice || dto.supplierPriceBdt === undefined) {
       throw new BadRequestException('Product name, supplier price and target selling price are required');
     }
 
-    // 1. Air Cargo / Freight & Sourcing fee calculation
-    let shippingCost = 100; // Local delivery baseline
-    let cargoFee = 0;
-    let deliveryDaysText = '24–48 Hours across Bangladesh';
+    const analysisResult = await this.hybridAi.analyze(dto);
 
-    if (sourcePlatform === 'SKYBUY_CHINA') {
-      // Skybuy China air cargo ~850 BDT/kg, min 150 BDT
-      cargoFee = Math.max(150, Math.round((weightGrams / 1000) * 850));
-      shippingCost = cargoFee + 100; // Skybuy Air Cargo + Local Courier
-      deliveryDaysText = '7–10 Business Days via Skybuy Air Cargo';
-    } else if (sourcePlatform === 'ALIEXPRESS') {
-      cargoFee = Math.max(250, Math.round((weightGrams / 1000) * 1100));
-      shippingCost = cargoFee + 100;
-      deliveryDaysText = '12–18 Days via AliExpress Standard Shipping';
-    } else if (sourcePlatform === 'RESELLING_BD') {
-      cargoFee = 60; // Local wholesale sorting & handling
-      shippingCost = 100; // Standard BD courier
-      deliveryDaysText = '24–48 Hours inside Dhaka / 72 Hours nationwide';
-    } else {
-      cargoFee = 40;
-      shippingCost = 90;
-      deliveryDaysText = '24–48 Hours across Bangladesh';
-    }
-
-    // 2. Unit economics
-    const packagingCost = 35; // Bubble wrap, poly mailer, branded sticker
-    const gatewayFee = Math.round(targetSellingPrice * 0.015); // 1.5% COD / digital gateway fee
-    const adSpend = Math.max(50, Number(estimatedAdSpendPerOrder) || 200);
-
-    // In Bangladesh, returned COD parcels incur 2-way courier charge (~130 BDT) + 50% wasted ad spend
-    const returnRiskCost = Math.round(
-      ((codReturnRatePercent / 100) * 130) + 
-      (adSpend * (codReturnRatePercent / 100) * 0.5)
-    );
-
-    const totalLandedCost = supplierPriceBdt + shippingCost + packagingCost + gatewayFee + returnRiskCost + adSpend;
-    const netProfit = targetSellingPrice - totalLandedCost;
-    const profitMargin = targetSellingPrice > 0 ? Number(((netProfit / targetSellingPrice) * 100).toFixed(1)) : 0;
-
-    // Break-even and Safe 35% margin price
-    const fixedCostsExcludingGateway = supplierPriceBdt + shippingCost + packagingCost + returnRiskCost + adSpend;
-    const breakEvenSellingPrice = Math.round(fixedCostsExcludingGateway / (1 - 0.015));
-    const recommendedSellingPrice = Math.round(fixedCostsExcludingGateway / (1 - 0.015 - 0.35));
-
-    const grossMarginAfterSourcing = targetSellingPrice - (supplierPriceBdt + shippingCost + packagingCost + gatewayFee + returnRiskCost);
-    const breakEvenRoas = grossMarginAfterSourcing > 0 
-      ? Number((targetSellingPrice / grossMarginAfterSourcing).toFixed(2)) 
-      : 0;
-
-    // 3. AI Viability Score (0-100)
-    let score = 50;
-
-    // Margin factor
-    if (profitMargin >= 35) score += 25;
-    else if (profitMargin >= 25) score += 18;
-    else if (profitMargin >= 15) score += 8;
-    else if (profitMargin < 10) score -= 20;
-
-    // Net profit in BDT factor
-    if (netProfit >= 600) score += 15;
-    else if (netProfit >= 400) score += 10;
-    else if (netProfit >= 250) score += 5;
-    else if (netProfit < 100) score -= 15;
-
-    // Weight penalty for air cargo
-    if (sourcePlatform === 'SKYBUY_CHINA' || sourcePlatform === 'ALIEXPRESS') {
-      if (weightGrams <= 250) score += 8;
-      else if (weightGrams > 700) score -= 14;
-    } else {
-      score += 5; // Local sourcing speed bonus
-    }
-
-    // Bangladesh impulse buy sweet-spot (৳990 – ৳2,490)
-    if (targetSellingPrice >= 950 && targetSellingPrice <= 2500) score += 8;
-    else if (targetSellingPrice > 4000) score -= 6;
-
-    // Clamp score
-    score = Math.max(12, Math.min(98, Math.round(score)));
-
-    // Verdict Badge
-    let verdict = '❌ HIGH RISK / LOW MARGIN (Avoid)';
-    let verdictLevel: 'WINNER' | 'PROMISING' | 'AVOID' = 'AVOID';
-    if (score >= 80) {
-      verdict = '🔥 WINNING PRODUCT (Scale Immediately)';
-      verdictLevel = 'WINNER';
-    } else if (score >= 55) {
-      verdict = '⚡ PROMISING (Test with Small Budget)';
-      verdictLevel = 'PROMISING';
-    }
-
-    // 4. Bangladesh Market & AI Insights
-    const strengths: string[] = [];
-    const risks: string[] = [];
-
-    if (profitMargin >= 25) strengths.push(`Healthy net margin of ${profitMargin}% accommodates ad fluctuations.`);
-    if (netProfit >= 350) strengths.push(`Attractive cash profit of ৳${netProfit.toLocaleString()} per delivered parcel.`);
-    if (weightGrams <= 300) strengths.push(`Lightweight parcel (${weightGrams}g) minimizes air freight overhead.`);
-    if (sourcePlatform === 'RESELLING_BD') strengths.push('Fast 24–48h local sourcing reduces customer cancellation rates.');
-
-    if (profitMargin < 18) risks.push(`Tight net margin (${profitMargin}%). High risk if Facebook CPM spikes.`);
-    if (weightGrams > 600 && sourcePlatform === 'SKYBUY_CHINA') risks.push(`Heavy weight (${weightGrams}g) adds ৳${cargoFee} to air freight.`);
-    if (codReturnRatePercent > 18) risks.push(`High COD return rate (${codReturnRatePercent}%). Mandatory customer phone verification required.`);
-    if (targetSellingPrice > 3500) risks.push('High price tag for impulse Facebook buyers. Offer partial advance payment to prevent return.');
-
-    // 5. Auto-generated Storefront Copy & Ad Hooks
-    const seoTitle = `${productName} — Premium Quality | Best Price in Bangladesh`;
-    const description = `
-<h3>${productName}</h3>
-<p>Upgrade your day-to-day lifestyle with our premium <strong>${productName}</strong>. Sourced directly with high reliability and backed by full warranty inspection.</p>
-<ul>
-  <li><strong>Authentic Quality:</strong> Verified and tested before dispatch.</li>
-  <li><strong>Safe Delivery:</strong> ${deliveryDaysText}.</li>
-  <li><strong>Payment Flexibility:</strong> Cash on Delivery (COD) available nationwide.</li>
-  <li><strong>Hassle-Free Replacement:</strong> 7-day checking guarantee.</li>
-</ul>
-<p><em>Order now to get instant discounted delivery anywhere in Bangladesh!</em></p>
-    `.trim();
-
-    const fbAdHookBangla = `🔥 সীমিত সময়ের স্পেশাল অফার! প্রিমিয়াম ${productName} এখন পাচ্ছেন বিশেষ ছাড়ে। সরাসরি ক্যাশ অন ডেলিভারিতে নিতে এখনই অর্ডার করুন! 🚀`;
-    const fbAdHookEnglish = `Looking for the best ${productName}? Get premium quality, unbeatable price & Cash on Delivery anywhere in Bangladesh. Order today before stock runs out!`;
-
-    const analysisResult = {
-      id: 'res-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      productName,
-      sourcePlatform,
-      supplierUrl,
-      supplierPriceBdt,
-      weightGrams,
-      targetSellingPrice,
-      categoryHint,
-      imageUrl: imageUrl || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=800&auto=format&fit=crop',
-      
-      // Cost breakdown
-      costBreakdown: {
-        supplierCost: supplierPriceBdt,
-        airCargoFee: cargoFee,
-        shippingCost,
-        packagingCost,
-        gatewayFee,
-        adSpend,
-        returnRiskCost,
-        totalLandedCost,
-      },
-
-      // Profitability
-      profitability: {
-        netProfit,
-        profitMargin,
-        breakEvenSellingPrice,
-        recommendedSellingPrice,
-        breakEvenRoas,
-      },
-
-      // Scoring & Verdict
-      score,
-      verdict,
-      verdictLevel,
-      deliveryDaysText,
-
-      // Market analysis
-      strengths,
-      risks,
-      targetAudience: 'Urban youth, tech enthusiasts and online shoppers (Age 20-38) across Dhaka, Chattogram, Sylhet.',
-
-      // Generated copy
-      copywriting: {
-        seoTitle,
-        description,
-        fbAdHookBangla,
-        fbAdHookEnglish,
-      },
-
-      importStatus: 'WATCHLIST',
-      analyzedAt: new Date().toISOString(),
-    };
-
-    // 6. Save to Watchlist in AuditLog
+    // Save to Watchlist in AuditLog
     try {
       await this.prisma.auditLog.create({
         data: {
@@ -266,6 +83,7 @@ export class DropshippingService {
         targetSellingPrice: data.targetSellingPrice || 0,
         weightGrams: data.weightGrams || 0,
         imageUrl: data.imageUrl,
+        engineUsed: data.engineUsed || 'ALGORITHMIC_FALLBACK',
         score: data.score || 0,
         verdict: data.verdict || 'Promising',
         verdictLevel: data.verdictLevel || 'PROMISING',

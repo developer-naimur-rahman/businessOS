@@ -117,8 +117,11 @@ export default function DropshippingHubPage() {
     setAnalyzing(true)
     try {
       const res = await api.post("/admin/dropshipping/ai-analyze", formData)
-      setAnalysisResult(res.data)
-      toast.success("AI Unit Economics & Viability Analysis Complete!")
+      if (res.data?.engineUsed === 'AI_GEMINI') {
+        toast.success("AI Analysis Complete (Powered by Google Gemini ✨)")
+      } else {
+        toast.success("Unit Economics & Viability Analysis Complete (Algorithmic ⚡)")
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to analyze product")
     } finally {
@@ -584,9 +587,20 @@ export default function DropshippingHubPage() {
                 }`}>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
                     <div>
-                      <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-200/90 bg-black/20 px-2.5 py-0.5 rounded-full inline-block mb-1.5">
-                        AI Verdict & Viability Score
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {analysisResult.engineUsed === 'AI_GEMINI' ? (
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-cyan-200 bg-cyan-950/70 border border-cyan-500/40 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 shadow-xs">
+                            <Sparkles className="w-3 h-3 text-cyan-300 animate-pulse" /> Google Gemini AI
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-200/90 bg-black/30 border border-emerald-500/30 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 shadow-xs">
+                            <Layers className="w-3 h-3 text-emerald-300" /> Algorithmic Engine Active
+                          </span>
+                        )}
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-white/70 bg-white/10 px-2.5 py-0.5 rounded-full inline-block">
+                          AI Verdict & Viability Score
+                        </span>
+                      </div>
                       <h2 className="text-xl font-black tracking-tight">{analysisResult.verdict}</h2>
                       <p className="text-xs text-slate-200 mt-1 flex items-center gap-2">
                         <Truck className="w-3.5 h-3.5" /> {analysisResult.deliveryDaysText}
@@ -858,6 +872,17 @@ export default function DropshippingHubPage() {
                              item.sourcePlatform === 'RESELLING_BD' ? '🇧🇩 BD Reselling' :
                              '🌐 Global'}
                           </span>
+                          <div className="mt-1">
+                            {item.engineUsed === 'AI_GEMINI' ? (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-cyan-800 bg-cyan-50 border border-cyan-200 px-1.5 py-0.5 rounded">
+                                <Sparkles className="w-2.5 h-2.5 text-cyan-600" /> Gemini AI
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                <Layers className="w-2.5 h-2.5 text-slate-500" /> Algorithmic
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="px-4 py-3.5 text-right font-medium text-slate-700">
