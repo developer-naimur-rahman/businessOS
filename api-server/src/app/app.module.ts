@@ -15,9 +15,26 @@ import { DesignStudioModule } from './design-studio/design-studio.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { StorageModule } from './storage/storage.module';
+import { DropshippingModule } from './dropshipping/dropshipping.module';
 
 @Module({
-  imports: [PrismaModule, IamModule, AuthModule, SystemModule, FinanceModule, BusinessCoreModule, OperationalStructureModule, InventoryModule, SalesModule, FinanceIntegrationModule, DesignStudioModule, PurchasesModule, StorefrontModule, StorageModule],
+  imports: [
+    PrismaModule, 
+    IamModule, 
+    AuthModule, 
+    SystemModule, 
+    FinanceModule, 
+    BusinessCoreModule, 
+    OperationalStructureModule, 
+    InventoryModule, 
+    SalesModule, 
+    FinanceIntegrationModule, 
+    DesignStudioModule, 
+    PurchasesModule, 
+    StorefrontModule, 
+    StorageModule,
+    DropshippingModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

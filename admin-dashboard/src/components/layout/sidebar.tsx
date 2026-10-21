@@ -8,7 +8,7 @@ import {
   Package, Boxes, Store, Factory, ArrowRightLeft,
   TerminalSquare, TrendingUp, X, GitBranch, Warehouse,
   ShoppingBag, Sliders, Truck, MessageSquare,
-  Receipt, CircleDollarSign
+  Receipt, CircleDollarSign, Sparkles
 } from "lucide-react"
 
 interface SidebarProps {
@@ -47,8 +47,9 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       ]
     },
     {
-      label: "Catalog & Inventory",
+      label: "Catalog & Sourcing",
       items: [
+        { name: "🚀 Dropshipping AI Hub", href: "/admin/dropshipping", icon: Sparkles },
         { name: "Products", href: "/admin/products", icon: Package },
         { name: "Services", href: "/admin/services", icon: Package },
         { name: "Service Price List", href: "/admin/services/price-list", icon: Sliders },
