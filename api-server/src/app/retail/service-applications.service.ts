@@ -10,7 +10,15 @@ export interface ApplicationFieldValue {
   value: string;
   order: number;
   sourceDocId?: string;
+  sourceDocTitle?: string;
+  confidence?: number; // 0.0 to 1.0
+  isConflict?: boolean;
+  conflictDetails?: string;
+  verificationStatus?: 'EXTRACTED' | 'MANUAL_EDIT' | 'VERIFIED_BY_STAFF' | 'MISSING';
+  originalExtractedValue?: string;
   isVerified?: boolean;
+  verifiedByStaff?: string;
+  verifiedAt?: string;
 }
 
 export interface ApplicationDeliverable {
@@ -38,6 +46,7 @@ export interface InternetServiceApplication {
     title: string;
     fileUrl: string;
     mimeType: string;
+    extractedSummary?: string;
   }>;
   voiceNoteUrl?: string;
   voiceTranscript?: string;
@@ -105,6 +114,257 @@ export class ServiceApplicationsService {
   ) {}
 
   /**
+   * AI Multi-Document Extraction & Dynamic Form Mapping Adapter
+   * Extracts values from all uploaded documents, maps them to the service's ordered fields,
+   * detects conflicts, and attaches provenance.
+   */
+  async extractAndMapApplication(
+    dto: {
+      serviceSlug: string;
+      documents: Array<{ id: string; docType: string; title: string; fileUrl: string; mimeType: string }>;
+      existingProfile?: any;
+      organizationId?: string;
+    }
+  ): Promise<{
+    serviceSlug: string;
+    serviceTitleBn: string;
+    extractedFields: ApplicationFieldValue[];
+    conflictsDetected: Array<{ fieldKey: string; messageBn: string }>;
+    overallConfidence: number;
+    engineUsed: 'AI_GEMINI' | 'ALGORITHMIC_FALLBACK';
+  }> {
+    let organizationId = dto.organizationId;
+    if (!organizationId) {
+      const org = await this.prisma.organization.findFirst();
+      if (org) organizationId = org.id;
+    }
+
+    const serviceDef = await this.knowledgeService.getServiceBySlugOrId(dto.serviceSlug, organizationId);
+    const orderedFields = serviceDef.orderedFields || [];
+
+    // Document snippets, extracted text, and metadata
+    const docSummaries = dto.documents.map((d: any, i) => {
+      const isBase64 = d.fileUrl && d.fileUrl.startsWith('data:');
+      const snippet = isBase64 ? d.fileUrl.slice(0, 1500) : (d.fileUrl || '');
+      const text = d.extractedText ? `${d.extractedText} ` : '';
+      return `Document #${i + 1}: Title="${d.title}", Type="${d.docType}", Mime="${d.mimeType}", Content="${text}${snippet}"`;
+    }).join('\n\n');
+
+    const fieldsSchemaDescription = orderedFields.map(f =>
+      `FieldKey: "${f.key}", Order: ${f.order}, LabelBn: "${f.labelBn}", LabelEn: "${f.labelEn}", Type: "${f.type}", Required: ${f.required}`
+    ).join('\n');
+
+    const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+    let geminiSuccess = false;
+    let geminiResult: any = null;
+
+    if (geminiApiKey && geminiApiKey.length > 5 && !geminiApiKey.includes('placeholder') && dto.documents.length > 0) {
+      try {
+        const prompt = `You are an expert OCR & identity document parser for Bangladesh citizen and government portals (Teletalk, BPSC, E-Passport, BDRIS, NID Wing, NBR TIN).
+Target Service: "${serviceDef.titleBn}" (${serviceDef.titleEn})
+Target Form Field Schema:
+${fieldsSchemaDescription}
+
+Uploaded Documents provided by citizen:
+${docSummaries}
+
+INSTRUCTIONS:
+1. Extract the most accurate value for each field key from the uploaded documents.
+2. For each field, specify:
+   - "value": extracted string (e.g. name in English must be UPPERCASE, date of birth must be YYYY-MM-DD, NID/Birth registration number as clean digits). If not found, use empty string "".
+   - "sourceDocTitle": the exact title of the document from which this value was found (or empty if missing).
+   - "confidence": confidence score between 0.0 and 1.0 (e.g. 0.95 for clear text, 0.0 for missing).
+   - "isConflict": true if different documents show differing values for this field (e.g. DOB or name spelling mismatch).
+   - "conflictDetails": brief explanation in Bengali of the discrepancy if isConflict is true.
+3. DO NOT invent or fabricate any value. If a field is not present in the documents, set value: "" and confidence: 0.0.
+
+Respond strictly in JSON format (no markdown, no backticks):
+{
+  "fields": [
+    {
+      "key": "<fieldKey>",
+      "value": "<extractedValue>",
+      "sourceDocTitle": "<source document title>",
+      "confidence": <number between 0.0 and 1.0>,
+      "isConflict": <boolean>,
+      "conflictDetails": "<Bengali explanation or null>"
+    }
+  ]
+}`;
+
+        const model = 'gemini-3.5-flash-lite';
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+          }),
+        });
+        clearTimeout(timeout);
+
+        if (res.ok) {
+          const json = await res.json();
+          const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            geminiResult = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+            geminiSuccess = true;
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Gemini document mapping failed: ${err.message}. Falling back to Algorithmic Heuristics.`);
+      }
+    }
+
+    // Combine extracted fields
+    const conflicts: Array<{ fieldKey: string; messageBn: string }> = [];
+    let totalConfidence = 0;
+
+    const extractedFields: ApplicationFieldValue[] = orderedFields.map(f => {
+      let val = '';
+      let sourceTitle = '';
+      let conf = 0;
+      let conflict = false;
+      let conflictDetail = '';
+      let status: ApplicationFieldValue['verificationStatus'] = 'MISSING';
+
+      // 1. Check if Gemini found it
+      if (geminiSuccess && geminiResult?.fields) {
+        const found = geminiResult.fields.find((gf: any) => gf.key === f.key);
+        if (found && found.value && String(found.value).trim()) {
+          val = String(found.value).trim();
+          sourceTitle = found.sourceDocTitle || dto.documents[0]?.title || 'Uploaded Document';
+          conf = Number(found.confidence) || 0.85;
+          conflict = !!found.isConflict;
+          conflictDetail = found.conflictDetails || '';
+          status = 'EXTRACTED';
+        }
+      }
+
+      // 2. Algorithmic Fallback Heuristics if Gemini didn't extract this field
+      if (!val && dto.documents.length > 0) {
+        const fullContent = dto.documents.map((d: any) => `${d.title} ${d.extractedText || ''} ${d.fileUrl?.slice(0, 500)}`).join(' ');
+
+        if (f.key.toLowerCase().includes('nid') || f.key.toLowerCase().includes('reg')) {
+          const nidMatch = fullContent.match(/\b(19\d{15}|20\d{15}|\d{17}|\d{13}|\d{10})\b/);
+          if (nidMatch) {
+            val = nidMatch[0];
+            sourceTitle = dto.documents[0].title;
+            conf = 0.88;
+            status = 'EXTRACTED';
+          }
+        } else if (f.key.toLowerCase().includes('dob') || f.key.toLowerCase().includes('birth')) {
+          const dobMatch = fullContent.match(/\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b/);
+          if (dobMatch) {
+            val = dobMatch[0];
+            sourceTitle = dto.documents[0].title;
+            conf = 0.85;
+            status = 'EXTRACTED';
+          }
+        } else if (f.key === 'applicantNameEn') {
+          const enMatch = fullContent.match(/Name:\s*([A-Za-z\s.]+)/i) || fullContent.match(/\b(MD\s+[A-Za-z\s]+)\b/);
+          if (enMatch) {
+            val = enMatch[1].trim().toUpperCase();
+            sourceTitle = dto.documents[0].title;
+            conf = 0.82;
+            status = 'EXTRACTED';
+          }
+        } else if (f.key === 'applicantNameBn') {
+          const bnMatch = fullContent.match(/নাম:\s*([^\n,.]+)/) || fullContent.match(/মো:\s*([^\n,.]+)/);
+          if (bnMatch) {
+            val = (bnMatch[1] || bnMatch[0]).trim();
+            sourceTitle = dto.documents[0].title;
+            conf = 0.82;
+            status = 'EXTRACTED';
+          }
+        } else if (f.key === 'fatherNameEn' || f.key.toLowerCase().includes('father')) {
+          const fatMatch = fullContent.match(/পিতা:\s*([^\n,.]+)/) || fullContent.match(/Father:\s*([A-Za-z\s.]+)/i);
+          if (fatMatch) {
+            val = fatMatch[1].trim();
+            sourceTitle = dto.documents[0].title;
+            conf = 0.80;
+            status = 'EXTRACTED';
+          }
+        } else if (f.key === 'motherNameEn' || f.key.toLowerCase().includes('mother')) {
+          const motMatch = fullContent.match(/মাতা:\s*([^\n,.]+)/) || fullContent.match(/Mother:\s*([A-Za-z\s.]+)/i);
+          if (motMatch) {
+            val = motMatch[1].trim();
+            sourceTitle = dto.documents[0].title;
+            conf = 0.80;
+            status = 'EXTRACTED';
+          }
+        } else if (f.key.toLowerCase().includes('address')) {
+          const addrMatch = fullContent.match(/ঠিকানা:\s*([^\n]+)/) || fullContent.match(/Address:\s*([^\n]+)/i);
+          if (addrMatch) {
+            val = addrMatch[1].trim();
+            sourceTitle = dto.documents[0].title;
+            conf = 0.78;
+            status = 'EXTRACTED';
+          }
+        }
+      }
+
+      // 3. Reusable Customer Vault Protection (Section 4 Requirement)
+      // Never silently overwrite previously verified customer data with OCR.
+      if (dto.existingProfile) {
+        const p = dto.existingProfile;
+        const vaultVal = p[f.key] || (f.key === 'applicantNameEn' ? p.nameEn : f.key === 'applicantNameBn' ? p.nameBn : f.key === 'dob' ? p.dob : f.key === 'nidNumber' ? p.nidNumber : '');
+        if (vaultVal) {
+          if (val && val !== vaultVal) {
+            // Conflict between customer's saved verified profile and new document
+            conflict = true;
+            conflictDetail = `ভল্টে সংরক্ষিত পূর্বের তথ্য (${vaultVal}) এবং নতুন ডকুমেন্টের মানের মধ্যে অমিল রয়েছে।`;
+            conflicts.push({ fieldKey: f.key, messageBn: conflictDetail });
+          } else if (!val) {
+            val = vaultVal;
+            sourceTitle = 'Verified Customer Vault';
+            conf = 1.0;
+            status = 'VERIFIED_BY_STAFF';
+          }
+        }
+      }
+
+      if (conflict) {
+        conflicts.push({ fieldKey: f.key, messageBn: conflictDetail || 'তথ্য গরমিল শনাক্ত হয়েছে।' });
+      }
+
+      totalConfidence += conf;
+
+      return {
+        key: f.key,
+        labelBn: f.labelBn,
+        labelEn: f.labelEn,
+        value: val,
+        order: f.order,
+        sourceDocTitle: sourceTitle || undefined,
+        confidence: conf,
+        isConflict: conflict,
+        conflictDetails: conflictDetail || undefined,
+        verificationStatus: status,
+        originalExtractedValue: val || undefined,
+        isVerified: status === 'VERIFIED_BY_STAFF',
+      };
+    });
+
+    const overallConfidence = orderedFields.length > 0 ? Math.round((totalConfidence / orderedFields.length) * 100) / 100 : 0.8;
+
+    return {
+      serviceSlug: serviceDef.slug,
+      serviceTitleBn: serviceDef.titleBn,
+      extractedFields,
+      conflictsDetected: conflicts,
+      overallConfidence,
+      engineUsed: geminiSuccess ? 'AI_GEMINI' : 'ALGORITHMIC_FALLBACK',
+    };
+  }
+
+  /**
    * Customer submits service intake request
    */
   async submitApplication(
@@ -114,7 +374,7 @@ export class ServiceApplicationsService {
       customerName: string;
       customerPhone: string;
       customerEmail?: string;
-      fieldValues?: Record<string, any>;
+      fieldValues?: Record<string, any> | ApplicationFieldValue[];
       uploadedDocuments?: any[];
       voiceNoteUrl?: string;
       voiceTranscript?: string;
@@ -155,18 +415,41 @@ export class ServiceApplicationsService {
     const submittedPay = Number(dto.paidAmountBdt || 0);
     const due = Math.max(0, totalAmount - submittedPay);
 
-    // Build ordered field values
-    const orderedFieldValues: ApplicationFieldValue[] = (serviceDef.orderedFields || []).map(f => {
-      const rawVal = dto.fieldValues ? dto.fieldValues[f.key] : '';
-      return {
+    // Build ordered field values with full provenance retention
+    let orderedFieldValues: ApplicationFieldValue[] = [];
+
+    if (Array.isArray(dto.fieldValues)) {
+      // Already an array of ApplicationFieldValue from the Review & Correction step
+      orderedFieldValues = dto.fieldValues.map((f, idx) => ({
         key: f.key,
         labelBn: f.labelBn,
         labelEn: f.labelEn,
-        value: rawVal !== undefined && rawVal !== null ? String(rawVal) : '',
-        order: f.order,
-        isVerified: false,
-      };
-    });
+        value: f.value !== undefined && f.value !== null ? String(f.value) : '',
+        order: f.order || idx + 1,
+        sourceDocId: f.sourceDocId,
+        sourceDocTitle: f.sourceDocTitle,
+        confidence: f.confidence !== undefined ? Number(f.confidence) : (f.value ? 0.9 : 0.0),
+        isConflict: !!f.isConflict,
+        conflictDetails: f.conflictDetails,
+        verificationStatus: f.verificationStatus || (f.value ? 'EXTRACTED' : 'MISSING'),
+        originalExtractedValue: f.originalExtractedValue || f.value,
+        isVerified: !!f.isVerified,
+      }));
+    } else {
+      // Key-value dictionary
+      orderedFieldValues = (serviceDef.orderedFields || []).map(f => {
+        const rawVal = dto.fieldValues ? dto.fieldValues[f.key] : '';
+        return {
+          key: f.key,
+          labelBn: f.labelBn,
+          labelEn: f.labelEn,
+          value: rawVal !== undefined && rawVal !== null ? String(rawVal) : '',
+          order: f.order,
+          verificationStatus: rawVal ? 'EXTRACTED' : 'MISSING',
+          isVerified: false,
+        };
+      });
+    }
 
     const application: InternetServiceApplication = {
       id: `app-${Date.now()}`,
@@ -213,7 +496,7 @@ export class ServiceApplicationsService {
         {
           status: 'SUBMITTED_FOR_REVIEW',
           timestamp: nowIso,
-          notes: 'Customer submitted online request with initial documents & details.',
+          notes: 'Customer submitted prepared application with verified documents & review.',
           author: dto.customerName,
         },
       ],
@@ -234,14 +517,19 @@ export class ServiceApplicationsService {
 
     // Also link/save to Customer Vault for future reusability
     try {
+      const fieldMap: Record<string, string> = {};
+      for (const f of orderedFieldValues) {
+        fieldMap[f.key] = f.value;
+      }
+
       await this.vaultService.upsertProfile(organizationId, null, {
         phone: dto.customerPhone,
         nameEn: dto.customerName,
-        nameBn: (dto.fieldValues?.applicantNameBn as string) || '',
-        dob: (dto.fieldValues?.dob as string) || '',
-        nidNumber: (dto.fieldValues?.nidNumber as string) || '',
-        presentAddress: (dto.fieldValues?.presentAddress as string) || '',
-        permanentAddress: (dto.fieldValues?.permanentAddress as string) || '',
+        nameBn: fieldMap['applicantNameBn'] || '',
+        dob: fieldMap['dob'] || '',
+        nidNumber: fieldMap['nidNumber'] || '',
+        presentAddress: fieldMap['presentAddress'] || '',
+        permanentAddress: fieldMap['permanentAddress'] || '',
       });
     } catch (err: any) {
       this.logger.warn(`Could not auto-sync customer vault: ${err.message}`);
@@ -432,7 +720,12 @@ export class ServiceApplicationsService {
     const fields = [...(current.fieldValues || [])];
     const idx = fields.findIndex(f => f.key === fieldKey);
     if (idx >= 0) {
-      fields[idx] = { ...fields[idx], value: newValue, isVerified: true };
+      fields[idx] = {
+        ...fields[idx],
+        value: newValue,
+        verificationStatus: 'MANUAL_EDIT',
+        isVerified: true,
+      };
     } else {
       fields.push({
         key: fieldKey,
@@ -440,6 +733,7 @@ export class ServiceApplicationsService {
         labelEn: fieldKey,
         value: newValue,
         order: fields.length + 1,
+        verificationStatus: 'MANUAL_EDIT',
         isVerified: true,
       });
     }
@@ -457,6 +751,103 @@ export class ServiceApplicationsService {
         entityType: 'InternetServiceApplication',
         entityId: current.referenceNumber,
         action: 'UPDATE_FIELD_VALUE',
+        oldData: current as any,
+        newData: updated as any,
+      },
+    });
+
+    return { success: true, fieldValues: fields };
+  }
+
+  /**
+   * Staff verifies an individual application field (Section 3 Requirement)
+   */
+  async verifyField(
+    organizationId: string,
+    userId: string | null,
+    refOrId: string,
+    fieldKey: string,
+    isVerified: boolean,
+    notes?: string
+  ) {
+    const current = await this.getApplicationByRef(organizationId, refOrId);
+    const nowIso = new Date().toISOString();
+
+    const fields = [...(current.fieldValues || [])];
+    const idx = fields.findIndex(f => f.key === fieldKey);
+    if (idx >= 0) {
+      fields[idx] = {
+        ...fields[idx],
+        isVerified,
+        verificationStatus: isVerified ? 'VERIFIED_BY_STAFF' : fields[idx].verificationStatus,
+        verifiedByStaff: isVerified ? (userId || 'Staff') : undefined,
+        verifiedAt: isVerified ? nowIso : undefined,
+      };
+    }
+
+    const updated: InternetServiceApplication = {
+      ...current,
+      fieldValues: fields,
+      updatedAt: nowIso,
+    };
+
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId: userId || undefined,
+        entityType: 'InternetServiceApplication',
+        entityId: current.referenceNumber,
+        action: isVerified ? 'VERIFY_APPLICATION_FIELD' : 'UNVERIFY_APPLICATION_FIELD',
+        oldData: current as any,
+        newData: updated as any,
+      },
+    });
+
+    return { success: true, fieldValues: fields };
+  }
+
+  /**
+   * Staff resolves a detected conflict on a field (Section 3 Requirement)
+   */
+  async resolveConflict(
+    organizationId: string,
+    userId: string | null,
+    refOrId: string,
+    fieldKey: string,
+    resolvedValue: string,
+    resolutionNote: string
+  ) {
+    const current = await this.getApplicationByRef(organizationId, refOrId);
+    const nowIso = new Date().toISOString();
+
+    const fields = [...(current.fieldValues || [])];
+    const idx = fields.findIndex(f => f.key === fieldKey);
+    if (idx >= 0) {
+      fields[idx] = {
+        ...fields[idx],
+        value: resolvedValue,
+        isConflict: false,
+        conflictDetails: undefined,
+        verificationStatus: 'VERIFIED_BY_STAFF',
+        isVerified: true,
+        verifiedByStaff: userId || 'Staff',
+        verifiedAt: nowIso,
+      };
+    }
+
+    const updated: InternetServiceApplication = {
+      ...current,
+      fieldValues: fields,
+      updatedAt: nowIso,
+    };
+
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId: userId || undefined,
+        entityType: 'InternetServiceApplication',
+        entityId: current.referenceNumber,
+        action: 'RESOLVE_FIELD_CONFLICT',
         oldData: current as any,
         newData: updated as any,
       },

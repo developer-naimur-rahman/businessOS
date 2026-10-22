@@ -29,7 +29,13 @@ import {
   SendHorizontal,
   Camera,
   Layers,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle,
+  Eye,
+  Edit2,
+  CheckSquare,
+  Square,
+  Download
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -73,12 +79,15 @@ export default function ServiceJobsPage() {
   const [appSearchQuery, setAppSearchQuery] = useState("")
   const [loadingApps, setLoadingApps] = useState(true)
 
-  // Ordered Field Copy Assistant Worksheet Modal
+  // Ordered Field Copy Assistant Worksheet Modal (Section 3 Requirement)
   const [worksheetApp, setWorksheetApp] = useState<any | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const [nextCopyIndex, setNextCopyIndex] = useState(0)
   const [editingFieldKey, setEditingFieldKey] = useState<string | null>(null)
   const [editingFieldValue, setEditingFieldValue] = useState("")
+  const [resolvingConflictKey, setResolvingConflictKey] = useState<string | null>(null)
+  const [showPrintableSheet, setShowPrintableSheet] = useState(false)
+  const [viewingDoc, setViewingDoc] = useState<any | null>(null)
 
   // Deliverable Upload Form in Worksheet
   const [deliverableTitle, setDeliverableTitle] = useState("")
@@ -249,20 +258,54 @@ export default function ServiceJobsPage() {
     toast.success("সকল ফিল্ডের ডাটা ক্লিপবোর্ডে কপি হয়েছে!")
   }
 
-  // Save Inline Field Edit
+  // Save Inline Field Edit (Section 3 Requirement)
   const handleSaveFieldEdit = async (refNumber: string, fieldKey: string) => {
     try {
       await api.patch(`/admin/service-applications/${refNumber}/field`, {
         fieldKey,
         newValue: editingFieldValue,
       })
-      toast.success("ফিল্ড মান আপডেট হয়েছে!")
+      toast.success("ফিল্ড মান সফলভাবে আপডেট ও অডিট লগে সংরক্ষিত হয়েছে!")
       setEditingFieldKey(null)
       const updated = await api.get(`/admin/service-applications/${refNumber}`)
       setWorksheetApp(updated.data)
       loadApplications()
     } catch (e: any) {
       toast.error("ফিল্ড সেভ করতে সমস্যা।")
+    }
+  }
+
+  // Staff Field Verification Toggle (Section 3 Requirement)
+  const handleVerifyField = async (refNumber: string, fieldKey: string, currentVerified: boolean) => {
+    try {
+      await api.patch(`/admin/service-applications/${refNumber}/verify-field`, {
+        fieldKey,
+        isVerified: !currentVerified,
+      })
+      toast.success(!currentVerified ? "ফিল্ডটি স্টাফ কর্তৃক ভেরিফাইড হিসেবে চিহ্নিত হয়েছে!" : "ভেরিফিকেশন প্রত্যাহার করা হয়েছে।")
+      const updated = await api.get(`/admin/service-applications/${refNumber}`)
+      setWorksheetApp(updated.data)
+      loadApplications()
+    } catch (e: any) {
+      toast.error("ভেরিফিকেশন সম্পন্ন করা যায়নি।")
+    }
+  }
+
+  // Staff Resolve Conflict (Section 3 Requirement)
+  const handleResolveConflict = async (refNumber: string, fieldKey: string, resolvedValue: string) => {
+    try {
+      await api.patch(`/admin/service-applications/${refNumber}/resolve-conflict`, {
+        fieldKey,
+        resolvedValue,
+        resolutionNote: 'Resolved by staff operator during official application preparation',
+      })
+      toast.success("অমিল দূর করে ফিল্ডটি আপডেট ও ভেরিফাই করা হয়েছে!")
+      setResolvingConflictKey(null)
+      const updated = await api.get(`/admin/service-applications/${refNumber}`)
+      setWorksheetApp(updated.data)
+      loadApplications()
+    } catch (e: any) {
+      toast.error("কনফ্লিক্ট দূর করতে সমস্যা হয়েছে।")
     }
   }
 
@@ -509,7 +552,7 @@ export default function ServiceJobsPage() {
         </div>
       )}
 
-      {/* TAB 2: PHYSICAL SERVICE & REPAIR JOBS (Existing) */}
+      {/* TAB 2: PHYSICAL SERVICE & REPAIR JOBS */}
       {activeMainTab === 'PHYSICAL' && (
         <div className="space-y-6 animate-in fade-in">
           {/* KPI Cards */}
@@ -646,10 +689,10 @@ export default function ServiceJobsPage() {
         </div>
       )}
 
-      {/* --- ORDERED APPLICATION PREPARATION & COPY ASSISTANT MODAL (PROMPT SECTION 10) --- */}
+      {/* --- STAFF APPLICATION DATA WORKSPACE MODAL (Section 3 Requirement) --- */}
       {worksheetApp && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-6">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-5xl w-full p-6 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
             
             {/* Modal Header */}
             <div className="flex items-start justify-between pb-4 border-b border-slate-200 gap-4">
@@ -666,7 +709,7 @@ export default function ServiceJobsPage() {
                   {worksheetApp.serviceTitleBn}
                 </h2>
                 <p className="text-xs text-slate-500 font-semibold">
-                  আবেদনকারী: {worksheetApp.customerName} • {worksheetApp.customerPhone}
+                  আবেদনকারী: {worksheetApp.customerName} • {worksheetApp.customerPhone} • {worksheetApp.deliveryAddress || 'দোকান সংগ্রহ'}
                 </p>
               </div>
 
@@ -678,24 +721,24 @@ export default function ServiceJobsPage() {
               </button>
             </div>
 
-            {/* Quick Action Bar for Staff Fast Data Entry into Official Government Portal */}
+            {/* Practical Quick Action Bar for Staff (Section 3 Requirement) */}
             <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-cyan-400" />
                 <div>
                   <span className="text-xs font-bold text-cyan-300 block">স্মার্ট ডাটা কপি অ্যাসিস্ট্যান্ট</span>
-                  <span className="text-[11px] text-slate-400">সরকারি পোর্টালে ফরম পূরণ করতে ১-ক্লিকে কপি করুন</span>
+                  <span className="text-[11px] text-slate-400">সরকারি ওয়েবসাইটে তথ্য নির্ভুলভাবে বসাতে ১-ক্লিক কপি ব্যবহার করুন</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleCopyNextField}
                   className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shadow-md transition-all inline-flex items-center gap-1.5"
                 >
                   <Copy className="w-3.5 h-3.5" />
-                  কপি পরবর্তী ফিল্ড (Next Field #{nextCopyIndex + 1})
+                  পরবর্তী ফিল্ড কপি (#{nextCopyIndex + 1})
                 </button>
                 <button
                   type="button"
@@ -704,82 +747,199 @@ export default function ServiceJobsPage() {
                 >
                   সব ডাটা কপি
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintableSheet(true)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-all inline-flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  ক্লিন ডাটা শীট
+                </button>
               </div>
             </div>
 
-            {/* Ordered Fields Grid */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-cyan-600" />
-                অর্ডার অনুযায়ী সাজানো আবেদন ফিল্ডসমূহ (Ordered Application Fields):
-              </h3>
+            {/* Photo & Signature Quick Specs Bar (Section 5 Requirement) */}
+            <div className="bg-cyan-50/80 p-3.5 rounded-2xl border border-cyan-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <Camera className="w-4 h-4 text-cyan-700" />
+                <span className="font-bold text-cyan-900">সরকারি ছবি ও স্বাক্ষর স্ট্যান্ডার্ড:</span>
+                <span className="text-cyan-800 font-semibold bg-white px-2 py-0.5 rounded-md border border-cyan-200">
+                  ছবি: ৩০০ × ৩০০ px (max 100KB)
+                </span>
+                <span className="text-cyan-800 font-semibold bg-white px-2 py-0.5 rounded-md border border-cyan-200">
+                  স্বাক্ষর: ৩০০ × ৮০ px (max 60KB)
+                </span>
+              </div>
+              <span className="text-[11px] text-cyan-700 font-medium">
+                ডকুমেন্টে ক্লিক করে ফুল-সাইজ প্রিভিউ দেখুন
+              </span>
+            </div>
 
-              <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-2">
+            {/* Ordered Fields Grid with Full Provenance & Staff Verification (Section 3 Requirement) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-cyan-600" />
+                  অর্ডার অনুযায়ী সাজানো আবেদন ফিল্ডসমূহ (Configured Field Order):
+                </h3>
+                <span className="text-[11px] text-slate-500">
+                  ফিল্ড মান কপি করতে ক্লিক করুন • যাচাই করে ভেরিফাই করুন
+                </span>
+              </div>
+
+              <div className="space-y-3 max-h-[380px] overflow-y-auto pr-2">
                 {worksheetApp.fieldValues?.map((field: any, idx: number) => {
                   const isCopied = copiedKey === field.key
                   const isEditing = editingFieldKey === field.key
+                  const isResolving = resolvingConflictKey === field.key
+
                   return (
                     <div
                       key={field.key}
-                      className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                      className={`p-4 rounded-2xl border transition-all space-y-3 ${
                         isCopied
-                          ? "bg-emerald-50 border-emerald-300"
+                          ? "bg-emerald-50 border-emerald-300 ring-1 ring-emerald-300"
+                          : field.isConflict
+                          ? "bg-rose-50/70 border-rose-300"
+                          : field.isVerified
+                          ? "bg-emerald-50/40 border-emerald-200"
                           : "bg-slate-50/70 border-slate-200 hover:bg-white hover:border-cyan-200"
                       }`}
                     >
-                      <div className="flex items-start gap-3 flex-1">
-                        <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                          {field.order || idx + 1}
-                        </span>
-                        <div className="flex-1">
-                          <span className="text-xs font-bold text-slate-800 block">
-                            {field.labelBn} <span className="text-[10px] text-slate-400">({field.labelEn})</span>
+                      {/* Field Top Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center shrink-0">
+                            {field.order || idx + 1}
                           </span>
+                          <span className="text-xs font-bold text-slate-900">
+                            {field.labelBn} <span className="text-[10px] text-slate-400 font-normal">({field.labelEn})</span>
+                          </span>
+                        </div>
 
+                        {/* Provenance Badges */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {field.sourceDocTitle && (
+                            <span className="text-[10px] font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                              উৎস: {field.sourceDocTitle}
+                            </span>
+                          )}
+                          {field.confidence !== undefined && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                              field.confidence >= 0.8 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {Math.round((field.confidence || 0.8) * 100)}%
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            field.isVerified
+                              ? 'bg-emerald-600 text-white'
+                              : field.verificationStatus === 'MANUAL_EDIT'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-slate-200 text-slate-700'
+                          }`}>
+                            {field.isVerified ? '✓ স্টাফ ভেরিফাইড' : field.verificationStatus || 'EXTRACTED'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Conflict Alert Banner */}
+                      {field.isConflict && (
+                        <div className="bg-rose-100/80 p-3 rounded-xl border border-rose-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-rose-900 font-medium">
+                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                            <span>{field.conflictDetails || "ডকুমেন্ট ও পূর্বের তথ্যে অমিল শনাক্ত হয়েছে।"}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleResolveConflict(worksheetApp.referenceNumber, field.key, field.value)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg"
+                            >
+                              বর্তমান মান ঠিক আছে
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setEditingFieldKey(field.key); setEditingFieldValue(field.value || ""); }}
+                              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold rounded-lg"
+                            >
+                              সংশোধন করুন
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Value Display / Inline Edit Mode */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                        <div className="flex-1">
                           {isEditing ? (
-                            <div className="flex items-center gap-2 mt-1">
+                            <div className="flex items-center gap-2">
                               <input
                                 type="text"
                                 value={editingFieldValue}
                                 onChange={(e) => setEditingFieldValue(e.target.value)}
-                                className="px-3 py-1 text-xs rounded-lg border border-slate-300 bg-white flex-1"
+                                className="px-3 py-1.5 text-xs font-mono font-bold rounded-xl border border-slate-300 bg-white flex-1"
                               />
                               <button
                                 onClick={() => handleSaveFieldEdit(worksheetApp.referenceNumber, field.key)}
-                                className="px-2.5 py-1 bg-cyan-600 text-white text-xs font-bold rounded-lg"
+                                className="px-3 py-1.5 bg-cyan-600 text-white text-xs font-bold rounded-xl"
                               >
                                 সেভ
                               </button>
+                              <button
+                                onClick={() => setEditingFieldKey(null)}
+                                className="px-2.5 py-1.5 bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                              >
+                                বাতিল
+                              </button>
                             </div>
                           ) : (
-                            <p className="text-sm font-bold text-cyan-950 mt-0.5 font-mono select-all">
-                              {field.value || <span className="text-slate-400 italic font-sans font-normal">মান দেওয়া হয়নি</span>}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-bold text-slate-950 font-mono select-all bg-white px-3 py-1.5 rounded-xl border border-slate-200 inline-block min-w-[200px]">
+                                {field.value || <span className="text-slate-400 italic font-sans font-normal">মান খালি</span>}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => { setEditingFieldKey(field.key); setEditingFieldValue(field.value || ""); }}
+                                className="p-1.5 text-slate-400 hover:text-slate-700"
+                                title="এডিট করুন"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => handleCopyFieldValue(field.key, field.value)}
-                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 ${
-                            isCopied
-                              ? "bg-emerald-600 text-white shadow-sm"
-                              : "bg-white border border-slate-200 text-slate-700 hover:bg-cyan-50 hover:text-cyan-800"
-                          }`}
-                        >
-                          {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          {isCopied ? "কপি হয়েছে!" : "কপি (Copy)"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setEditingFieldKey(field.key); setEditingFieldValue(field.value || ""); }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600"
-                          title="এডিট করুন"
-                        >
-                          ✎
-                        </button>
+                        {/* Working Action Controls */}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {/* 1-Click Copy */}
+                          <button
+                            type="button"
+                            onClick={() => handleCopyFieldValue(field.key, field.value)}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                              isCopied
+                                ? "bg-emerald-600 text-white shadow-sm"
+                                : "bg-white border border-slate-200 text-slate-800 hover:bg-cyan-50 hover:text-cyan-800"
+                            }`}
+                          >
+                            {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                            {isCopied ? "কপি হয়েছে!" : "কপি (Copy)"}
+                          </button>
+
+                          {/* Staff Verification Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyField(worksheetApp.referenceNumber, field.key, !!field.isVerified)}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 ${
+                              field.isVerified
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                            }`}
+                          >
+                            {field.isVerified ? <CheckSquare className="w-3.5 h-3.5 text-emerald-600" /> : <Square className="w-3.5 h-3.5" />}
+                            {field.isVerified ? "ভেরিফাইড" : "ভেরিফাই"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )
@@ -787,24 +947,42 @@ export default function ServiceJobsPage() {
               </div>
             </div>
 
-            {/* Uploaded Customer Supporting Documents */}
+            {/* Uploaded Customer Supporting Documents with Quick Preview */}
             {worksheetApp.uploadedDocuments && worksheetApp.uploadedDocuments.length > 0 && (
               <div className="space-y-3 pt-3 border-t border-slate-200">
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  গ্রাহকের আপলোডকৃত ডকুমেন্ট ও ছবি ({worksheetApp.uploadedDocuments.length} টি):
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    গ্রাহকের আপলোডকৃত ডকুমেন্ট ও ছবি ({worksheetApp.uploadedDocuments.length} টি):
+                  </h4>
+                  <span className="text-[11px] text-slate-400">ক্লিক করে ডকুমেন্ট প্রিভিউ করুন</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
                   {worksheetApp.uploadedDocuments.map((doc: any) => (
-                    <a
+                    <div
                       key={doc.id}
-                      href={doc.fileUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-between font-semibold text-slate-700"
+                      className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-between font-semibold text-slate-700"
                     >
-                      <span className="truncate">📎 {doc.title} ({doc.docType})</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
-                    </a>
+                      <span className="truncate pr-2">📎 {doc.title} ({doc.docType})</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setViewingDoc(doc)}
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-cyan-50 text-cyan-700"
+                          title="প্রিভিউ দেখুন"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <a
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-600"
+                          title="নতুন ট্যাবে খুলুন"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -876,7 +1054,185 @@ export default function ServiceJobsPage() {
         </div>
       )}
 
-      {/* --- PHYSICAL JOB MODALS --- */}
+      {/* --- CLEAN PRINTABLE APPLICATION DATA SHEET MODAL (Section 3 Requirement) --- */}
+      {showPrintableSheet && worksheetApp && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 print:p-0 print:bg-white">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-8 space-y-6 shadow-2xl max-h-[92vh] overflow-y-auto print:max-h-none print:shadow-none print:rounded-none">
+            
+            {/* Action Bar (Hidden in Print) */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 print:hidden">
+              <span className="font-bold text-slate-700 text-sm">
+                ক্লিন অ্যাপ্লিকেশন ডাটা শীট (সরকারি সাইটে ডাটা এন্ট্রির উপযোগী)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" /> প্রিন্ট করুন (Print)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyAllFields}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                >
+                  <Copy className="w-3.5 h-3.5" /> সম্পূর্ণ টেক্সট কপি
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPrintableSheet(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Sheet Header */}
+            <div className="border-b-2 border-slate-900 pb-4 space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-xl font-black uppercase tracking-wider text-slate-900">
+                    BUSINESSOS SERVICE CENTER — APPLICATION DATA SHEET
+                  </h1>
+                  <p className="text-xs text-slate-600 font-bold mt-0.5">
+                    সেবা: {worksheetApp.serviceTitleBn} ({worksheetApp.serviceTitleEn})
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono text-sm font-black bg-slate-100 px-3 py-1 rounded-lg border border-slate-300">
+                    REF: #{worksheetApp.referenceNumber}
+                  </span>
+                  <p className="text-[10px] text-slate-500 font-bold mt-1">
+                    তারিখ: {new Date(worksheetApp.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-2">
+                <div>গ্রাহকের নাম: <b>{worksheetApp.customerName}</b></div>
+                <div>মোবাইল: <b>{worksheetApp.customerPhone}</b></div>
+                <div>ডেলিভারি মাধ্যম: <b>{worksheetApp.deliveryMode}</b></div>
+              </div>
+            </div>
+
+            {/* Clean Ordered Field Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse border border-slate-300">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 text-slate-900">
+                    <th className="p-2.5 border-r border-slate-300 w-12 text-center">নং</th>
+                    <th className="p-2.5 border-r border-slate-300">ফিল্ডের নাম (বাংলা / English)</th>
+                    <th className="p-2.5 border-r border-slate-300">প্রস্তুতকৃত মান (Data Value)</th>
+                    <th className="p-2.5 border-r border-slate-300 w-28 text-center print:hidden">কপি</th>
+                    <th className="p-2.5 w-24 text-center">স্ট্যাটাস</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {worksheetApp.fieldValues?.map((f: any, idx: number) => (
+                    <tr key={f.key} className="border-b border-slate-200 hover:bg-slate-50">
+                      <td className="p-2.5 border-r border-slate-300 text-center font-bold">{f.order || idx + 1}</td>
+                      <td className="p-2.5 border-r border-slate-300 font-bold text-slate-800">
+                        {f.labelBn} <span className="text-[10px] text-slate-500 font-normal">({f.labelEn})</span>
+                      </td>
+                      <td className="p-2.5 border-r border-slate-300 font-mono font-bold text-slate-950 text-sm select-all">
+                        {f.value || <span className="text-slate-400 italic font-sans font-normal">খালি</span>}
+                      </td>
+                      <td className="p-2.5 border-r border-slate-300 text-center print:hidden">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyFieldValue(f.key, f.value)}
+                          className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded font-bold text-[10px]"
+                        >
+                          কপি
+                        </button>
+                      </td>
+                      <td className="p-2.5 text-center font-bold text-[10px]">
+                        {f.isVerified ? "✓ ভেরিফাইড" : f.verificationStatus || "EXTRACTED"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Photo & Signature Preview in Sheet */}
+            {worksheetApp.uploadedDocuments?.filter((d: any) => d.docType.includes('ছবি') || d.docType.includes('স্বাক্ষর')).length > 0 && (
+              <div className="pt-4 border-t border-slate-200">
+                <span className="text-xs font-bold text-slate-800 block mb-2">সংযুক্ত ছবি ও স্বাক্ষর:</span>
+                <div className="flex gap-4">
+                  {worksheetApp.uploadedDocuments?.filter((d: any) => d.docType.includes('ছবি') || d.docType.includes('স্বাক্ষর')).map((img: any, i: number) => (
+                    <div key={i} className="border border-slate-300 p-2 rounded-lg text-center space-y-1">
+                      <div className="w-24 h-24 bg-slate-100 flex items-center justify-center overflow-hidden">
+                        <img src={img.fileUrl} alt={img.title} className="max-w-full max-h-full object-contain" />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-700 block">{img.docType}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 text-center text-[10px] text-slate-400 border-t border-slate-200">
+              BusinessOS Internet Service Center • Prepared for Official Application Submission
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* --- DOCUMENT FULL-SIZE PREVIEW MODAL (Section 3 Requirement) --- */}
+      {viewingDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">{viewingDoc.title}</h3>
+                <span className="text-xs text-cyan-700 font-semibold">{viewingDoc.docType}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingDoc(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold flex items-center justify-center text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center bg-slate-100 rounded-2xl p-4">
+              {viewingDoc.mimeType?.startsWith('image/') || viewingDoc.fileUrl?.startsWith('data:image/') ? (
+                <img src={viewingDoc.fileUrl} alt={viewingDoc.title} className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm" />
+              ) : (
+                <div className="text-center py-10 space-y-2">
+                  <FileText className="w-12 h-12 text-slate-400 mx-auto" />
+                  <p className="text-xs text-slate-600 font-bold">পিডিএফ বা অন্যান্য ফাইল ফরম্যাট</p>
+                  <a
+                    href={viewingDoc.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 bg-cyan-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" /> নতুন উইন্ডোতে ওপেন করুন
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setViewingDoc(null)}
+                className="px-5 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- PHYSICAL JOB CREATE MODAL --- */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
@@ -979,7 +1335,7 @@ export default function ServiceJobsPage() {
         </div>
       )}
 
-      {/* Print Slip Modal */}
+      {/* --- PRINT SLIP MODAL FOR PHYSICAL JOBS --- */}
       {showPrintSlipModal && selectedJob && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">

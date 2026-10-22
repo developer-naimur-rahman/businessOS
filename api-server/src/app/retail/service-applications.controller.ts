@@ -15,6 +15,11 @@ export class PublicServiceRequestController {
     return this.applicationsService.submitApplication(body);
   }
 
+  @Post('extract-and-map')
+  async extractAndMap(@Body() body: any) {
+    return this.applicationsService.extractAndMapApplication(body);
+  }
+
   @Post(':ref/approve')
   async approveDraft(@Param('ref') ref: string, @Body() body: { notes?: string }) {
     return this.applicationsService.customerApproveDraft(ref, body.notes);
@@ -90,6 +95,40 @@ export class AdminServiceApplicationsController {
       ref,
       body.fieldKey,
       body.newValue
+    );
+  }
+
+  @Patch(':ref/verify-field')
+  @RequirePermissions('services.manage')
+  async verifyField(
+    @Request() req: any,
+    @Param('ref') ref: string,
+    @Body() body: { fieldKey: string; isVerified: boolean; notes?: string }
+  ) {
+    return this.applicationsService.verifyField(
+      req.user.organizationId,
+      req.user.id || req.user.sub,
+      ref,
+      body.fieldKey,
+      body.isVerified,
+      body.notes
+    );
+  }
+
+  @Patch(':ref/resolve-conflict')
+  @RequirePermissions('services.manage')
+  async resolveConflict(
+    @Request() req: any,
+    @Param('ref') ref: string,
+    @Body() body: { fieldKey: string; resolvedValue: string; resolutionNote: string }
+  ) {
+    return this.applicationsService.resolveConflict(
+      req.user.organizationId,
+      req.user.id || req.user.sub,
+      ref,
+      body.fieldKey,
+      body.resolvedValue,
+      body.resolutionNote
     );
   }
 
