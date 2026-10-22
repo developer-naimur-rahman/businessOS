@@ -1,9 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationService } from '../common/notifications/notification.service';
 
 export interface CreateServiceJobDto {
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   serviceCategory: 'PRINTING_PRESS' | 'PC_LAPTOP_REPAIR' | 'PHOTO_VIDEO_EDIT' | 'CUSTOM_DESIGN' | 'OTHER_SERVICE';
   jobDescription: string;
   deviceOrFileDetails?: string;
@@ -23,7 +25,10 @@ export interface UpdateJobStatusDto {
 export class ServiceJobsService {
   private readonly logger = new Logger(ServiceJobsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly notificationService?: NotificationService,
+  ) {}
 
   async createJob(organizationId: string, userId: string | null, dto: CreateServiceJobDto) {
     const jobNumber = `JOB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -35,6 +40,7 @@ export class ServiceJobsService {
       jobNumber,
       customerName: dto.customerName,
       customerPhone: dto.customerPhone,
+      customerEmail: dto.customerEmail?.trim() || undefined,
       serviceCategory: dto.serviceCategory,
       jobDescription: dto.jobDescription,
       deviceOrFileDetails: dto.deviceOrFileDetails || '',
@@ -64,6 +70,20 @@ export class ServiceJobsService {
         newData: jobData,
       },
     });
+
+    if (jobData.customerEmail && this.notificationService) {
+      this.notificationService.notifyServiceJobUpdate({
+        jobNumber,
+        customerName: jobData.customerName,
+        customerEmail: jobData.customerEmail,
+        customerPhone: jobData.customerPhone,
+        status: 'RECEIVED',
+        estimatedCostBdt: jobData.estimatedCostBdt,
+        dueAmountBdt: jobData.dueAmountBdt,
+        serviceCategory: jobData.serviceCategory,
+        notes: `Job ticket created. Promised by ${new Date(jobData.promisedDeliveryDate).toLocaleDateString()}`,
+      }).catch((e) => this.logger.warn(`Failed to dispatch initial job email: ${e.message}`));
+    }
 
     return {
       success: true,
@@ -176,6 +196,20 @@ export class ServiceJobsService {
       const phone = currentData.customerPhone ? currentData.customerPhone.replace(/[^0-9]/g, '') : '';
       customerReadySms = `প্রিয় ${currentData.customerName}, আপনার অর্ডার #${currentData.jobNumber} রেডি হয়েছে। শপ থেকে সংগ্রহ করার জন্য অনুরোধ করা হচ্ছে। বাকি টাকা: ৳${updatedDue}। ধন্যবাদ।`;
       whatsappUrl = `https://wa.me/88${phone.startsWith('88') ? phone.slice(2) : phone}?text=${encodeURIComponent(customerReadySms)}`;
+    }
+
+    if (currentData.customerEmail && this.notificationService) {
+      this.notificationService.notifyServiceJobUpdate({
+        jobNumber: currentData.jobNumber,
+        customerName: currentData.customerName,
+        customerEmail: currentData.customerEmail,
+        customerPhone: currentData.customerPhone,
+        status: dto.status,
+        estimatedCostBdt: currentData.estimatedCostBdt,
+        dueAmountBdt: updatedDue,
+        serviceCategory: currentData.serviceCategory,
+        notes: dto.notes,
+      }).catch((e) => this.logger.warn(`Failed to dispatch status email: ${e.message}`));
     }
 
     return {

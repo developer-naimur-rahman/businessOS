@@ -65,6 +65,7 @@ export default function ServiceJobsPage() {
   // Physical Create form
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
+  const [customerEmail, setCustomerEmail] = useState("")
   const [serviceCategory, setServiceCategory] = useState("PC_LAPTOP_REPAIR")
   const [jobDescription, setJobDescription] = useState("")
   const [deviceOrFileDetails, setDeviceOrFileDetails] = useState("")
@@ -146,6 +147,7 @@ export default function ServiceJobsPage() {
       const res = await api.post("/admin/service-jobs", {
         customerName,
         customerPhone,
+        customerEmail: customerEmail.trim() || undefined,
         serviceCategory,
         jobDescription,
         deviceOrFileDetails,
@@ -158,6 +160,7 @@ export default function ServiceJobsPage() {
       setShowCreateModal(false)
       setCustomerName("")
       setCustomerPhone("")
+      setCustomerEmail("")
       setJobDescription("")
       setDeviceOrFileDetails("")
       setEstimatedCostBdt("")
@@ -1262,6 +1265,17 @@ export default function ServiceJobsPage() {
                   required
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">গ্রাহকের ইমেইল (অপশনাল - ইমেইলে রসিদ ও ট্র্যাকিং যাবে)</label>
+                <input
+                  type="email"
+                  placeholder="customer@example.com"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200"
                 />
               </div>

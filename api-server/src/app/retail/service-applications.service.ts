@@ -1,7 +1,8 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException, Optional } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ServiceKnowledgeService } from './service-knowledge.service';
 import { CustomerVaultService } from './customer-vault.service';
+import { NotificationService } from '../common/notifications/notification.service';
 
 export interface ApplicationFieldValue {
   key: string;
@@ -111,7 +112,8 @@ export class ServiceApplicationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly knowledgeService: ServiceKnowledgeService,
-    private readonly vaultService: CustomerVaultService
+    private readonly vaultService: CustomerVaultService,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   /**
@@ -697,6 +699,17 @@ Respond strictly in JSON format (no markdown, no backticks):
       },
     });
 
+    if (current.customerEmail && this.notificationService) {
+      this.notificationService.notifyInternetServiceApplication({
+        referenceNumber: current.referenceNumber,
+        serviceTitleBn: current.serviceTitleBn,
+        customerName: current.customerName,
+        customerEmail: current.customerEmail,
+        status: newStatus,
+        notes,
+      }).catch(e => this.logger.warn(`Failed to dispatch application status email: ${e.message}`));
+    }
+
     return { success: true, application: updated };
   }
 
@@ -952,6 +965,18 @@ Respond strictly in JSON format (no markdown, no backticks):
         newData: updated as any,
       },
     });
+
+    if (current.customerEmail && this.notificationService) {
+      this.notificationService.notifyInternetServiceApplication({
+        referenceNumber: current.referenceNumber,
+        serviceTitleBn: current.serviceTitleBn,
+        customerName: current.customerName,
+        customerEmail: current.customerEmail,
+        status: updated.status,
+        notes: `নতুন ডেলিভারেবল ফাইল সংযুক্ত করা হয়েছে: ${deliverable.title}`,
+        deliverableTitle: deliverable.title,
+      }).catch(e => this.logger.warn(`Failed to dispatch deliverable email: ${e.message}`));
+    }
 
     return { success: true, deliverable: newDeliverable, deliverables };
   }

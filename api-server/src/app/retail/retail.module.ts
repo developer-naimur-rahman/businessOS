@@ -43,6 +43,7 @@ import { ServiceApplicationsService } from './service-applications.service';
 import { PublicServiceRequestController, AdminServiceApplicationsController } from './service-applications.controller';
 import { ServiceAssistantService } from './service-assistant.service';
 import { PublicServiceAssistantController } from './service-assistant.controller';
+import { NotificationService } from '../common/notifications/notification.service';
 
 @Module({
   imports: [PrismaModule],
@@ -89,6 +90,7 @@ import { PublicServiceAssistantController } from './service-assistant.controller
     ServiceSchedulingService,
     ServiceApplicationsService,
     ServiceAssistantService,
+    NotificationService,
   ],
   exports: [
     BakiKhataService,
@@ -98,6 +100,7 @@ import { PublicServiceAssistantController } from './service-assistant.controller
     PrintQueueService,
     DigitalServicesService,
     QuotationsService,
+    NotificationService,
     MachineHealthService,
     AiCopilotService,
     HrPayrollService,
