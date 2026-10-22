@@ -93,6 +93,7 @@ export default function CashRegisterPage() {
 
   // Closing Notes
   const [closingNotes, setClosingNotes] = useState('')
+  const [isCloseConfirmModalOpen, setIsCloseConfirmModalOpen] = useState(false)
 
   useEffect(() => {
     fetchRegisterSummary(selectedDate)
@@ -203,12 +204,13 @@ export default function CashRegisterPage() {
     }
   }
 
-  const handleCloseRegister = async () => {
+  const handleOpenCloseConfirm = () => {
     if (!summary) return
+    setIsCloseConfirmModalOpen(true)
+  }
 
-    if (!window.confirm(`Are you sure you want to close and lock the cash register for ${selectedDate}?\n\nExpected: ৳${summary.expectedClosingBalance.toLocaleString()}\nCounted: ৳${actualCountedCash.toLocaleString()}\nVariance: ${variance >= 0 ? '+' : ''}৳${variance.toLocaleString()}`)) {
-      return
-    }
+  const performCloseRegister = async () => {
+    if (!summary) return
 
     try {
       setClosingRegister(true)
@@ -227,6 +229,7 @@ export default function CashRegisterPage() {
 
       if (res.data?.success) {
         toast.success(res.data.message || 'Register closed and day locked.')
+        setIsCloseConfirmModalOpen(false)
         fetchRegisterSummary(selectedDate)
         fetchHistory()
       }
@@ -618,7 +621,7 @@ export default function CashRegisterPage() {
             {!summary?.isClosed ? (
               <button
                 type="button"
-                onClick={handleCloseRegister}
+                onClick={handleOpenCloseConfirm}
                 disabled={closingRegister || loading}
                 className="w-full py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
@@ -798,6 +801,88 @@ export default function CashRegisterPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Close Register Confirmation Modal */}
+      {isCloseConfirmModalOpen && summary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200 p-6 space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+                <Lock className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-lg text-slate-900">
+                  দিন সমাপ্ত ও ক্যাশ রেজিস্টার লক
+                </h3>
+                <p className="text-xs text-slate-500">
+                  তারিখ: {selectedDate} • ক্যাশ ড্রয়ার রিকনসিলিয়েশন
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-2.5 text-xs">
+              <div className="flex justify-between items-center text-slate-600">
+                <span>হিসাব অনুযায়ী থাকার কথা (Expected):</span>
+                <span className="font-bold text-slate-900 font-mono text-sm">৳{summary.expectedClosingBalance.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-600">
+                <span>বাস্তবে গুনে পাওয়া ক্যাশ (Counted):</span>
+                <span className="font-bold text-slate-900 font-mono text-sm">৳{actualCountedCash.toLocaleString()}</span>
+              </div>
+              <div className="h-px bg-slate-200 my-1" />
+              <div className="flex justify-between items-center font-bold">
+                <span>পার্থক্য (Variance):</span>
+                <span className={`font-mono text-sm px-2 py-0.5 rounded-md ${
+                  variance === 0 
+                    ? 'bg-emerald-100 text-emerald-800' 
+                    : variance > 0 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-rose-100 text-rose-800'
+                }`}>
+                  {variance > 0 ? `+৳${variance.toLocaleString()} (উদ্বৃত্ত)` : variance < 0 ? `-৳${Math.abs(variance).toLocaleString()} (ঘাটতি)` : '৳০ (সঠিক মিল)'}
+                </span>
+              </div>
+            </div>
+
+            {closingNotes.trim() && (
+              <div className="text-xs text-slate-600 bg-amber-50/60 border border-amber-200/60 p-3 rounded-xl">
+                <span className="font-bold text-amber-900 block mb-0.5">লকিং নোট:</span>
+                {closingNotes.trim()}
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              সতর্কতা: রেজিস্টার লক করার পর এই দিনের হিসাব সংরক্ষিত থাকবে। আপনি কি নিশ্চিত যে দিনের ক্যাশ হিসাব চূড়ান্ত করতে চান?
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsCloseConfirmModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                বাতিল / পুনরায় গণনা
+              </button>
+              <button
+                type="button"
+                onClick={performCloseRegister}
+                disabled={closingRegister}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-all"
+              >
+                {closingRegister ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> সংরক্ষণ হচ্ছে...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> চূড়ান্ত লক করুন
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

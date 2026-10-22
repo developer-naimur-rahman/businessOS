@@ -252,10 +252,27 @@ export default function StorefrontShell({ children }: { children: React.ReactNod
             </nav>
           </div>
 
-          <div className="flex items-center gap-5 text-xs text-slate-500 font-medium">
-            <Link href="/faq" className="hover:text-slate-900 transition-colors">Help & FAQ</Link>
-            <span>•</span>
-            <Link href="/contact" className="hover:text-slate-900 transition-colors">Support</Link>
+          <div className="flex items-center gap-3 text-xs font-medium">
+            <Link 
+              href="/upload-print" 
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold transition-all border border-indigo-200"
+              title="পেনড্রাইভ ছাড়া দ্রুত ফাইল প্রিন্ট ড্রপ"
+            >
+              <Printer className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Print Drop</span>
+            </Link>
+            <Link 
+              href="/track" 
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-all border border-slate-200"
+              title="সার্ভিস বা অর্ডারের লাইভ ট্র্যাকিং"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-500" />
+              <span>Track Job</span>
+            </Link>
+            <div className="h-4 w-px bg-slate-200 mx-1 hidden xl:block" />
+            <Link href="/faq" className="hover:text-slate-900 transition-colors text-slate-500 hidden xl:block">Help & FAQ</Link>
+            <span className="text-slate-400 hidden xl:block">•</span>
+            <Link href="/contact" className="hover:text-slate-900 transition-colors text-slate-500 hidden xl:block">Support</Link>
           </div>
         </div>
 
@@ -304,6 +321,24 @@ export default function StorefrontShell({ children }: { children: React.ReactNod
                       <Printer className="w-4 h-4" /> Printing Studio
                     </span>
                     <ChevronRight className="w-4 h-4 text-[#04BBFD]" />
+                  </Link>
+                  <Link 
+                    href="/upload-print" 
+                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-indigo-50/80 text-indigo-700 font-bold text-base transition-colors border border-indigo-100"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Printer className="w-4 h-4 text-indigo-600" /> Print Drop Express
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-indigo-500" />
+                  </Link>
+                  <Link 
+                    href="/track" 
+                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-slate-100/80 text-slate-800 font-bold text-base transition-colors border border-slate-200"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Search className="w-4 h-4 text-slate-600" /> Track Order & Service
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
                   </Link>
                   <Link 
                     href="/categories" 

@@ -1,10 +1,11 @@
 "use client"
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react"
+import Link from "next/link"
 import { api } from "../../../lib/api-client"
 import { 
   Search, ShoppingCart, UserCircle, Plus, Minus, CreditCard, ScanLine, 
   Trash2, PauseCircle, FolderOpen, Split, Monitor, Zap, Check, X,
-  Banknote, Smartphone, Receipt, ArrowRight, ShieldCheck, Clock, Wrench
+  Banknote, Smartphone, Receipt, ArrowRight, ShieldCheck, Clock, Wrench, CircleDollarSign
 } from "lucide-react"
 import { POSSuccessModal } from "../../../components/pos/POSSuccessModal"
 import { ReceiptTemplate } from "../../../components/pos/ReceiptTemplate"
@@ -1043,6 +1044,13 @@ export default function AdminPOSPage() {
               >
                 <Wrench className="w-3.5 h-3.5 mr-1 text-teal-600" /> F7: সার্ভিস ডেলিভারি
               </button>
+              <Link 
+                href="/admin/cash-register"
+                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg flex items-center font-semibold transition-colors border border-amber-200 cursor-pointer"
+                title="দৈনিক ক্যাশ ড্রয়ার ও রিকনসিলিয়েশন (Till)"
+              >
+                <CircleDollarSign className="w-3.5 h-3.5 mr-1 text-amber-600" /> ক্যাশ ড্রয়ার
+              </Link>
             </div>
 
             <button 
