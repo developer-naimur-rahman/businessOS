@@ -10,7 +10,8 @@ import {
   ShoppingBag, Sliders, Truck, MessageSquare,
   Receipt, CircleDollarSign, Sparkles, Bot, RotateCcw,
   Building2, Barcode, Gift, Send, Star, ShieldAlert,
-  Monitor, BookOpen, Wrench, ShieldCheck, ClipboardList, Award
+  Monitor, BookOpen, Wrench, ShieldCheck, ClipboardList, Award,
+  Smartphone, Printer, Cpu, Database, ExternalLink, QrCode
 } from "lucide-react"
 
 interface SidebarProps {
@@ -23,9 +24,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   const groups = [
     {
-      label: "Workspace",
+      label: "Workspace & AI",
       items: [
         { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+        { name: "✨ AI Business Copilot", href: "/admin/ai-copilot", icon: Bot },
         { name: "Analytics", href: "/admin/analytics", icon: TrendingUp },
       ]
     },
@@ -35,6 +37,8 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         { name: "Terminal POS", href: "/admin/pos", icon: TerminalSquare },
         { name: "🖥️ Customer Live Display", href: "/admin/pos/customer-display", icon: Monitor },
         { name: "📒 Digital Baki Khata", href: "/admin/baki-khata", icon: BookOpen },
+        { name: "🖨️ Print Drop Queue", href: "/admin/print-queue", icon: Printer },
+        { name: "📱 Digital & Utility Desk", href: "/admin/digital-services", icon: Smartphone },
       ]
     },
     {
@@ -42,8 +46,11 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       items: [
         { name: "🛠️ Service & Print Jobs", href: "/admin/service-jobs", icon: Wrench },
         { name: "🛡️ Serial & Warranty Desk", href: "/admin/warranty", icon: ShieldCheck },
+        { name: "🖥️ Quotations & PC Builder", href: "/admin/quotations", icon: Cpu },
+        { name: "🖨️ Machine & Printer Health", href: "/admin/machine-health", icon: Wrench },
         { name: "📋 Bazaar & Wanted List", href: "/admin/sourcing-list", icon: ClipboardList },
         { name: "🏆 Staff Commissions", href: "/admin/staff-commissions", icon: Award },
+        { name: "👥 Staff Attendance & Payroll", href: "/admin/hr-payroll", icon: Users },
       ]
     },
     {
@@ -73,14 +80,6 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       ]
     },
     {
-      label: "Growth & Retention",
-      items: [
-        { name: "🎁 Loyalty & Rewards", href: "/admin/loyalty", icon: Gift },
-        { name: "📣 Marketing Campaigns", href: "/admin/marketing/campaigns", icon: Send },
-        { name: "⭐ Review Moderation", href: "/admin/reviews", icon: Star },
-      ]
-    },
-    {
       label: "Finance & Accounts",
       items: [
         { name: "Profit & Loss (P&L)", href: "/admin/finance/profit-loss", icon: TrendingUp },
@@ -90,15 +89,21 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       ]
     },
     {
-      label: "Governance & Platform",
+      label: "Governance & Vault",
       items: [
+        { name: "💾 Cloud Backup Vault", href: "/admin/system/backup", icon: Database },
         { name: "🔐 Staff Audit & RBAC", href: "/admin/security/audit-logs", icon: ShieldAlert },
         { name: "Staff & Users", href: "/admin/staff", icon: Users },
         { name: "Branches", href: "/admin/branches", icon: GitBranch },
         { name: "Warehouses", href: "/admin/warehouses", icon: Warehouse },
         { name: "Storefront CMS", href: "/admin/storefront", icon: Store },
-        { name: "Design Studio", href: "/admin/design-studio", icon: Store },
-        { name: "Media Library", href: "/admin/media", icon: Store },
+      ]
+    },
+    {
+      label: "Customer Self-Service",
+      items: [
+        { name: "📤 Upload Print Drop", href: "/upload-print", icon: ExternalLink },
+        { name: "🔍 Public Live Tracker", href: "/track", icon: ExternalLink },
       ]
     }
   ]
@@ -166,12 +171,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Desktop Persistent Sidebar */}
       <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-full">
         {sidebarContent}
       </aside>
 
-      {/* Mobile Modal Drawer Sidebar */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden animate-in fade-in duration-200">
           <div 

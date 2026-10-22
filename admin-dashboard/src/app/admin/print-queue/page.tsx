@@ -1,0 +1,273 @@
+"use client"
+import React, { useEffect, useState } from 'react';
+import { api } from '../../../lib/api-client';
+import { 
+  Printer, QrCode, Clock, CheckCircle2, AlertCircle, RefreshCw, 
+  FileText, Download, ArrowRight, User, Phone, Layers, Sparkles, X
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+export default function AdminPrintQueuePage() {
+  const [queue, setQueue] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'ALL' | 'WAITING_IN_QUEUE' | 'PRINTING_NOW' | 'PRINTED_READY' | 'BILLED_COMPLETED'>('ALL');
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrConfig, setQrConfig] = useState<any>(null);
+
+  const fetchQueue = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/admin/print-queue', {
+        params: { status: activeTab !== 'ALL' ? activeTab : undefined }
+      });
+      setQueue(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load print queue.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchQrConfig = async () => {
+    try {
+      const res = await api.get('/admin/print-queue/qr-config');
+      setQrConfig(res.data);
+    } catch {
+      // Ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+    fetchQrConfig();
+  }, [activeTab]);
+
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      await api.patch(`/admin/print-queue/${id}/status`, { status: newStatus });
+      toast.success(`Job marked as ${newStatus.replace(/_/g, ' ')}`);
+      fetchQueue();
+    } catch {
+      toast.error('Failed to update job status.');
+    }
+  };
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <Printer className="w-7 h-7 text-indigo-600" /> Print Drop Desk & Queue
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Zero-pendrive walk-in customer file submissions & live machine queue
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setQrModalOpen(true)}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
+          >
+            <QrCode className="w-4 h-4 text-indigo-400" /> Desk QR Standee Poster
+          </button>
+          <button
+            onClick={fetchQueue}
+            className="w-10 h-10 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center transition-colors"
+            title="Refresh Queue"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-slate-200">
+        {[
+          { key: 'ALL', label: 'All Jobs' },
+          { key: 'WAITING_IN_QUEUE', label: 'Waiting in Queue' },
+          { key: 'PRINTING_NOW', label: 'Printing Now' },
+          { key: 'PRINTED_READY', label: 'Ready for Pickup' },
+          { key: 'BILLED_COMPLETED', label: 'Billed & Delivered' }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as any)}
+            className={`px-3.5 py-2 text-xs font-bold rounded-lg transition-all ${
+              activeTab === tab.key 
+                ? 'bg-indigo-600 text-white shadow-xs' 
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Queue List */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-48 bg-white rounded-2xl border border-slate-100 animate-pulse"></div>
+          ))}
+        </div>
+      ) : queue.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-3xl border border-slate-200/80">
+          <Printer className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-30" />
+          <h3 className="font-bold text-slate-700">No print jobs in this category</h3>
+          <p className="text-xs text-slate-400 mt-1">Walk-in customer drops will automatically show up here.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {queue.map(job => (
+            <div 
+              key={job.id} 
+              className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex flex-col justify-between"
+            >
+              <div>
+                {/* Header Bar */}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-mono text-sm font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-lg">
+                    #{job.tokenNumber}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    job.status === 'WAITING_IN_QUEUE' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                    job.status === 'PRINTING_NOW' ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse' :
+                    job.status === 'PRINTED_READY' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {job.status?.replace(/_/g, ' ')}
+                  </span>
+                </div>
+
+                {/* File info */}
+                <div className="flex items-start gap-2.5 mb-3">
+                  <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
+                    <FileText className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-slate-900 truncate">{job.fileName}</h4>
+                    <p className="text-[11px] text-slate-500 font-semibold">
+                      {job.paperSize} • {job.colorMode === 'FULL_COLOR' ? 'Color' : 'B&W'} • {job.copies} Copies
+                    </p>
+                  </div>
+                </div>
+
+                {/* Customer Details */}
+                <div className="bg-slate-50 rounded-2xl p-3 space-y-1.5 text-xs text-slate-600 mb-3 border border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-slate-500 font-medium"><User className="w-3.5 h-3.5 mr-1" /> Customer:</span>
+                    <span className="font-bold text-slate-800">{job.customerName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center text-slate-500 font-medium"><Phone className="w-3.5 h-3.5 mr-1" /> Phone:</span>
+                    <span className="font-mono text-slate-800">{job.customerPhone}</span>
+                  </div>
+                  {job.bindingOrLamination && job.bindingOrLamination !== 'NONE' && (
+                    <div className="flex items-center justify-between text-indigo-700 font-semibold">
+                      <span>Add-on:</span>
+                      <span>{job.bindingOrLamination.replace(/_/g, ' ')}</span>
+                    </div>
+                  )}
+                  {job.notes && (
+                    <p className="text-[11px] text-amber-700 italic pt-1 border-t border-slate-200/60">
+                      Note: "{job.notes}"
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Price & Action */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase">Estimated Fee</span>
+                  <p className="text-lg font-black text-slate-900">৳{job.estimatedPriceBdt}</p>
+                </div>
+
+                <div className="flex gap-1.5">
+                  {job.status === 'WAITING_IN_QUEUE' && (
+                    <button
+                      onClick={() => handleUpdateStatus(job.id, 'PRINTING_NOW')}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                    >
+                      Start Print
+                    </button>
+                  )}
+                  {job.status === 'PRINTING_NOW' && (
+                    <button
+                      onClick={() => handleUpdateStatus(job.id, 'PRINTED_READY')}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                    >
+                      Mark Ready
+                    </button>
+                  )}
+                  {job.status === 'PRINTED_READY' && (
+                    <button
+                      onClick={() => handleUpdateStatus(job.id, 'BILLED_COMPLETED')}
+                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs"
+                    >
+                      Bill & Collect
+                    </button>
+                  )}
+                  {job.fileUrlOrBase64 && (
+                    <a
+                      href={job.fileUrlOrBase64}
+                      download={job.fileName}
+                      className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
+                      title="Download attached file"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* QR Standee Poster Modal */}
+      {qrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 animate-in zoom-in-95">
+            <div className="bg-indigo-600 p-6 text-center text-white relative">
+              <button 
+                onClick={() => setQrModalOpen(false)}
+                className="absolute top-4 right-4 text-indigo-200 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <h3 className="text-xl font-black">Desk Print Standee</h3>
+              <p className="text-xs text-indigo-200 mt-1">Place this QR poster at your shop cash desk</p>
+            </div>
+
+            <div className="p-6 text-center space-y-4">
+              <div className="w-48 h-48 bg-slate-50 border-2 border-dashed border-indigo-200 rounded-2xl mx-auto flex flex-col items-center justify-center p-3">
+                <QrCode className="w-36 h-36 text-slate-900" />
+              </div>
+
+              <div>
+                <h4 className="font-black text-slate-900 text-base">স্ক্যান করে প্রিন্ট ফাইল ড্রপ করুন</h4>
+                <p className="text-xs text-slate-500 mt-0.5">পেনড্রাইভের ঝামেলা ও ভাইরাস ছাড়াই সরাসরি প্রিন্ট করুন</p>
+                <p className="text-[11px] font-mono font-bold text-indigo-600 mt-1">
+                  URL: /upload-print
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  window.print();
+                }}
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md flex items-center justify-center gap-1.5"
+              >
+                <Printer className="w-4 h-4" /> Print Shop Desk Poster (A4)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
