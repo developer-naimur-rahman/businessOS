@@ -61,7 +61,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       status = HttpStatus.BAD_REQUEST;
       message = 'Invalid data provided for database operation.';
       error = 'Validation Error';
-      this.logger.warn(`Prisma validation error on ${request.method} ${request.url}`);
+      this.logger.warn(`Prisma validation error on ${request.method} ${request.url}: ${exception.message}`);
     } else {
       // General unexpected errors
       const err = exception as any;

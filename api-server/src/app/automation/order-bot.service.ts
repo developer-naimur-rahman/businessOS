@@ -23,7 +23,7 @@ export class OrderBotService {
     const sales = await this.prisma.sale.findMany({
       where: {
         organizationId,
-        status: { in: ['DRAFT', 'PENDING' as any, 'CONFIRMED'] },
+        status: { in: ['DRAFT', 'COMPLETED'] },
       },
       include: {
         customer: true,
@@ -172,22 +172,22 @@ export class OrderBotService {
     let systemNote = '';
 
     if (isConfirm) {
-      updatedStatus = 'CONFIRMED' as any;
+      updatedStatus = 'COMPLETED';
       botStatus = 'CONFIRMED_1';
       systemNote = '✅ Bot Verified COD (Customer replied 1/YES)';
 
       await this.prisma.sale.update({
         where: { id: sale.id },
-        data: { status: 'CONFIRMED' as any },
+        data: { status: 'COMPLETED' },
       });
     } else if (isCancel) {
-      updatedStatus = 'CANCELLED' as any;
+      updatedStatus = 'CANCELLED';
       botStatus = 'CANCELLED_2';
       systemNote = '❌ Cancelled by Customer via Bot (Customer replied 2/NO)';
 
       await this.prisma.sale.update({
         where: { id: sale.id },
-        data: { status: 'CANCELLED' as any },
+        data: { status: 'CANCELLED' },
       });
     }
 

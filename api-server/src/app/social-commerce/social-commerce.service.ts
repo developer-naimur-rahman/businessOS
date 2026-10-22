@@ -290,7 +290,7 @@ Return STRICT JSON ONLY (no markdown blocks, no backticks):
         branchId: branch.id,
         warehouseId: warehouse.id,
         customerId: customer.id,
-        status: 'CONFIRMED' as any,
+        status: 'COMPLETED',
         paymentStatus: 'UNPAID',
         saleNumber,
         subtotal,

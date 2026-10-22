@@ -306,7 +306,7 @@ export class CourierService {
     const sales = await this.prisma.sale.findMany({
       where: {
         organizationId,
-        status: { in: ['CONFIRMED', 'PROCESSING', 'PENDING' as any] },
+        status: { in: ['COMPLETED', 'DRAFT'] },
       },
       include: {
         customer: true,

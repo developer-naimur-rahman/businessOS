@@ -139,9 +139,17 @@ export class SalesService {
         const amount = new Prisma.Decimal(p.amount);
         if (amount.lte(0)) throw new BadRequestException('Payment amount must be greater than zero.');
         totalPaid = totalPaid.add(amount);
+
+        let method = p.method as any;
+        if (method === 'CARD' || method === 'CREDIT_CARD' || method === 'DEBIT_CARD') {
+          method = PaymentMethod.BANK;
+        } else if (!Object.values(PaymentMethod).includes(method)) {
+          method = PaymentMethod.OTHER;
+        }
+
         paymentsToCreate.push({
           organizationId,
-          method: p.method,
+          method,
           amount,
           reference: p.reference,
         });

@@ -281,8 +281,9 @@ export default function AdminPOSPage() {
           discount: 0
         })),
         payments: [{
-          method: paymentMethod,
-          amount: total
+          method: paymentMethod === 'CARD' ? 'BANK' : paymentMethod,
+          amount: total,
+          reference: paymentMethod === 'CARD' ? 'Card POS Terminal' : undefined,
         }]
       })
       

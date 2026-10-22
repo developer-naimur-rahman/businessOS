@@ -123,7 +123,7 @@ export class StaffAuditService {
     const logs = await this.prisma.auditLog.findMany({
       where,
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -153,10 +153,12 @@ export class StaffAuditService {
         riskReason = 'Operational adjustment or financial reversal';
       }
 
+      const userName = log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() : '';
+
       return {
         id: log.id,
         timestamp: log.createdAt.toISOString(),
-        actorName: log.user?.name || 'Super Admin (System)',
+        actorName: userName || 'Super Admin (System)',
         actorEmail: log.user?.email || 'admin@businessos.local',
         userId: log.userId,
         entityType: log.entityType,
