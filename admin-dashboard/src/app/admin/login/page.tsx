@@ -5,7 +5,7 @@ import { useAuthStore } from "../../../store/useAuthStore"
 import { useRouter } from "next/navigation"
 import { api } from "../../../lib/api-client"
 import { toast } from "sonner"
-import { Lock, Mail, ArrowRight, KeyRound, User, Eye, EyeOff, Store } from "lucide-react"
+import { Lock, Mail, ArrowRight, KeyRound, User, Eye, EyeOff, Store, Phone, CheckCircle2 } from "lucide-react"
 
 export default function AdminLogin() {
   const [activeTab, setActiveTab] = useState<"email" | "pin">("email")
@@ -20,6 +20,13 @@ export default function AdminLogin() {
   
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  // Forgot Password State
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState("")
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotSuccess, setForgotSuccess] = useState(false)
+  const [forgotError, setForgotError] = useState("")
   
   const setUser = useAuthStore((state) => state.setUser)
   const setToken = useAuthStore((state) => state.setToken)
@@ -35,11 +42,50 @@ export default function AdminLogin() {
     }
   }, [router])
 
-  // Email & Password Login Handler
+  // Detect if input is a phone number (BD format)
+  const isPhoneNumber = (val: string) => {
+    const cleaned = val.replace(/[\s\-()]/g, '')
+    return /^(\+?880|0)?1[3-9]\d{8}$/.test(cleaned)
+  }
+
+  // Normalize BD phone number to consistent format for backend
+  const normalizePhone = (val: string): string => {
+    const digits = val.replace(/[^0-9]/g, '')
+    // Remove leading 880 country code if present
+    if (digits.startsWith('880') && digits.length === 13) {
+      return '0' + digits.slice(3) // 8801XXXXXXXXX -> 01XXXXXXXXX
+    }
+    if (digits.length === 10 && digits.startsWith('1')) {
+      return '0' + digits // 1XXXXXXXXX -> 01XXXXXXXXX
+    }
+    return digits.startsWith('0') ? digits : '0' + digits
+  }
+
+  // Forgot Password Handler
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!forgotEmail.trim()) {
+      setForgotError("Please enter your email address")
+      return
+    }
+    setForgotLoading(true)
+    setForgotError("")
+    try {
+      await api.post('/auth/forgot-password', { email: forgotEmail.trim().toLowerCase() })
+      setForgotSuccess(true)
+    } catch (err: any) {
+      // Always show success to avoid revealing registered emails
+      setForgotSuccess(true)
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
+  // Email & Password Login Handler (supports phone numbers too)
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email.trim()) {
-      setError("Please enter your staff email address")
+      setError("Please enter your staff email or phone number")
       return
     }
     if (!password) {
@@ -50,11 +96,15 @@ export default function AdminLogin() {
     setLoading(true)
     setError("")
 
+    // Determine if input is a phone number or email
+    const trimmedInput = email.trim()
+    const inputIsPhone = isPhoneNumber(trimmedInput)
+    const loginPayload = inputIsPhone
+      ? { phone: normalizePhone(trimmedInput), password }
+      : { email: trimmedInput, password }
+
     try {
-      const res = await api.post('/auth/login', {
-        email: email.trim(),
-        password: password
-      })
+      const res = await api.post('/auth/login', loginPayload)
       
       const token = res.data.access_token || res.data.token
       if (token) {
@@ -271,20 +321,20 @@ export default function AdminLogin() {
           </button>
         </div>
 
-        {/* Mode 1: Email & Password Form */}
+        {/* Mode 1: Email / Phone & Password Form */}
         {activeTab === "email" && (
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-slate-400" /> Staff Email
+                {isPhoneNumber(email) ? <Phone className="w-3.5 h-3.5 text-slate-400" /> : <User className="w-3.5 h-3.5 text-slate-400" />} Staff Email or Phone
               </label>
               <input
-                type="email"
+                type="text"
                 required
                 className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-all text-slate-900"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. staff@demo.local"
+                placeholder="e.g. staff@demo.local or 01XXXXXXXXX"
                 disabled={loading}
                 autoFocus
               />
@@ -336,6 +386,22 @@ export default function AdminLogin() {
                 </>
               )}
             </button>
+
+            {/* Forgot Password */}
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(true)
+                  setForgotEmail(email.includes('@') ? email : '')
+                  setForgotSuccess(false)
+                  setForgotError('')
+                }}
+                className="text-xs text-indigo-600 font-semibold hover:underline"
+              >
+                Forgot password? Reset it
+              </button>
+            </div>
 
             {/* Quick Demo Fill Credentials */}
             <div className="pt-2 border-t border-slate-100 space-y-2">
@@ -432,6 +498,74 @@ export default function AdminLogin() {
           </a>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="bg-gradient-to-r from-indigo-600 to-violet-600 p-6 text-center">
+              <Lock className="w-10 h-10 text-white mx-auto mb-2" />
+              <h3 className="text-xl font-black text-white">Password Reset</h3>
+              <p className="text-indigo-100 text-xs mt-1">We&apos;ll send a reset link to your registered email</p>
+            </div>
+            <div className="p-6">
+              {forgotSuccess ? (
+                <div className="text-center space-y-4">
+                  <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-base">Reset Link Sent!</h4>
+                    <p className="text-sm text-slate-500 mt-1">
+                      If an account exists with this email, you&apos;ll receive a password reset link in your inbox. Check your spam folder too.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowForgotPassword(false)}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors"
+                  >
+                    Back to Login
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  {forgotError && (
+                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl text-sm font-medium border border-rose-200 text-center">
+                      {forgotError}
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Registered Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="email@example.com"
+                      value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)}
+                      className="w-full h-11 mt-1 px-4 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-slate-50 focus:bg-white transition-all text-slate-900"
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-all shadow-md shadow-indigo-600/25 text-sm"
+                  >
+                    {forgotLoading ? 'Sending...' : 'Send Reset Link'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(false)}
+                    className="w-full py-2.5 text-sm text-slate-500 font-semibold hover:text-slate-700"
+                  >
+                    Back to Login
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

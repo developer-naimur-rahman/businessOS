@@ -18,7 +18,7 @@ export interface ServiceJob {
   advancePaidBdt: number;
   finalCostBdt?: number;
   assignedStaffName?: string;
-  status: 'PENDING' | 'IN_PROGRESS' | 'WAITING_FOR_PARTS' | 'READY_FOR_DELIVERY' | 'DELIVERED_PAID' | 'CANCELLED';
+  status: 'PENDING' | 'RECEIVED' | 'IN_PROGRESS' | 'WAITING_FOR_PARTS' | 'READY_FOR_DELIVERY' | 'DELIVERED' | 'DELIVERED_PAID' | 'CANCELLED';
   promisedDeliveryDate?: string;
   deliverables?: Array<{
     id: string;
@@ -93,7 +93,7 @@ export interface PrintQueueItem {
   notes?: string;
   estimatedPriceBdt: number;
   finalCostBdt?: number;
-  status: 'QUEUED' | 'PRINTING' | 'READY_FOR_PICKUP' | 'DELIVERED';
+  status: 'QUEUED' | 'WAITING_IN_QUEUE' | 'PRINTING' | 'PRINTING_NOW' | 'READY_FOR_PICKUP' | 'PRINTED_READY' | 'DELIVERED' | 'BILLED_DELIVERED' | 'BILLED_COMPLETED';
   createdAt: string;
   updatedAt: string;
 }
@@ -816,15 +816,23 @@ export const demoStore = {
   getServiceJobs(status?: string, search?: string) {
     let list = [...this.store.serviceJobs];
     if (status && status !== 'ALL') {
-      list = list.filter(j => j.status === status);
+      const s = status.toUpperCase();
+      if (s === 'RECEIVED' || s === 'PENDING') {
+        list = list.filter(j => j.status === 'RECEIVED' || j.status === 'PENDING');
+      } else if (s === 'DELIVERED' || s === 'DELIVERED_PAID') {
+        list = list.filter(j => j.status === 'DELIVERED' || j.status === 'DELIVERED_PAID');
+      } else {
+        list = list.filter(j => (j.status as string) === s);
+      }
     }
     if (search && search.trim()) {
       const q = search.toLowerCase().trim();
       list = list.filter(j => 
-        j.jobNumber.toLowerCase().includes(q) ||
-        j.customerName.toLowerCase().includes(q) ||
-        j.customerPhone.includes(q) ||
-        j.serviceCategory.toLowerCase().includes(q)
+        (j.jobNumber && j.jobNumber.toLowerCase().includes(q)) ||
+        (j.customerName && j.customerName.toLowerCase().includes(q)) ||
+        (j.customerPhone && j.customerPhone.includes(q)) ||
+        (j.serviceCategory && j.serviceCategory.toLowerCase().includes(q)) ||
+        (j.jobDescription && j.jobDescription.toLowerCase().includes(q))
       );
     }
     return list;
@@ -968,7 +976,18 @@ export const demoStore = {
   getPrintQueue(status?: string) {
     let list = [...this.store.printQueue];
     if (status && status !== 'ALL') {
-      list = list.filter(p => p.status === status);
+      const s = status.toUpperCase();
+      if (s === 'WAITING_IN_QUEUE' || s === 'QUEUED') {
+        list = list.filter(p => p.status === 'QUEUED' || p.status === 'WAITING_IN_QUEUE');
+      } else if (s === 'PRINTING_NOW' || s === 'PRINTING') {
+        list = list.filter(p => p.status === 'PRINTING' || p.status === 'PRINTING_NOW');
+      } else if (s === 'PRINTED_READY' || s === 'READY_FOR_PICKUP') {
+        list = list.filter(p => p.status === 'READY_FOR_PICKUP' || p.status === 'PRINTED_READY');
+      } else if (s === 'BILLED_COMPLETED' || s === 'BILLED_DELIVERED') {
+        list = list.filter(p => p.status === 'BILLED_DELIVERED' || p.status === 'BILLED_COMPLETED');
+      } else {
+        list = list.filter(p => (p.status as string) === s);
+      }
     }
     return list;
   },

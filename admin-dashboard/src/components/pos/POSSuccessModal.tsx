@@ -27,13 +27,13 @@ export function POSSuccessModal({ sale, businessDetails, onNewSale, onPrintTherm
     if (sale.lines && Array.isArray(sale.lines)) {
       itemsText = sale.lines.map((line: any, idx: number) => {
         const name = line.productName || line.sku || `Item #${idx + 1}`;
-        const qty = line.quantity || 1;
-        const price = line.unitPrice || line.sellingPrice || 0;
-        return `▪️ ${name} x${qty} = ৳${(price * qty).toLocaleString()}`;
+        const qty = Number(line.quantity || 1);
+        const price = Number(line.unitPrice || line.sellingPrice || 0);
+        return `▪️ ${name} x${qty} = ৳${Number(price * qty).toLocaleString()}`;
       }).join('\n');
     }
 
-    return `🧾 *INVOICE #${sale.saleNumber || 'SALE'}*
+    return `🧾 *INVOICE #${sale.saleNumber || sale.orderNumber || sale.id || 'SALE'}*
 📅 ${dateStr}
 🏪 *${businessDetails?.name || 'BusinessOS Retail & Studio'}*
 --------------------------------
@@ -83,20 +83,20 @@ Keep this digital token for warranty coverage & repairs.
             <CheckCircle2 className="w-10 h-10 text-emerald-600 animate-pulse" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-0.5">Sale Completed!</h2>
-          <p className="text-emerald-100 font-medium text-sm">Invoice #{sale.saleNumber}</p>
+          <p className="text-emerald-100 font-medium text-sm">Invoice #{sale.saleNumber || sale.orderNumber || sale.id || 'COMPLETED'}</p>
         </div>
         
         <div className="p-6">
           <div className="flex justify-between items-center mb-5 py-3 border-y border-slate-100">
             <span className="text-slate-500 font-medium">Grand Total</span>
-            <span className="text-3xl font-black text-slate-900 tracking-tight">৳{Number(sale.total).toLocaleString()}</span>
+            <span className="text-3xl font-black text-slate-900 tracking-tight">৳{Number(sale.total || 0).toLocaleString()}</span>
           </div>
 
           {/* Change to return banner */}
-          {sale.changeGiven > 0 && (
+          {Number(sale.changeGiven || 0) > 0 && (
             <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center text-emerald-900">
               <span className="text-xs font-bold">ফেরত দিন (Change to return):</span>
-              <span className="text-xl font-black text-emerald-700 tabular-nums">৳{Number(sale.changeGiven).toLocaleString()}</span>
+              <span className="text-xl font-black text-emerald-700 tabular-nums">৳{Number(sale.changeGiven || 0).toLocaleString()}</span>
             </div>
           )}
 
@@ -104,7 +104,7 @@ Keep this digital token for warranty coverage & repairs.
           {Number(sale.discount || 0) > 0 && (
             <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex justify-between items-center text-amber-900 text-xs font-semibold">
               <span>ছাড় / ডিসকাউন্ট (Discount):</span>
-              <span className="font-bold text-amber-700 tabular-nums">-৳{Number(sale.discount).toLocaleString()}</span>
+              <span className="font-bold text-amber-700 tabular-nums">-৳{Number(sale.discount || 0).toLocaleString()}</span>
             </div>
           )}
 

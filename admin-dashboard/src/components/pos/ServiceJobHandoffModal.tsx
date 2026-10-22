@@ -223,9 +223,9 @@ export function ServiceJobHandoffModal({ isOpen, onClose, onImportJob }: Service
                 <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <div className="text-right">
                     <span className="text-[10px] text-slate-400 block uppercase font-bold">বকেয়া বিল (Due)</span>
-                    <span className="text-lg font-black text-rose-600 font-mono">৳{job.dueBdt.toLocaleString()}</span>
-                    {job.advancePaid > 0 && (
-                      <span className="text-[10px] text-slate-400 block">(অগ্রিম: ৳{job.advancePaid})</span>
+                    <span className="text-lg font-black text-rose-600 font-mono">৳{Number(job.dueBdt || 0).toLocaleString()}</span>
+                    {Number(job.advancePaid || 0) > 0 && (
+                      <span className="text-[10px] text-slate-400 block">(অগ্রিম: ৳{Number(job.advancePaid || 0).toLocaleString()})</span>
                     )}
                   </div>
 

@@ -74,6 +74,7 @@ export default function ServiceJobsPage() {
   })
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState("ALL")
+  const [categoryFilter, setCategoryFilter] = useState("ALL")
   const [searchQuery, setSearchQuery] = useState("")
 
   // Modals for physical jobs
@@ -357,15 +358,70 @@ export default function ServiceJobsPage() {
     }
   }
 
-  const filteredJobs = (data.jobs || []).filter((j: any) => {
-    const q = searchQuery.toLowerCase()
-    return (
-      (j.jobNumber && j.jobNumber.toLowerCase().includes(q)) ||
-      (j.customerName && j.customerName.toLowerCase().includes(q)) ||
-      (j.customerPhone && j.customerPhone.includes(q)) ||
-      (j.jobDescription && j.jobDescription.toLowerCase().includes(q))
-    )
-  })
+  const filteredJobs = useMemo(() => {
+    return (data.jobs || []).filter((j: any) => {
+      // 1. Status Filter
+      if (statusFilter !== "ALL") {
+        const s = statusFilter.toUpperCase()
+        const jobStatus = (j.status || '').toUpperCase()
+        if (s === 'RECEIVED' && jobStatus !== 'RECEIVED' && jobStatus !== 'PENDING') return false
+        if (s === 'DELIVERED' && jobStatus !== 'DELIVERED' && jobStatus !== 'DELIVERED_PAID') return false
+        if (s !== 'RECEIVED' && s !== 'DELIVERED' && jobStatus !== s) return false
+      }
+
+      // 2. Category Filter
+      if (categoryFilter !== "ALL") {
+        const c = categoryFilter.toLowerCase()
+        const cat = (j.serviceCategory || '').toLowerCase()
+        if (!cat.includes(c) && !c.includes(cat)) {
+          if (categoryFilter === 'PC_LAPTOP_REPAIR' && !cat.includes('pc') && !cat.includes('laptop') && !cat.includes('repair')) return false
+          if (categoryFilter === 'PRINTING_PRESS' && !cat.includes('print') && !cat.includes('press')) return false
+          if (categoryFilter === 'PHOTO_VIDEO_EDIT' && !cat.includes('photo') && !cat.includes('video') && !cat.includes('edit')) return false
+          if (categoryFilter === 'CUSTOM_DESIGN' && !cat.includes('design') && !cat.includes('custom')) return false
+          if (categoryFilter === 'OS_SETUP' && !cat.includes('os') && !cat.includes('software')) return false
+          if (categoryFilter === 'PRINTER_REPAIR' && !cat.includes('printer')) return false
+        }
+      }
+
+      // 3. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim()
+        const match =
+          (j.jobNumber && j.jobNumber.toLowerCase().includes(q)) ||
+          (j.customerName && j.customerName.toLowerCase().includes(q)) ||
+          (j.customerPhone && j.customerPhone.includes(q)) ||
+          (j.jobDescription && j.jobDescription.toLowerCase().includes(q)) ||
+          (j.serviceCategory && j.serviceCategory.toLowerCase().includes(q)) ||
+          (j.deviceOrFileDetails && j.deviceOrFileDetails.toLowerCase().includes(q))
+        if (!match) return false
+      }
+
+      return true
+    })
+  }, [data.jobs, statusFilter, categoryFilter, searchQuery])
+
+  const filteredApplications = useMemo(() => {
+    return (applications || []).filter((app: any) => {
+      // 1. App Status Filter
+      if (appStatusFilter !== "ALL") {
+        if (app.status !== appStatusFilter) return false
+      }
+
+      // 2. App Search Query
+      if (appSearchQuery.trim()) {
+        const q = appSearchQuery.toLowerCase().trim()
+        const match =
+          (app.referenceNumber && app.referenceNumber.toLowerCase().includes(q)) ||
+          (app.customerName && app.customerName.toLowerCase().includes(q)) ||
+          (app.customerPhone && app.customerPhone.includes(q)) ||
+          (app.serviceTitleBn && app.serviceTitleBn.toLowerCase().includes(q)) ||
+          (app.serviceTitleEn && app.serviceTitleEn.toLowerCase().includes(q))
+        if (!match) return false
+      }
+
+      return true
+    })
+  }, [applications, appStatusFilter, appSearchQuery])
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300 max-w-[1400px] mx-auto p-4 sm:p-6 lg:p-8">
@@ -486,7 +542,7 @@ export default function ServiceJobsPage() {
                 <div key={i} className="h-56 bg-slate-100 rounded-3xl" />
               ))}
             </div>
-          ) : applications.length === 0 ? (
+          ) : filteredApplications.length === 0 ? (
             <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 p-8 space-y-3">
               <Sparkles className="w-12 h-12 text-slate-300 mx-auto" />
               <h3 className="font-bold text-slate-700 text-base">কোনো অনলাইন আবেদন পাওয়া যায়নি</h3>
@@ -496,7 +552,7 @@ export default function ServiceJobsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {applications.map((app) => (
+              {filteredApplications.map((app) => (
                 <div
                   key={app.referenceNumber}
                   className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-lg transition-all p-5 flex flex-col justify-between space-y-4"
@@ -623,40 +679,59 @@ export default function ServiceJobsPage() {
             </div>
           </div>
 
-          {/* Filter Tabs and Search Bar */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-              {[
-                { id: "ALL", label: "সকল জব" },
-                { id: "RECEIVED", label: "📥 গ্রহীত" },
-                { id: "IN_PROGRESS", label: "⚙️ কাজ চলছে" },
-                { id: "WAITING_FOR_PARTS", label: "⏳ পার্টস অপেক্ষা" },
-                { id: "READY_FOR_DELIVERY", label: "🎉 রেডি" },
-                { id: "DELIVERED", label: "✅ ডেলিভার্ড" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
-                    statusFilter === tab.id
-                      ? "bg-slate-900 text-white shadow-sm"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          {/* Filter Tabs, Category Selector and Search Bar */}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
+                {[
+                  { id: "ALL", label: "সকল জব" },
+                  { id: "RECEIVED", label: "📥 গ্রহীত" },
+                  { id: "IN_PROGRESS", label: "⚙️ কাজ চলছে" },
+                  { id: "WAITING_FOR_PARTS", label: "⏳ পার্টস অপেক্ষা" },
+                  { id: "READY_FOR_DELIVERY", label: "🎉 রেডি" },
+                  { id: "DELIVERED", label: "✅ ডেলিভার্ড" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setStatusFilter(tab.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors ${
+                      statusFilter === tab.id
+                        ? "bg-slate-900 text-white shadow-sm"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-            <div className="relative w-full md:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="জব নম্বর, গ্রাহক বা কাজের বিবরণ..."
-                className="w-full h-10 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="text-xs font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 text-slate-700 cursor-pointer shadow-xs"
+                >
+                  <option value="ALL">সকল ক্যাটাগরি (All Categories)</option>
+                  <option value="PC_LAPTOP_REPAIR">🖥️ পিসি ও ল্যাপটপ মেরামত (PC & Laptop)</option>
+                  <option value="PRINTING_PRESS">🖨️ প্রিন্টিং প্রেস ও ফটোকপি (Printing Press)</option>
+                  <option value="PHOTO_VIDEO_EDIT">🎬 ফটো ও ভিডিও এডিটিং (Photo/Video Edit)</option>
+                  <option value="CUSTOM_DESIGN">🎨 গ্রাফিক্স ডিজাইন (Custom Design)</option>
+                  <option value="OS_SETUP">💿 ওএস ও সফটওয়্যার সেটআপ (OS & Software)</option>
+                  <option value="PRINTER_REPAIR">⚙️ প্রিন্টার সার্ভিসিং (Printer Repair)</option>
+                  <option value="OTHER_SERVICE">📌 অন্যান্য সেবা (Other Services)</option>
+                </select>
+
+                <div className="relative flex-1 md:w-64">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="জব নম্বর, গ্রাহক বা কাজের বিবরণ..."
+                    className="w-full h-9 pl-9 pr-4 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

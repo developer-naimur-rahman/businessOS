@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, UnauthorizedException, Logger } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -7,13 +7,38 @@ import { RateLimit, RateLimitGuard } from '../common/guards/rate-limit.guard';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private authService: AuthService) {}
 
   @Post('login')
   @UseGuards(RateLimitGuard)
   @RateLimit({ limit: 10, ttlSeconds: 60 })
   async login(@Body() req: any) {
-    const user = await this.authService.validateUser(req.email, req.password);
+    // Support both email and phone number login
+    const identifier = req.email || req.phone;
+    if (!identifier) {
+      throw new UnauthorizedException('Email or phone number is required');
+    }
+
+    let email = req.email;
+
+    // If phone number was provided, try to find user by phone-derived email
+    // or look up users with matching phone patterns
+    if (req.phone && !req.email) {
+      const cleanPhone = req.phone.replace(/[^0-9]/g, '');
+      // Try finding by email first (staff users use email login)
+      // For admin staff that may have phone-based auth, try phone as email lookup
+      const user = await this.authService.findUserByPhone(cleanPhone);
+      if (user) {
+        email = user.email;
+      } else {
+        // Return generic error to avoid phone enumeration
+        throw new UnauthorizedException('Invalid credentials');
+      }
+    }
+
+    const user = await this.authService.validateUser(email, req.password);
     return this.authService.login(user);
   }
 
@@ -58,6 +83,39 @@ export class AuthController {
     }
 
     throw new UnauthorizedException('Invalid PIN or staff code');
+  }
+
+  @Post('forgot-password')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 5, ttlSeconds: 60 })
+  async forgotPassword(@Body() req: { email: string }) {
+    // Always return success to avoid email enumeration attacks
+    const email = (req.email || '').trim().toLowerCase();
+    if (email) {
+      try {
+        await this.authService.requestPasswordReset(email);
+      } catch (err) {
+        // Silently log but don't expose whether the email exists
+        this.logger.warn(`Password reset requested for: ${email} (result suppressed for security)`);
+      }
+    }
+    return {
+      success: true,
+      message: 'If an account exists with this email, a password reset link has been sent.',
+    };
+  }
+
+  @Post('reset-password')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 5, ttlSeconds: 60 })
+  async resetPassword(@Body() req: { token: string; newPassword: string }) {
+    if (!req.token || !req.newPassword) {
+      throw new UnauthorizedException('Reset token and new password are required');
+    }
+    if (req.newPassword.length < 6) {
+      throw new UnauthorizedException('Password must be at least 6 characters long');
+    }
+    return this.authService.resetPassword(req.token, req.newPassword);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -47,6 +47,13 @@ export default function CustomerAccountDashboard() {
   const [authLoading, setAuthLoading] = useState(false)
   const [authError, setAuthError] = useState("")
 
+  // Forgot password state
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState("")
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotSuccess, setForgotSuccess] = useState(false)
+  const [forgotError, setForgotError] = useState("")
+
   // Dashboard Data State
   const [loading, setLoading] = useState(true)
   const [vaultProfile, setVaultProfile] = useState<any>(null)
@@ -180,7 +187,7 @@ export default function CustomerAccountDashboard() {
           password,
         })
         login(res.data.access_token, res.data.customer)
-        toast.success(`স্বাগতম, ${res.data.customer.name}!`)
+        toast.success(`স্বাগতম, ${res.data.customer?.name || 'Customer'}!`)
       } else {
         const res = await api.post('/public/auth/register', {
           email: emailOrPhone,
@@ -196,6 +203,26 @@ export default function CustomerAccountDashboard() {
       toast.error('লগইন ব্যর্থ হয়েছে। সঠিক তথ্য প্রদান করুন।')
     } finally {
       setAuthLoading(false)
+    }
+  }
+
+  // Forgot password handler
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!forgotEmail.trim()) {
+      setForgotError("অনুগ্রহ করে আপনার ইমেইল এড্রেস লিখুন")
+      return
+    }
+    setForgotLoading(true)
+    setForgotError("")
+    try {
+      await api.post('/public/auth/forgot-password', { email: forgotEmail.trim().toLowerCase() })
+      setForgotSuccess(true)
+    } catch (err: any) {
+      // Show success regardless of error to prevent email enumeration attacks
+      setForgotSuccess(true)
+    } finally {
+      setForgotLoading(false)
     }
   }
 
@@ -419,6 +446,23 @@ export default function CustomerAccountDashboard() {
             </button>
           </div>
 
+          {authMode === 'login' && (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotPassword(true)
+                  setForgotEmail(emailOrPhone.includes('@') ? emailOrPhone : '')
+                  setForgotSuccess(false)
+                  setForgotError('')
+                }}
+                className="text-sm text-cyan-600 font-semibold hover:underline"
+              >
+                পাসওয়ার্ড ভুলে গেছেন? রিসেট করুন
+              </button>
+            </div>
+          )}
+
           <div className="text-center text-sm text-slate-500 pt-4 border-t border-slate-100">
             {authMode === 'login' ? (
               <>
@@ -445,6 +489,73 @@ export default function CustomerAccountDashboard() {
             )}
           </div>
         </form>
+
+        {/* Forgot Password Modal */}
+        {showForgotPassword && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="bg-gradient-to-r from-cyan-600 to-teal-600 p-6 text-center">
+                <Lock className="w-10 h-10 text-white mx-auto mb-2" />
+                <h3 className="text-xl font-black text-white">পাসওয়ার্ড রিসেট</h3>
+                <p className="text-cyan-100 text-xs mt-1">আপনার রেজিস্টার্ড ইমেইলে রিসেট লিংক পাঠানো হবে</p>
+              </div>
+              <div className="p-6">
+                {forgotSuccess ? (
+                  <div className="text-center space-y-4">
+                    <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-base">রিসেট লিংক পাঠানো হয়েছে!</h4>
+                      <p className="text-sm text-slate-500 mt-1">
+                        যদি এই ইমেইলে কোনো অ্যাকাউন্ট থাকে, তাহলে আপনার ইনবক্সে পাসওয়ার্ড রিসেট লিংক পাবেন। স্প্যাম ফোল্ডারও চেক করুন।
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowForgotPassword(false)}
+                      className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition-colors"
+                    >
+                      লগইন পেজে ফিরে যান
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    {forgotError && (
+                      <div className="p-3 bg-rose-50 text-rose-600 rounded-xl text-sm font-medium border border-rose-200 text-center">
+                        {forgotError}
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">রেজিস্টার্ড ইমেইল এড্রেস</label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="email@example.com"
+                        value={forgotEmail}
+                        onChange={e => setForgotEmail(e.target.value)}
+                        className="control-input h-12 w-full mt-1 px-4 rounded-xl border border-slate-200"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="w-full h-12 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold transition-all shadow-md shadow-cyan-600/20"
+                    >
+                      {forgotLoading ? 'প্রসেসিং হচ্ছে...' : 'রিসেট লিংক পাঠান'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(false)}
+                      className="w-full py-2.5 text-sm text-slate-500 font-semibold hover:text-slate-700"
+                    >
+                      লগইনে ফিরে যান
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

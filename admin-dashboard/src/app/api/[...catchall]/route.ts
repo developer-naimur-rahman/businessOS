@@ -44,38 +44,28 @@ async function handleProxyOrMock(req: Request, context: RouteContext, method: st
       });
       clearTimeout(timeoutId);
 
-      if (backendRes.ok) {
-        const data = await backendRes.json().catch(() => ({ success: true }));
-        return NextResponse.json(data, { status: backendRes.status });
+      // Preserve authoritative backend response status and body (both success and error)
+      const contentType = backendRes.headers.get('content-type') || '';
+      let data: any;
+      if (contentType.includes('application/json')) {
+        data = await backendRes.json().catch(() => ({}));
+      } else {
+        const text = await backendRes.text().catch(() => '');
+        data = { message: text || backendRes.statusText };
       }
+      return NextResponse.json(data, { status: backendRes.status });
     } catch {
-      // Backend unreachable or timed out; fall through to intelligent mock handler
+      // Backend unreachable, timed out, or connection refused
     }
   }
 
-  // 2. Intelligent, resilient fallback based on route patterns
-  // Parse body if present
-  let bodyJson: any = {};
-  if (['POST', 'PUT', 'PATCH'].includes(method)) {
-    try {
-      const text = await req.clone().text();
-      bodyJson = text ? JSON.parse(text) : {};
-    } catch {
-      bodyJson = {};
-    }
-  }
-
-  // Handle common mutation endpoints (POST/PUT/PATCH/DELETE)
+  // 2. Reject unmatched write mutations (POST, PUT, PATCH, DELETE) when authoritative persistence is unavailable
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
     return NextResponse.json({
-      success: true,
-      message: `${method} ${fullPath} processed successfully`,
-      data: {
-        id: `mock-${Date.now()}`,
-        ...bodyJson,
-        updatedAt: new Date().toISOString()
-      }
-    });
+      success: false,
+      error: 'BACKEND_PERSISTENCE_UNAVAILABLE',
+      message: `Write action (${method} ${fullPath}) cannot be completed in standalone demonstration mode without an active backend persistence server.`
+    }, { status: 503 });
   }
 
   // Handle GET endpoints with structured mock responses
@@ -333,7 +323,7 @@ async function handleProxyOrMock(req: Request, context: RouteContext, method: st
 
   // Generic fallback for any other GET endpoint
   return NextResponse.json({
-    success: true,
+    isDemoData: true,
     data: [],
     items: [],
     total: 0,
