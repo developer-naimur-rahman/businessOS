@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ServiceKnowledgeService } from './service-knowledge.service';
 import { CustomerVaultService } from './customer-vault.service';
@@ -39,6 +39,7 @@ export interface InternetServiceApplication {
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
+  customerId?: string;
   fieldValues: ApplicationFieldValue[];
   uploadedDocuments: Array<{
     id: string;
@@ -410,6 +411,7 @@ Respond strictly in JSON format (no markdown, no backticks):
       customerName: string;
       customerPhone: string;
       customerEmail?: string;
+      customerId?: string;
       fieldValues?: Record<string, any> | ApplicationFieldValue[];
       uploadedDocuments?: any[];
       voiceNoteUrl?: string;
@@ -504,6 +506,7 @@ Respond strictly in JSON format (no markdown, no backticks):
       customerName: customerName.trim(),
       customerPhone: dto.customerPhone.trim(),
       customerEmail: dto.customerEmail?.trim(),
+      customerId: dto.customerId,
       fieldValues: orderedFieldValues,
       uploadedDocuments: (dto.uploadedDocuments || []).map((d, idx) => ({
         id: d.id || `doc-${idx + 1}`,
@@ -626,18 +629,25 @@ Respond strictly in JSON format (no markdown, no backticks):
   /**
    * Get single application by reference number or ID
    */
-  async getApplicationByRef(organizationId: string, refOrId: string): Promise<InternetServiceApplication> {
+  async getApplicationByRef(organizationId?: string, refOrId?: string): Promise<InternetServiceApplication> {
+    const targetRef = refOrId || organizationId;
+    let orgId = refOrId ? organizationId : undefined;
+    if (!orgId) {
+      const org = await this.prisma.organization.findFirst();
+      orgId = org?.id;
+    }
+
     const log = await this.prisma.auditLog.findFirst({
       where: {
-        organizationId,
+        ...(orgId ? { organizationId: orgId } : {}),
         entityType: 'InternetServiceApplication',
-        entityId: refOrId,
+        entityId: targetRef,
       },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!log || !log.newData) {
-      throw new NotFoundException(`Service application '${refOrId}' not found.`);
+      throw new NotFoundException(`Service application '${targetRef}' not found.`);
     }
 
     return (log.newData as any) as InternetServiceApplication;
@@ -985,5 +995,143 @@ Respond strictly in JSON format (no markdown, no backticks):
     });
 
     return { success: true, application: updated };
+  }
+
+  /**
+   * Add additional documents and fields to an existing active application
+   * Preserves previous submissions and audit history.
+   * Clear advisory: Updates the shop service desk application file; official government records will be submitted during desk processing.
+   */
+  async addAdditionalDocuments(
+    organizationId: string | undefined,
+    refOrId: string,
+    dto: {
+      customerId?: string;
+      customerPhone?: string;
+      documents: Array<{
+        id?: string;
+        docType?: string;
+        title?: string;
+        fileUrl?: string;
+        mimeType?: string;
+        base64Snippet?: string;
+      }>;
+      additionalFields?: Array<{
+        key: string;
+        labelBn?: string;
+        labelEn?: string;
+        value: string;
+        sourceDocTitle?: string;
+      }>;
+      customerNote?: string;
+    }
+  ) {
+    let orgId = organizationId;
+    if (!orgId) {
+      const org = await this.prisma.organization.findFirst();
+      orgId = org?.id || '';
+    }
+    const current = await this.getApplicationByRef(orgId, refOrId);
+
+    // 1. Eligibility Check
+    const closedStatuses = ['COMPLETED', 'CANCELLED', 'DELIVERED'];
+    if (closedStatuses.includes(current.status)) {
+      throw new BadRequestException(`Cannot add documents to an application with status '${current.status}'.`);
+    }
+
+    // 2. Ownership / Security Check
+    if (dto.customerId) {
+      const isOwner = current.customerId === dto.customerId;
+      const cleanPhone = (dto.customerPhone || '').replace(/[^0-9]/g, '');
+      const currentCleanPhone = (current.customerPhone || '').replace(/[^0-9]/g, '');
+      const phoneMatch = cleanPhone.length >= 10 && currentCleanPhone.includes(cleanPhone.slice(-10));
+      if (!isOwner && !phoneMatch) {
+        throw new ForbiddenException('You do not have permission to modify this application.');
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // 3. Append documents, preserving previous submissions
+    const newDocs = (dto.documents || []).map((d, idx) => ({
+      id: d.id || `supp-doc-${Date.now()}-${idx + 1}`,
+      docType: d.docType || 'ADDITIONAL_SUPPORTING_DOC',
+      title: d.title || `Additional Document ${idx + 1}`,
+      fileUrl: d.fileUrl || '',
+      mimeType: d.mimeType || 'application/octet-stream',
+      uploadedAt: nowIso,
+    }));
+
+    const updatedDocuments = [...(current.uploadedDocuments || []), ...newDocs];
+
+    // 4. Update / Append fieldValues
+    const existingFieldMap = new Map((current.fieldValues || []).map(f => [f.key, f]));
+    if (dto.additionalFields && Array.isArray(dto.additionalFields)) {
+      for (const af of dto.additionalFields) {
+        if (!af.key || af.value === undefined) continue;
+        const existing = existingFieldMap.get(af.key);
+        if (existing) {
+          existing.value = String(af.value);
+          existing.sourceDocTitle = af.sourceDocTitle || 'Customer Supplementary Upload';
+          existing.verificationStatus = 'MANUALLY_EDITED' as any;
+          existing.confidence = 1.0;
+        } else {
+          existingFieldMap.set(af.key, {
+            key: af.key,
+            labelBn: af.labelBn || af.key,
+            labelEn: af.labelEn || af.key,
+            value: String(af.value),
+            order: existingFieldMap.size + 1,
+            sourceDocTitle: af.sourceDocTitle || 'Customer Supplementary Upload',
+            verificationStatus: 'MANUALLY_EDITED' as any,
+            confidence: 1.0,
+          });
+        }
+      }
+    }
+    const updatedFieldValues = Array.from(existingFieldMap.values());
+
+    // 5. Update missing documents checklist
+    const uploadedDocTypes = new Set(newDocs.map(d => (d.docType || '').toLowerCase()));
+    const updatedMissingDocuments = (current.missingDocuments || []).filter((m: any) => {
+      const docName = (typeof m === 'string' ? m : m.nameEn || m.nameBn || '').toLowerCase();
+      return !Array.from(uploadedDocTypes).some(t => docName.includes(t) || t.includes(docName));
+    });
+
+    // 6. Update status history
+    const docTitles = newDocs.map(d => d.title).join(', ');
+    const historyEntry = {
+      status: current.status,
+      timestamp: nowIso,
+      notes: `Customer submitted additional documents: ${docTitles || 'Supplementary files'}${dto.customerNote ? ` (Note: ${dto.customerNote})` : ''}. [Advisory: Updates shop service desk application file only; official government portal records will be submitted during desk processing.]`,
+      author: current.customerName || 'Customer',
+    };
+
+    const updatedApplication: InternetServiceApplication = {
+      ...current,
+      uploadedDocuments: updatedDocuments,
+      fieldValues: updatedFieldValues,
+      missingDocuments: updatedMissingDocuments,
+      statusHistory: [...(current.statusHistory || []), historyEntry],
+      updatedAt: nowIso,
+    };
+
+    // 7. Write immutable audit log
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: orgId,
+        entityType: 'InternetServiceApplication',
+        entityId: current.referenceNumber,
+        action: 'CUSTOMER_ADD_MORE_DATA',
+        oldData: current as any,
+        newData: updatedApplication as any,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Additional documents submitted. Please note that this updates your shop service desk application file; official government records will be submitted during desk processing.',
+      application: updatedApplication,
+    };
   }
 }

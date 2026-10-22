@@ -72,6 +72,55 @@ export default function CustomerAccountDashboard() {
   const [editingField, setEditingField] = useState<any>(null)
   const [newFieldValue, setNewFieldValue] = useState("")
 
+  // Add More Data to Application Modal State
+  const [selectedAppForMoreData, setSelectedAppForMoreData] = useState<any | null>(null)
+  const [moreDocTitle, setMoreDocTitle] = useState("")
+  const [moreDocType, setMoreDocType] = useState("SUPPORTING_DOC")
+  const [moreDocBase64, setMoreDocBase64] = useState("")
+  const [moreDocFileName, setMoreDocFileName] = useState("")
+  const [moreCustomerNote, setMoreCustomerNote] = useState("")
+  const [submittingMoreData, setSubmittingMoreData] = useState(false)
+
+  const handleAddMoreDataSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedAppForMoreData) return
+    if (!moreDocTitle && !moreDocBase64) {
+      toast.error("অনুগ্রহ করে ডকুমেন্টের নাম অথবা ফাইল যুক্ত করুন।")
+      return
+    }
+
+    setSubmittingMoreData(true)
+    try {
+      const documents = []
+      if (moreDocTitle || moreDocBase64) {
+        documents.push({
+          title: moreDocTitle || moreDocFileName || 'অতিরিক্ত ডকুমেন্ট',
+          docType: moreDocType,
+          fileUrl: moreDocBase64 || '',
+          mimeType: moreDocBase64 ? 'image/jpeg' : 'application/octet-stream',
+        })
+      }
+
+      await api.post(`/customer/vault/applications/${selectedAppForMoreData.referenceNumber}/add-documents`, {
+        documents,
+        customerNote: moreCustomerNote || undefined,
+      })
+
+      toast.success("অতিরিক্ত ডকুমেন্ট সফলভাবে জমা হয়েছে!")
+      setSelectedAppForMoreData(null)
+      setMoreDocTitle("")
+      setMoreDocType("SUPPORTING_DOC")
+      setMoreDocBase64("")
+      setMoreDocFileName("")
+      setMoreCustomerNote("")
+      loadCustomerData()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "ডকুমেন্ট যুক্ত করতে সমস্যা হয়েছে।")
+    } finally {
+      setSubmittingMoreData(false)
+    }
+  }
+
   // Load customer data
   const loadCustomerData = async () => {
     if (!token && !localStorage.getItem('customer_access_token')) {
@@ -912,11 +961,25 @@ export default function CustomerAccountDashboard() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
                     <div className="text-right">
                       <div className="text-xs text-slate-400">মোট ফি</div>
                       <div className="font-bold text-slate-900">৳{Number(app.financials?.totalAmountBdt || 0).toLocaleString()}</div>
                     </div>
+                    {app.status !== 'COMPLETED' && app.status !== 'CANCELLED' && app.status !== 'DELIVERED' && (
+                      <button
+                        onClick={() => {
+                          setSelectedAppForMoreData(app)
+                          setMoreDocTitle("")
+                          setMoreDocBase64("")
+                          setMoreDocFileName("")
+                          setMoreCustomerNote("")
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-cyan-600 text-white text-xs font-bold hover:bg-cyan-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" /> অতিরিক্ত ফাইল যোগ করুন
+                      </button>
+                    )}
                     <Link
                       href={`/track?query=${app.referenceNumber}`}
                       className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
@@ -926,6 +989,137 @@ export default function CustomerAccountDashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Add More Data Modal */}
+          {selectedAppForMoreData && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-slate-100 shadow-2xl space-y-5 animate-in zoom-in-95">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-black text-slate-900 text-lg flex items-center gap-2">
+                      <UploadCloud className="w-5 h-5 text-cyan-600" /> অতিরিক্ত তথ্য বা ফাইল সংযুক্ত করুন
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">
+                      টোকেন: #{selectedAppForMoreData.referenceNumber} • {selectedAppForMoreData.serviceTitleBn || selectedAppForMoreData.serviceSlug}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedAppForMoreData(null)}
+                    className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {selectedAppForMoreData.missingDocuments && selectedAppForMoreData.missingDocuments.length > 0 && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+                    <div className="font-bold flex items-center gap-1 text-amber-800">
+                      <AlertTriangle className="w-3.5 h-3.5" /> যে কাগজপত্রগুলো জমা দেওয়া বাকি আছে:
+                    </div>
+                    <ul className="list-disc list-inside space-y-0.5 pl-1">
+                      {selectedAppForMoreData.missingDocuments.map((m: any, idx: number) => (
+                        <li key={idx}>{typeof m === 'string' ? m : m.nameBn || m.nameEn}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <form onSubmit={handleAddMoreDataSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      কাগজের ধরন / ক্যাটাগরি
+                    </label>
+                    <select
+                      value={moreDocType}
+                      onChange={(e) => setMoreDocType(e.target.value)}
+                      className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value="SSC_CERTIFICATE">এসএসসি / শিক্ষাগত সনদ (SSC/Academic Cert)</option>
+                      <option value="NID">জাতীয় পরিচয়পত্র (NID Card)</option>
+                      <option value="BIRTH_CERTIFICATE">জন্ম নিবন্ধন সনদ (Birth Certificate)</option>
+                      <option value="CITIZEN_CERT">নাগরিকত্ব / চেয়ারম্যান সনদ (Citizenship Cert)</option>
+                      <option value="TRADE_LICENSE">ট্রেড লাইসেন্স (Trade License)</option>
+                      <option value="SUPPORTING_DOC">অন্যান্য সাপোর্টিং ডকুমেন্ট (Supporting Doc)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      ডকুমেন্টের নাম / টাইটেল
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="যেমন: এসএসসি মূল মার্কশিট বা চেয়ারম্যান সনদ"
+                      value={moreDocTitle}
+                      onChange={(e) => setMoreDocTitle(e.target.value)}
+                      className="w-full h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      ফাইল নির্বাচন করুন (ছবি বা PDF)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setMoreDocFileName(file.name)
+                          if (!moreDocTitle) setMoreDocTitle(file.name)
+                          const reader = new FileReader()
+                          reader.onload = (evt) => {
+                            setMoreDocBase64(evt.target?.result as string)
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                      className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-cyan-50 file:text-cyan-700 hover:file:bg-cyan-100"
+                    />
+                    {moreDocFileName && (
+                      <p className="text-[11px] text-emerald-600 font-medium mt-1">✓ সিলেক্টেড: {moreDocFileName}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      অতিরিক্ত নোট বা মন্তব্য (ঐচ্ছিক)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="কর্মীর জন্য বিশেষ কোনো নির্দেশনা থাকলে লিখুন..."
+                      value={moreCustomerNote}
+                      onChange={(e) => setMoreCustomerNote(e.target.value)}
+                      className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                  </div>
+
+                  {/* Mandatory Advisory */}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-500 leading-relaxed">
+                    ℹ️ <strong className="text-slate-700">স্বচ্ছতা নোট:</strong> এখানে সংযুক্ত ফাইলটি সরাসরি আমাদের সার্ভিস ডেস্কে সংযুক্ত হবে। সরকারি পোর্টালে কর্মী প্রসেসিংয়ের সময় তা দাখিল করা হবে (অফিসিয়াল সরকারি রেকর্ড স্বয়ংক্রিয়ভাবে পরিবর্তিত হয় না)।
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAppForMoreData(null)}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      বাতিল
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submittingMoreData}
+                      className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {submittingMoreData ? 'জমা হচ্ছে...' : 'জমা দিন'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>

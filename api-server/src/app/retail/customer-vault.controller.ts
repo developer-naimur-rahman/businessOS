@@ -19,6 +19,7 @@ import { PermissionsGuard } from '../iam/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CustomerJwtAuthGuard } from '../auth/guards/customer-jwt-auth.guard';
+import { ServiceApplicationsService } from './service-applications.service';
 
 // Public endpoints for customers
 @Controller('public/customer-vault')
@@ -67,7 +68,8 @@ export class PublicCustomerVaultController {
 export class AuthenticatedCustomerVaultController {
   constructor(
     private readonly vaultService: CustomerVaultService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly applicationsService: ServiceApplicationsService
   ) {}
 
   private async getOrganizationId(): Promise<string> {
@@ -175,17 +177,38 @@ export class AuthenticatedCustomerVaultController {
       take: 100,
     });
 
-    const myApps = logs
-      .map(l => (l.newData as any) || {})
-      .filter(app => {
-        const appPhone = (app.customerPhone || '').replace(/[^0-9]/g, '');
-        return (
-          app.customerId === req.user.customerId ||
-          (cleanPhone.length >= 10 && appPhone.includes(cleanPhone.slice(-10)))
-        );
-      });
+    const seenRefs = new Set<string>();
+    const myApps: any[] = [];
+    for (const l of logs) {
+      const app = (l.newData as any) || {};
+      if (!app.referenceNumber || seenRefs.has(app.referenceNumber)) continue;
+      const appPhone = (app.customerPhone || '').replace(/[^0-9]/g, '');
+      if (
+        app.customerId === req.user.customerId ||
+        (cleanPhone.length >= 10 && appPhone.includes(cleanPhone.slice(-10)))
+      ) {
+        seenRefs.add(app.referenceNumber);
+        myApps.push(app);
+      }
+    }
 
     return myApps;
+  }
+
+  /**
+   * Phase 4 / Requirement 2: Authenticated customer adds additional documents to their application
+   */
+  @Post('applications/:ref/add-documents')
+  async addMoreDataToApplication(
+    @Request() req: any,
+    @Param('ref') ref: string,
+    @Body() body: any
+  ) {
+    const orgId = req.user.orgId || (await this.getOrganizationId());
+    return this.applicationsService.addAdditionalDocuments(orgId, ref, {
+      ...body,
+      customerId: req.user.customerId,
+    });
   }
 }
 

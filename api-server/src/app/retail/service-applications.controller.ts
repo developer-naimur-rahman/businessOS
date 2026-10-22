@@ -25,6 +25,11 @@ export class PublicServiceRequestController {
   async approveDraft(@Param('ref') ref: string, @Body() body: { notes?: string }) {
     return this.applicationsService.customerApproveDraft(ref, body.notes);
   }
+
+  @Post(':ref/add-documents')
+  async addAdditionalDocuments(@Param('ref') ref: string, @Body() body: any) {
+    return this.applicationsService.addAdditionalDocuments(undefined, ref, body);
+  }
 }
 
 // Admin management endpoints for the application pipeline, copy assistant & deliverables

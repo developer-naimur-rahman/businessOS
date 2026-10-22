@@ -5,6 +5,7 @@ import { api } from "../../../lib/api-client"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { useCustomerAuthStore } from "../../../store/useCustomerAuthStore"
 import {
   SendHorizontal,
   CheckCircle2,
@@ -55,6 +56,7 @@ function ServiceRequestContent() {
   const router = useRouter()
   const initialSlug = searchParams.get("service") || "teletalk-govt-job"
 
+  const { customer, isAuthenticated } = useCustomerAuthStore()
   const [services, setServices] = useState<any[]>([])
   const [selectedSlug, setSelectedSlug] = useState(initialSlug)
 
@@ -105,6 +107,15 @@ function ServiceRequestContent() {
   // Step 6: Submission Result
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [createdRefNumber, setCreatedRefNumber] = useState<string | null>(null)
+
+  // Auto-fill from authenticated customer if available
+  useEffect(() => {
+    if (isAuthenticated && customer) {
+      if (customer.phone && !contactPhone) setContactPhone(customer.phone)
+      if (customer.name && !applicantName) setApplicantName(customer.name)
+      if (customer.email && !customerEmail) setCustomerEmail(customer.email)
+    }
+  }, [isAuthenticated, customer])
 
   // Load published services catalog
   useEffect(() => {
@@ -281,23 +292,38 @@ function ServiceRequestContent() {
 
   // Optional Customer Vault Lookup
   const handleVaultLookup = async () => {
-    if (!contactPhone || contactPhone.replace(/[^0-9]/g, '').length < 10) {
-      toast.error("সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।")
-      return
-    }
-
     setVaultLookupLoading(true)
     try {
-      const res = await api.get('/public/customer-vault/lookup', { params: { phone: contactPhone } })
-      if (res.data?.found && res.data?.profile) {
-        const p = res.data.profile
+      let p: any = null
+      if (isAuthenticated) {
+        const res = await api.get('/customer/vault/me').catch(() => null)
+        if (res?.data) p = res.data
+      }
+      if (!p) {
+        if (!contactPhone || contactPhone.replace(/[^0-9]/g, '').length < 10) {
+          toast.error("সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।")
+          setVaultLookupLoading(false)
+          return
+        }
+        const res = await api.get('/public/customer-vault/lookup', { params: { phone: contactPhone } })
+        if (res.data?.requiresLogin) {
+          toast.info("ভল্ট রেকর্ড সুরক্ষিত। সম্পূর্ণ ডাটা প্রি-ফিলের জন্য অনুগ্রহ করে কাস্টমার একাউন্টে লগইন করুন।")
+          setVaultLookupLoading(false)
+          return
+        }
+        if (res.data?.found && res.data?.profile) {
+          p = res.data.profile
+        }
+      }
+
+      if (p) {
         setVaultFoundProfile(p)
         toast.success("কাস্টমার ভল্টে পূর্বের সংরক্ষিত তথ্য পাওয়া গেছে!")
 
         // Suggest prefilling missing fields from vault
         setExtractedFields(prev =>
           prev.map(f => {
-            const vaultVal = p[f.key] || (f.key === 'applicantNameEn' ? p.nameEn : f.key === 'applicantNameBn' ? p.nameBn : f.key === 'dob' ? p.dob : f.key === 'nidNumber' ? p.nidNumber : p.presentAddress);
+            const vaultVal = p[f.key] || (f.key === 'applicantNameEn' ? p.nameEn : f.key === 'applicantNameBn' ? p.nameBn : f.key === 'dob' ? p.dob : f.key === 'nidNumber' ? p.nidNumber : p.presentAddress)
             if (!f.value && vaultVal) {
               return {
                 ...f,
@@ -352,6 +378,7 @@ function ServiceRequestContent() {
         customerName: finalCustomerName,
         customerPhone: finalPhone,
         customerEmail: customerEmail.trim() || undefined,
+        customerId: customer?.id || undefined,
         deliveryMode,
         deliveryAddress: deliveryAddress.trim() || undefined,
         fieldValues: extractedFields,
