@@ -23,7 +23,7 @@ export interface CatalogItem {
   }>
 }
 
-export const STATIC_CATALOG: CatalogItem[] = [
+const RAW_STATIC_CATALOG: CatalogItem[] = [
   {
     id: '8a1d961a-3d6a-42d7-8f29-b47614eda74f',
     name: 'Wireless Mouse',
@@ -318,3 +318,18 @@ export const STATIC_CATALOG: CatalogItem[] = [
     category: { id: 'cat-cmp', name: 'Computer Components', slug: 'computer-components' }
   }
 ]
+
+export const STATIC_CATALOG: CatalogItem[] = RAW_STATIC_CATALOG.map(item => ({
+  ...item,
+  variants: (item.variants && item.variants.length > 0) ? item.variants : [
+    {
+      id: item.id,
+      sku: item.code || `SKU-${item.id.slice(0, 8)}`,
+      retailPrice: item.sellingPrice || 0,
+      posPrice: item.sellingPrice || 0,
+      costPrice: item.costPrice || Math.round((item.sellingPrice || 0) * 0.75),
+      status: 'ACTIVE',
+      attributes: []
+    } as any
+  ]
+}))

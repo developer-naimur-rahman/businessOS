@@ -29,6 +29,14 @@ export default function AdminPOSPage() {
   const [holdNoteInput, setHoldNoteInput] = useState("")
   const [isHoldModalOpen, setIsHoldModalOpen] = useState(false)
 
+  // Cash Tender Modal & Cart Discount State
+  const [isCashModalOpen, setIsCashModalOpen] = useState(false)
+  const [cashTendered, setCashTendered] = useState<string>("")
+  const [cashDiscount, setCashDiscount] = useState<number>(0)
+  const [cashShortfallMode, setCashShortfallMode] = useState<'DISCOUNT' | 'BAKI'>('DISCOUNT')
+  const [cashBakiPhone, setCashBakiPhone] = useState<string>("")
+  const [cartDiscount, setCartDiscount] = useState<number>(0)
+
   // Split Payment Modal State
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false)
   const [splitCash, setSplitCash] = useState<string>("")
@@ -37,6 +45,7 @@ export default function AdminPOSPage() {
   const [splitBank, setSplitBank] = useState<string>("")
   const [splitBaki, setSplitBaki] = useState<string>("")
   const [splitCustomerPhone, setSplitCustomerPhone] = useState<string>("")
+
 
   // Checkout & Print State
   const [completedSale, setCompletedSale] = useState<any>(null)
@@ -253,7 +262,8 @@ export default function AdminPOSPage() {
     return cart.reduce((acc, item) => acc + (Number(item.sellingPrice) * item.quantity), 0)
   }, [cart])
   const tax = 0
-  const total = subtotal + tax
+  const netTotal = Math.max(0, subtotal - cartDiscount)
+  const total = netTotal
 
   // Hold Current Cart (F4)
   const handleHoldCart = async () => {
@@ -369,11 +379,11 @@ export default function AdminPOSPage() {
         return
       }
 
-      // F9: Instant Complete (Cash) & Print
+      // F9: Open Cash Tender & Change Modal
       if (e.key === 'F9') {
         e.preventDefault()
         if (cart.length > 0 && !isProcessing) {
-          handleCheckout('CASH')
+          openCashModal()
         }
         return
       }
@@ -389,6 +399,9 @@ export default function AdminPOSPage() {
       if (e.key === 'Escape') {
         if (completedSale) {
           handleNewSale()
+        } else if (isCashModalOpen) {
+          setIsCashModalOpen(false)
+          broadcastDisplayState('ACTIVE_BILLING', false)
         } else if (isSplitModalOpen) {
           setIsSplitModalOpen(false)
           broadcastDisplayState('ACTIVE_BILLING', false)
@@ -428,7 +441,8 @@ export default function AdminPOSPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [completedSale, searchQuery, products, cart, total, isProcessing, isSplitModalOpen, isHoldModalOpen, isHeldDrawerOpen, broadcastDisplayState])
+  }, [completedSale, searchQuery, products, cart, total, isProcessing, isCashModalOpen, isSplitModalOpen, isHoldModalOpen, isHeldDrawerOpen, broadcastDisplayState])
+
 
   // Trigger browser print when printMode changes
   useEffect(() => {
@@ -441,13 +455,25 @@ export default function AdminPOSPage() {
   }, [printMode])
 
   const handleProductClick = (product: any) => {
-    const activeVariants = product.variants?.filter((v: any) => v.status === 'ACTIVE') || []
+    const activeVariants = (product.variants || []).filter((v: any) => v.status === 'ACTIVE' || !v.status)
     if (activeVariants.length === 1) {
       addToCart(activeVariants[0], product)
+    } else if (activeVariants.length === 0) {
+      // Single/Standard product without separate variants
+      const standardVariant = {
+        id: product.id,
+        sku: product.code || product.sku || `SKU-${product.id.slice(0, 8)}`,
+        retailPrice: Number(product.sellingPrice || 0),
+        posPrice: Number(product.sellingPrice || 0),
+        status: 'ACTIVE',
+        attributes: []
+      }
+      addToCart(standardVariant, product)
     } else {
       setSelectedProductForVariants(product)
     }
   }
+
 
   const addToCart = (variant: any, product: any) => {
     setCart(prev => {
@@ -510,7 +536,7 @@ export default function AdminPOSPage() {
   const changeToReturn = Math.max(0, totalTendered - total)
   const remainingDue = Math.max(0, total - totalTendered)
 
-  // Standard Checkout (Cash or Card)
+  // Standard Checkout (Card or Direct Cash)
   const handleCheckout = async (paymentMethod: 'CASH' | 'CARD') => {
     if (cart.length === 0 || !branchId || !warehouseId) {
       toast.warning("Missing branch or warehouse selection.")
@@ -521,6 +547,7 @@ export default function AdminPOSPage() {
       const response = await api.post('/sales/complete-direct', {
         branchId,
         warehouseId,
+        discount: cartDiscount,
         lines: cart.map(item => ({
           variantId: item.variantId,
           quantity: item.quantity,
@@ -548,6 +575,7 @@ export default function AdminPOSPage() {
       toast.success("Sale completed successfully")
       setCompletedSale(enrichedSale)
       setCart([])
+      setCartDiscount(0)
       localStorage.removeItem('pos_active_cart')
       broadcastDisplayState('THANK_YOU', false)
     } catch (err: any) {
@@ -558,6 +586,119 @@ export default function AdminPOSPage() {
       setIsProcessing(false)
     }
   }
+
+  // Open Cash Payment Modal
+  const openCashModal = () => {
+    if (cart.length === 0) {
+      toast.warning("কার্ট খালি! পণ্য যোগ করুন।")
+      return
+    }
+    setCashTendered(total.toString())
+    setCashDiscount(cartDiscount)
+    setCashShortfallMode('DISCOUNT')
+    setIsCashModalOpen(true)
+    broadcastDisplayState('SHOW_PAYMENT_QR', true)
+  }
+
+  // Confirm Cash Sale (with custom tender, discount, round-off, change, or baki)
+  const handleCashCheckoutConfirm = async () => {
+    if (cart.length === 0 || !branchId || !warehouseId) {
+      toast.warning("Missing branch or warehouse selection.")
+      return
+    }
+
+    const tendered = parseFloat(cashTendered) || 0
+    let effectiveDiscount = cartDiscount
+    let cashPaid = tendered
+    let bakiAmount = 0
+
+    if (tendered < total) {
+      const shortfall = total - tendered
+      if (cashShortfallMode === 'DISCOUNT') {
+        // Customer gives e.g. 2 taka less -> apply shortfall as discount
+        effectiveDiscount += shortfall
+        cashPaid = tendered
+      } else {
+        // Record as Baki
+        bakiAmount = shortfall
+        cashPaid = tendered
+      }
+    } else {
+      // Overpayment: cash payment covers total, change is tendered - total
+      cashPaid = total
+    }
+
+    const finalGrandTotal = Math.max(0, subtotal - effectiveDiscount)
+
+    setIsProcessing(true)
+    try {
+      const paymentsPayload: any[] = []
+      if (cashPaid > 0) {
+        paymentsPayload.push({
+          method: 'CASH',
+          amount: cashPaid,
+          reference: tendered > total ? `Cash tendered: ৳${tendered}, change: ৳${tendered - total}` : undefined
+        })
+      }
+      if (bakiAmount > 0) {
+        paymentsPayload.push({
+          method: 'OTHER',
+          amount: bakiAmount,
+          reference: `Customer Baki Due ${cashBakiPhone ? `(Phone: ${cashBakiPhone})` : ''}`
+        })
+      }
+
+      if (paymentsPayload.length === 0) {
+        paymentsPayload.push({ method: 'CASH', amount: finalGrandTotal })
+      }
+
+      const response = await api.post('/sales/complete-direct', {
+        branchId,
+        warehouseId,
+        discount: effectiveDiscount,
+        lines: cart.map(item => ({
+          variantId: item.variantId,
+          quantity: item.quantity,
+          discount: 0
+        })),
+        payments: paymentsPayload
+      })
+
+      const enrichedSale = {
+        ...response.data,
+        cashTendered: tendered,
+        changeGiven: Math.max(0, tendered - total),
+        customerPhone: cashBakiPhone,
+        lines: response.data.lines.map((line: any) => {
+          const product = cart.find(p => p.variantId === line.variantId)
+          return {
+            ...line,
+            productName: product?.name || line.productNameSnapshot || 'Unknown Product',
+            productCode: product?.sku || line.skuSnapshot
+          }
+        })
+      }
+
+      toast.success(
+        tendered > total 
+          ? `নগদ বিক্রয় সফল! গ্রাহককে ফেরত দিন: ৳${(tendered - total).toLocaleString()}`
+          : "নগদ বিক্রয় সফলভাবে সম্পন্ন হয়েছে!"
+      )
+      setCompletedSale(enrichedSale)
+      setCart([])
+      setCartDiscount(0)
+      setIsCashModalOpen(false)
+      localStorage.removeItem('pos_active_cart')
+      broadcastDisplayState('THANK_YOU', false)
+    } catch (err: any) {
+      console.error("Cash sale error:", err.response?.data || err)
+      const msg = err.response?.data?.message || err.response?.data?.error || "Failed to process cash sale"
+      toast.error(`Error: ${Array.isArray(msg) ? msg.join(', ') : msg}`)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
 
   // Split Payment Submission
   const handleSplitCheckout = async () => {
@@ -613,6 +754,7 @@ export default function AdminPOSPage() {
       const response = await api.post('/sales/complete-direct', {
         branchId,
         warehouseId,
+        discount: cartDiscount,
         lines: cart.map(item => ({
           variantId: item.variantId,
           quantity: item.quantity,
@@ -620,6 +762,7 @@ export default function AdminPOSPage() {
         })),
         payments: paymentsPayload
       })
+
 
       const enrichedSale = {
         ...response.data,
@@ -900,12 +1043,76 @@ export default function AdminPOSPage() {
 
           {/* Totals & Payment Actions */}
           <div className="p-4 bg-white border-t border-slate-100 shrink-0 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.03)] relative z-20">
-            <div className="space-y-1.5 mb-4 text-xs">
+            <div className="space-y-2 mb-3 text-xs">
               <div className="flex justify-between text-slate-500">
                 <span>Subtotal ({cart.length} items)</span>
                 <span className="font-semibold text-slate-700 tabular-nums">৳{subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-end pt-2 border-t border-slate-100 mt-2">
+
+              {/* Discount / Round-off Adjustment (Editable & Quick Buttons) */}
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                <div className="flex justify-between items-center text-slate-700">
+                  <span className="font-bold flex items-center gap-1 text-[11px]">
+                    ছাড় / ডিসকাউন্ট (Discount):
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-slate-400 font-mono text-xs">৳</span>
+                    <input 
+                      type="number"
+                      min="0"
+                      max={subtotal}
+                      value={cartDiscount === 0 ? '' : cartDiscount}
+                      onChange={(e) => {
+                        const val = Math.max(0, Math.min(subtotal, parseFloat(e.target.value) || 0))
+                        setCartDiscount(val)
+                      }}
+                      placeholder="0"
+                      className="w-16 px-1.5 py-0.5 text-right font-bold bg-white border border-slate-300 rounded text-amber-700 outline-none focus:ring-1 focus:ring-amber-500 text-xs"
+                    />
+                  </div>
+                </div>
+                {/* Quick 2 taka / 5 taka discount presets */}
+                <div className="flex items-center gap-1 justify-end pt-0.5">
+                  <span className="text-[10px] text-slate-400 mr-0.5">Quick:</span>
+                  <button 
+                    type="button"
+                    onClick={() => setCartDiscount(prev => Math.min(subtotal, prev + 2))}
+                    className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:bg-amber-50 hover:border-amber-300"
+                    title="কাস্টমার ২ টাকা কম দিলে"
+                  >
+                    -৳2
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setCartDiscount(prev => Math.min(subtotal, prev + 5))}
+                    className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:bg-amber-50 hover:border-amber-300"
+                  >
+                    -৳5
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const rem = subtotal % 10
+                      setCartDiscount(rem > 0 ? rem : 0)
+                    }}
+                    className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-bold text-slate-700 hover:bg-amber-50 hover:border-amber-300"
+                    title="রাউন্ড অফ (শেষের টাকা বাদ দিন)"
+                  >
+                    Round
+                  </button>
+                  {cartDiscount > 0 && (
+                    <button 
+                      type="button"
+                      onClick={() => setCartDiscount(0)}
+                      className="px-2 py-0.5 bg-rose-50 border border-rose-200 rounded text-[10px] font-bold text-rose-600 hover:bg-rose-100"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-end pt-1.5 border-t border-slate-100">
                 <span className="font-bold text-slate-400 uppercase tracking-widest text-[11px] mb-0.5">Grand Total</span>
                 <span className="text-3xl font-black text-slate-900 tabular-nums tracking-tighter">৳{total.toLocaleString()}</span>
               </div>
@@ -939,9 +1146,9 @@ export default function AdminPOSPage() {
               </button>
 
               <button 
-                onClick={() => handleCheckout('CASH')} 
+                onClick={openCashModal} 
                 disabled={isProcessing || cart.length === 0}
-                className="h-14 bg-indigo-600 text-white rounded-2xl font-bold shadow-md shadow-indigo-600/30 hover:bg-indigo-700 disabled:opacity-50 transition-all flex flex-col items-center justify-center relative overflow-hidden active:scale-[0.98]"
+                className="h-14 bg-emerald-600 text-white rounded-2xl font-bold shadow-md shadow-emerald-600/30 hover:bg-emerald-700 disabled:opacity-50 transition-all flex flex-col items-center justify-center relative overflow-hidden active:scale-[0.98]"
               >
                 {isProcessing ? (
                   <span className="flex items-center space-x-1">
@@ -951,7 +1158,9 @@ export default function AdminPOSPage() {
                   </span>
                 ) : (
                   <>
-                    <span className="text-base leading-none mb-0.5 tracking-tight font-black">Pay Cash</span>
+                    <span className="text-base leading-none mb-0.5 tracking-tight font-black flex items-center gap-1">
+                      <Banknote className="w-4 h-4" /> Pay Cash
+                    </span>
                     <span className="text-[9px] uppercase tracking-wider opacity-90 font-mono">(F9)</span>
                   </>
                 )}
@@ -1170,9 +1379,21 @@ export default function AdminPOSPage() {
                   </div>
                 )}
                 {remainingDue > 0 && (
-                  <div className="flex justify-between text-sm font-black text-rose-700 pt-1 border-t border-purple-200/60">
-                    <span>Remaining Balance:</span>
-                    <span className="tabular-nums">৳{remainingDue.toLocaleString()}</span>
+                  <div className="flex flex-col gap-1.5 pt-1 border-t border-purple-200/60">
+                    <div className="flex justify-between text-sm font-black text-rose-700">
+                      <span>Remaining Balance:</span>
+                      <span className="tabular-nums">৳{remainingDue.toLocaleString()}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCartDiscount(prev => prev + remainingDue)
+                        toast.success(`৳${remainingDue} ডিসকাউন্ট হিসেবে সমন্বয় করা হলো!`)
+                      }}
+                      className="self-end px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-colors"
+                    >
+                      ✓ Apply ৳{remainingDue} as Discount (ছাড় দিন)
+                    </button>
                   </div>
                 )}
               </div>
@@ -1200,6 +1421,181 @@ export default function AdminPOSPage() {
           </div>
         </div>
       )}
+
+      {/* Cash Tender & Change Modal (F9) */}
+      {isCashModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-700 to-teal-700 p-6 text-white flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black flex items-center gap-2">
+                  <Banknote className="w-6 h-6" /> নগদ ক্যাশ গ্রহণ (Cash Tender)
+                </h3>
+                <p className="text-xs text-emerald-200 mt-0.5">টাকার পরিমাণ এডিট করুন ও ফেরত হিসাব দেখুন</p>
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] uppercase tracking-wider text-emerald-200 block font-bold">Total Bill</span>
+                <span className="text-2xl font-black tabular-nums">৳{total.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Tender Amount Input */}
+              <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl">
+                <label className="text-xs font-black text-emerald-900 flex items-center justify-between mb-1.5">
+                  <span>গ্রাহক কত টাকা দিয়েছেন? (Cash Received)</span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">এডিটেবল</span>
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-xl font-bold text-emerald-700">৳</span>
+                  <input 
+                    type="number"
+                    autoFocus
+                    placeholder={total.toString()}
+                    value={cashTendered}
+                    onChange={(e) => setCashTendered(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleCashCheckoutConfirm()
+                      }
+                    }}
+                    className="w-full text-2xl font-black bg-white border-2 border-emerald-300 rounded-xl pl-9 pr-3 py-2 text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none tabular-nums"
+                  />
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setCashTendered(total.toString())}
+                    className="px-2.5 py-1 bg-white border border-emerald-200 rounded-lg text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+                  >
+                    সঠিক: ৳{total}
+                  </button>
+                  {[50, 100, 500, 1000].filter(n => n >= total || total <= n * 1.5).map(note => (
+                    <button
+                      key={note}
+                      type="button"
+                      onClick={() => setCashTendered(note.toString())}
+                      className="px-2.5 py-1 bg-white border border-emerald-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-emerald-100"
+                    >
+                      ৳{note}
+                    </button>
+                  ))}
+                  {/* Quick 2 taka less button */}
+                  {total > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => setCashTendered((total - 2).toString())}
+                      className="px-2.5 py-1 bg-amber-100 border border-amber-300 rounded-lg text-xs font-bold text-amber-900 hover:bg-amber-200"
+                      title="গ্রাহক ২ টাকা কম দিলে"
+                    >
+                      ২ টাকা কম (৳{total - 2})
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Calculations (Change to return OR Shortfall discount) */}
+              {(() => {
+                const tenderedNum = parseFloat(cashTendered) || 0
+                if (tenderedNum > total) {
+                  const change = tenderedNum - total
+                  return (
+                    <div className="p-4 bg-emerald-100 border border-emerald-300 rounded-2xl flex justify-between items-center text-emerald-950">
+                      <div>
+                        <span className="text-xs font-bold block">গ্রাহককে ফেরত দিন (Change to Return):</span>
+                        <span className="text-[11px] text-emerald-700">ক্যাশ ড্রয়ার থেকে ফেরত দিন</span>
+                      </div>
+                      <span className="text-2xl font-black text-emerald-700 tabular-nums">৳{change.toLocaleString()}</span>
+                    </div>
+                  )
+                }
+
+                if (tenderedNum < total && tenderedNum > 0) {
+                  const shortfall = total - tenderedNum
+                  return (
+                    <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-amber-900">
+                          গ্রাহক ৳{shortfall} কম দিয়েছেন:
+                        </span>
+                        <span className="text-sm font-black text-amber-700">৳{shortfall} কম</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setCashShortfallMode('DISCOUNT')}
+                          className={`p-2 rounded-xl text-xs font-bold text-center border transition-all ${
+                            cashShortfallMode === 'DISCOUNT'
+                              ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
+                          }`}
+                        >
+                          ✓ ছাড় দিন (Discount ৳{shortfall})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCashShortfallMode('BAKI')}
+                          className={`p-2 rounded-xl text-xs font-bold text-center border transition-all ${
+                            cashShortfallMode === 'BAKI'
+                              ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50'
+                          }`}
+                        >
+                          বাকি রাখুন (Due ৳{shortfall})
+                        </button>
+                      </div>
+
+                      {cashShortfallMode === 'BAKI' && (
+                        <input
+                          type="text"
+                          placeholder="কাস্টমার ফোন নম্বর (বাকি খাতার জন্য)"
+                          value={cashBakiPhone}
+                          onChange={(e) => setCashBakiPhone(e.target.value)}
+                          className="w-full text-xs bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 outline-none mt-1"
+                        />
+                      )}
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs font-semibold text-slate-500">
+                    সঠিক পরিমাণ টাকা গ্রহণ করা হচ্ছে
+                  </div>
+                )
+              })()}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCashModalOpen(false)
+                    broadcastDisplayState('ACTIVE_BILLING', false)
+                  }}
+                  className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-semibold hover:bg-slate-50"
+                >
+                  বাতিল (Esc)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCashCheckoutConfirm}
+                  disabled={isProcessing}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  {isProcessing ? "সম্পন্ন হচ্ছে..." : "ক্যাশ বিক্রয় সম্পন্ন করুন (Enter)"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Success Modal */}
       {completedSale && (

@@ -92,6 +92,22 @@ Keep this digital token for warranty coverage & repairs.
             <span className="text-3xl font-black text-slate-900 tracking-tight">৳{Number(sale.total).toLocaleString()}</span>
           </div>
 
+          {/* Change to return banner */}
+          {sale.changeGiven > 0 && (
+            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex justify-between items-center text-emerald-900">
+              <span className="text-xs font-bold">ফেরত দিন (Change to return):</span>
+              <span className="text-xl font-black text-emerald-700 tabular-nums">৳{Number(sale.changeGiven).toLocaleString()}</span>
+            </div>
+          )}
+
+          {/* Discount applied banner */}
+          {Number(sale.discount || 0) > 0 && (
+            <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 rounded-xl flex justify-between items-center text-amber-900 text-xs font-semibold">
+              <span>ছাড় / ডিসকাউন্ট (Discount):</span>
+              <span className="font-bold text-amber-700 tabular-nums">-৳{Number(sale.discount).toLocaleString()}</span>
+            </div>
+          )}
+
           {/* Customer WhatsApp input if needed */}
           {showPhoneInput && (
             <div className="mb-4 p-3 bg-emerald-50 rounded-xl border border-emerald-200">

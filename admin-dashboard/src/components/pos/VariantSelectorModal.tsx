@@ -25,43 +25,51 @@ export function VariantSelectorModal({ product, isOpen, onClose, onSelect }: { p
         {/* Variant List */}
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50 custom-scrollbar">
           <div className="grid gap-3">
-            {product.variants?.filter((v: any) => v.status === 'ACTIVE').map((variant: any) => {
-              const price = Number(variant.posPrice || variant.retailPrice || product.sellingPrice || 0);
-              const attrs = variant.attributes?.map((a: any) => a.attributeValue?.value).join(' / ') || '';
-              
-              return (
-                <button
-                  key={variant.id}
-                  onClick={() => {
-                    onSelect(variant, product);
-                    onClose();
-                  }}
-                  className="w-full text-left bg-white border border-slate-200 rounded-xl p-4 hover:border-indigo-500 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between group"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-slate-900 text-lg group-hover:text-indigo-700 transition-colors">
-                      {attrs || 'Standard Variant'}
-                    </span>
-                    <span className="text-sm text-slate-500">SKU: {variant.sku}</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <span className="font-bold text-indigo-600 text-lg">
-                      ৳{price.toLocaleString()}
-                    </span>
-                    <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Search className="w-4 h-4" /> {/* Or Plus */}
+            {(() => {
+              const activeVariants = (product.variants || []).filter((v: any) => v.status === 'ACTIVE' || !v.status);
+              const variantsToDisplay = activeVariants.length > 0 ? activeVariants : [
+                {
+                  id: product.id,
+                  sku: product.code || product.sku || `SKU-${product.id.slice(0, 8)}`,
+                  retailPrice: Number(product.sellingPrice || 0),
+                  posPrice: Number(product.sellingPrice || 0),
+                  status: 'ACTIVE',
+                  attributes: []
+                }
+              ];
+
+              return variantsToDisplay.map((variant: any) => {
+                const price = Number(variant.posPrice || variant.retailPrice || product.sellingPrice || 0);
+                const attrs = variant.attributes?.map((a: any) => a.attributeValue?.value).join(' / ') || '';
+                
+                return (
+                  <button
+                    key={variant.id}
+                    onClick={() => {
+                      onSelect(variant, product);
+                      onClose();
+                    }}
+                    className="w-full text-left bg-white border border-slate-200 rounded-xl p-4 hover:border-indigo-500 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between group"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-slate-900 text-lg group-hover:text-indigo-700 transition-colors">
+                        {attrs || 'Standard Variant'}
+                      </span>
+                      <span className="text-sm text-slate-500">SKU: {variant.sku}</span>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
-            
-            {(!product.variants || product.variants.filter((v: any) => v.status === 'ACTIVE').length === 0) && (
-              <div className="text-center p-8 text-slate-500">
-                No active variants available for this product.
-              </div>
-            )}
+                    
+                    <div className="flex items-center gap-4">
+                      <span className="font-bold text-indigo-600 text-lg">
+                        ৳{price.toLocaleString()}
+                      </span>
+                      <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Search className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </button>
+                );
+              });
+            })()}
           </div>
         </div>
       </div>

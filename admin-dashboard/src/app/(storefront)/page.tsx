@@ -403,6 +403,12 @@ export default function StorefrontHomePage() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
               <Link
+                href="/cv-studio"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 text-slate-950 font-black text-sm transition-all shadow-lg shadow-cyan-500/30"
+              >
+                <Sparkles className="w-4 h-4 text-slate-950" /> AI CV ও রেজ্যুমে স্টুডিও
+              </Link>
+              <Link
                 href="/account"
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-cyan-500/25"
               >
@@ -421,6 +427,7 @@ export default function StorefrontHomePage() {
                 <Search className="w-4 h-4" /> আবেদন ও অর্ডার ট্র্যাকিং
               </Link>
             </div>
+
           </div>
 
           {/* Core Feature Pillars */}

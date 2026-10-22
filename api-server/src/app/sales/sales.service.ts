@@ -16,6 +16,7 @@ export interface CreateSaleDto {
   warehouseId: string;
   customerId?: string;
   idempotencyKey?: string;
+  discount?: string | number;
   lines: Array<{
     variantId: string;
     quantity: string | number;
@@ -128,8 +129,11 @@ export class SalesService {
       }
     }
 
-    const totalDiscount = new Prisma.Decimal(0); // We only support line discounts for now to keep it simple, or can implement sale-level discount later
+    const totalDiscount = data.discount ? new Prisma.Decimal(data.discount) : new Prisma.Decimal(0);
+    if (totalDiscount.lt(0)) throw new BadRequestException('Sale discount cannot be negative.');
+    if (totalDiscount.gt(subtotal)) throw new BadRequestException('Sale discount cannot exceed subtotal.');
     const grandTotal = subtotal.sub(totalDiscount);
+
 
     // Payments
     let totalPaid = new Prisma.Decimal(0);
