@@ -743,6 +743,33 @@ export const demoStore = {
     return { success: true };
   },
 
+  getSalesHistory() {
+    return this.store.salesHistory;
+  },
+
+  getExpenses() {
+    return this.store.expenses;
+  },
+
+  getCashRegisterSummary() {
+    return {
+      openingBalance: this.store.cashRegister.openingBalance,
+      isClosed: this.store.cashRegister.isClosed,
+      cashInDrawer: this.store.cashRegister.openingBalance,
+      expectedClosingBalance: this.store.cashRegister.openingBalance
+    };
+  },
+
+  getBakiLedger() {
+    return {
+      totalDueBdt: 1500,
+      totalCustomers: 2,
+      customers: [
+        { id: 'baki-1', customerName: 'Md. Al-Amin', phone: '01711223344', dueAmount: 1500, lastDate: '2026-10-21' }
+      ]
+    };
+  },
+
   // --- TRACKING ---
   track(query: string) {
     const cleanQ = query.toLowerCase().trim();
