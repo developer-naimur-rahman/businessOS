@@ -11,7 +11,7 @@ import {
   Receipt, CircleDollarSign, Sparkles, Bot, RotateCcw,
   Building2, Barcode, Gift, Send, Star, ShieldAlert,
   Monitor, BookOpen, Wrench, ShieldCheck, ClipboardList, Award,
-  Smartphone, Printer, Cpu, Database, ExternalLink, QrCode
+  Smartphone, Printer, Cpu, Database, ExternalLink, QrCode, Calendar
 } from "lucide-react"
 
 interface SidebarProps {
@@ -45,6 +45,8 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       label: "Shop & Studio Operations",
       items: [
         { name: "🛠️ Service & Print Jobs", href: "/admin/service-jobs", icon: Wrench },
+        { name: "🌐 Service Knowledge Base", href: "/admin/service-knowledge", icon: Sparkles },
+        { name: "📅 Service Scheduling", href: "/admin/service-scheduling", icon: Calendar },
         { name: "🛡️ Serial & Warranty Desk", href: "/admin/warranty", icon: ShieldCheck },
         { name: "🖥️ Quotations & PC Builder", href: "/admin/quotations", icon: Cpu },
         { name: "🖨️ Machine & Printer Health", href: "/admin/machine-health", icon: Wrench },

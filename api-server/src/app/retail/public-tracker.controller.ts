@@ -14,6 +14,88 @@ export class PublicTrackerController {
     const query = rawQuery.trim();
     const queryLower = query.toLowerCase();
 
+    // 0. Check InternetServiceApplication (Internet & Citizen Services)
+    const internetAppLogs = await this.prisma.auditLog.findMany({
+      where: { entityType: 'InternetServiceApplication' },
+      take: 100,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const matchedApp = internetAppLogs.find(l => {
+      const data = (l.newData as any) || {};
+      const cleanPhone = (data.customerPhone || '').replace(/[^0-9]/g, '');
+      const cleanQ = query.replace(/[^0-9]/g, '');
+      return (
+        data.referenceNumber?.toLowerCase() === queryLower ||
+        (cleanQ.length >= 7 && cleanPhone.includes(cleanQ)) ||
+        data.customerName?.toLowerCase().includes(queryLower)
+      );
+    });
+
+    if (matchedApp) {
+      const app = (matchedApp.newData as any) || {};
+      const statusMap: Record<string, { label: string; step: number; color: string }> = {
+        DRAFT: { label: 'ড্রাফট প্রস্তুত (Draft)', step: 1, color: 'slate' },
+        AWAITING_CUSTOMER_INFO: { label: 'অতিরিক্ত তথ্যের অপেক্ষা (Waiting for Info)', step: 1, color: 'amber' },
+        AWAITING_PAYMENT: { label: 'পেমেন্ট যাচাইয়ের অপেক্ষায় (Waiting for Payment)', step: 1, color: 'amber' },
+        SUBMITTED_FOR_REVIEW: { label: 'আবেদন জমা হয়েছে (Under Review)', step: 1, color: 'blue' },
+        DOCUMENTS_VERIFIED: { label: 'কাগজপত্র যাচাই সম্পন্ন (Documents Verified)', step: 2, color: 'blue' },
+        READY_FOR_PROCESSING: { label: 'প্রসেসিংয়ের জন্য প্রস্তুত (Ready for Desk Processing)', step: 2, color: 'emerald' },
+        IN_PROGRESS: { label: 'অফিসিয়াল ফরম পূরণ চলছে (In Progress)', step: 3, color: 'blue' },
+        AWAITING_OFFICIAL_SUBMISSION: { label: 'সরকারি পোর্টালে সাবমিটের অপেক্ষায়', step: 3, color: 'amber' },
+        SUBMITTED_TO_AUTHORITY: { label: 'সরকারি কর্তৃপক্ষের কাছে দাখিলকৃত', step: 4, color: 'blue' },
+        READY_FOR_APPROVAL: { label: 'আবেদনকারীর চূড়ান্ত অনুমোদনের অপেক্ষায়', step: 4, color: 'emerald' },
+        COMPLETED: { label: 'সম্পন্ন ও রেডি (Application Completed)', step: 5, color: 'emerald' },
+        READY_FOR_PICKUP: { label: 'দোকান কাউন্টার থেকে সংগ্রহের জন্য প্রস্তুত', step: 5, color: 'emerald' },
+        DELIVERED: { label: 'গ্রাহককে ডেলিভারি দেওয়া হয়েছে (Delivered)', step: 5, color: 'slate' },
+        CANCELLED: { label: 'বাতিল করা হয়েছে (Cancelled)', step: 1, color: 'rose' }
+      };
+
+      const currentStatusInfo = statusMap[app.status] || { label: app.status || 'Received', step: 1, color: 'blue' };
+
+      return {
+        found: true,
+        type: 'INTERNET_SERVICE_APP',
+        referenceNumber: app.referenceNumber,
+        title: `${app.serviceTitleBn || 'ইন্টারনেট সেবা'} — ${app.serviceTitleEn || 'Citizen Service'}`,
+        serviceSlug: app.serviceSlug,
+        customerName: app.customerName ? app.customerName.slice(0, 3) + '***' : 'Customer',
+        customerPhone: app.customerPhone ? app.customerPhone.slice(0, 5) + '******' : null,
+        status: app.status,
+        statusLabel: currentStatusInfo.label,
+        currentStep: currentStatusInfo.step,
+        steps: [
+          { index: 1, name: 'আবেদন দাখিল (Submitted)', completed: currentStatusInfo.step >= 1 },
+          { index: 2, name: 'কাগজপত্র ও ফি ভেরিফাইড', completed: currentStatusInfo.step >= 2 },
+          { index: 3, name: 'অফিসিয়াল ফরম পূরণ', completed: currentStatusInfo.step >= 3 },
+          { index: 4, name: 'অনুমোদন ও কনফার্মেশন', completed: currentStatusInfo.step >= 4 },
+          { index: 5, name: 'ডেলিভারি / প্রিন্ট রেডি', completed: currentStatusInfo.step >= 5 }
+        ],
+        financials: {
+          officialGovtFeeBdt: Number(app.financials?.officialGovtFeeBdt || 0),
+          shopServiceChargeBdt: Number(app.financials?.shopServiceChargeBdt || 0),
+          printingOrAddonBdt: Number(app.financials?.printingOrAddonBdt || 0),
+          totalBdt: Number(app.financials?.totalAmountBdt || 0),
+          advancePaidBdt: Number(app.financials?.advancePaidBdt || 0),
+          dueAmountBdt: Number(app.financials?.dueAmountBdt || 0),
+          isFullyPaid: Number(app.financials?.dueAmountBdt || 0) <= 0,
+          paymentStatus: app.paymentEvidence?.paymentStatus || (Number(app.financials?.dueAmountBdt || 0) <= 0 ? 'VERIFIED' : 'PENDING_VERIFICATION'),
+          transactionId: app.paymentEvidence?.transactionId || null
+        },
+        deliveryMode: app.deliveryMode || 'ONLINE_DOWNLOAD',
+        deliverables: app.deliverables || [],
+        missingDocuments: app.missingDocuments || [],
+        canCustomerApprove: app.status === 'READY_FOR_APPROVAL',
+        dates: {
+          receivedAt: app.createdAt || matchedApp.createdAt
+        },
+        assignedStaff: app.assignedStaffName || 'Internet Service Specialist',
+        pickupNote: app.deliveryMode === 'SHOP_PICKUP'
+          ? `Show Token #${app.referenceNumber} at our service counter to collect your printed application documents.`
+          : 'You can download your application confirmation slip, resized photo, or admit card directly below.'
+      };
+    }
+
     // 1. Check ServiceJobTicket (AuditLog)
     const jobLogs = await this.prisma.auditLog.findMany({
       where: { entityType: 'ServiceJobTicket' },

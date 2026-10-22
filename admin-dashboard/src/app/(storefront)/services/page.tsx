@@ -3,140 +3,292 @@ import React, { useEffect, useState, useMemo, Suspense } from "react"
 import { api } from "../../../lib/api-client"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { MediaImage } from "../../../components/ui/media-image"
-import { Printer, Sparkles, ArrowRight } from "lucide-react"
-import { STATIC_CATALOG } from "../../../config/static-catalog"
+import {
+  Sparkles,
+  ArrowRight,
+  FileText,
+  Clock,
+  CheckCircle2,
+  Calendar,
+  HelpCircle,
+  Camera,
+  Search,
+  ExternalLink,
+  ChevronRight,
+  ShieldCheck,
+  SendHorizontal
+} from "lucide-react"
 
 function ServicesContent() {
   const searchParams = useSearchParams()
-  const categoryParam = searchParams.get("category") || ""
+  const categoryParam = searchParams.get("category") || "ALL"
 
-  const [services, setServices] = useState<any[]>([])
+  const [internetServices, setInternetServices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState(categoryParam)
 
   useEffect(() => {
-    async function fetchCatalog() {
+    async function loadServices() {
       try {
-        const res = await api.get('/public/catalog/products')
-        const items = res.data.items || res.data || []
-        const srvs = items.filter((p: any) => p.type === 'SERVICE')
-        if (srvs.length > 0) {
-          setServices(srvs)
-        } else {
-          setServices(STATIC_CATALOG.filter(i => i.type === 'SERVICE'))
+        const res = await api.get('/public/services')
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setInternetServices(res.data)
         }
       } catch (err) {
-        console.error("Failed to load catalog, using static fallback", err)
-        setServices(STATIC_CATALOG.filter(i => i.type === 'SERVICE'))
+        console.error("Failed to load services from API", err)
       } finally {
         setLoading(false)
       }
     }
-    fetchCatalog()
+    loadServices()
   }, [])
 
-  const filteredServices = useMemo(() => {
-    if (!categoryParam) return services
-    const cat = categoryParam.toLowerCase().trim()
-    return services.filter((s: any) => 
-      s.category?.name?.toLowerCase().includes(cat) ||
-      s.name?.toLowerCase().includes(cat) ||
-      s.description?.toLowerCase().includes(cat)
-    )
-  }, [services, categoryParam])
+  const categories = [
+    { key: 'ALL', labelBn: 'সকল অনলাইন সেবা', labelEn: 'All Services' },
+    { key: 'GOVT_JOB', labelBn: 'সরকারি ও টেলিটক চাকরি', labelEn: 'Govt Job Applications' },
+    { key: 'PASSPORT', labelBn: 'ই-পাসপোর্ট নতুন ও নবায়ন', labelEn: 'E-Passport' },
+    { key: 'CIVIL_REG', labelBn: 'জন্ম নিবন্ধন সংশোধন', labelEn: 'Birth Registration' },
+    { key: 'NID', labelBn: 'NID ও ভোটার কার্ড', labelEn: 'NID & Voter Services' },
+    { key: 'VISA', labelBn: 'ভিসা ও দূতাবাস ডকুমেন্ট', labelEn: 'Visa Assistance' },
+    { key: 'TAX_TIN', labelBn: 'ই-টিআইএন ও আয়কর', labelEn: 'e-TIN Tax' },
+    { key: 'PHOTO_DOC', labelBn: 'ফটো স্টুডিও ও প্রিন্ট', labelEn: 'Photo Studio & Print' },
+  ]
+
+  const filtered = useMemo(() => {
+    return internetServices.filter(s => {
+      const matchCat = selectedCategory === 'ALL' || s.category === selectedCategory
+      const q = search.toLowerCase().trim()
+      const matchSearch = !q ||
+        s.titleBn?.toLowerCase().includes(q) ||
+        s.titleEn?.toLowerCase().includes(q) ||
+        s.descriptionBn?.toLowerCase().includes(q) ||
+        s.category?.toLowerCase().includes(q)
+      return matchCat && matchSearch
+    })
+  }, [internetServices, selectedCategory, search])
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-10 md:py-20 animate-in fade-in duration-500">
+    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-10 md:py-16 animate-in fade-in duration-500">
       
-      {/* Page Header */}
-      <div className="mb-12 max-w-3xl">
-        <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-4">
-          Professional Services
+      {/* Hero Header */}
+      <div className="mb-10 text-center max-w-4xl mx-auto space-y-4">
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-800 text-xs font-bold uppercase tracking-wider">
+          <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
+          AI-Powered Internet & Citizen Service Center
+        </div>
+        <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-slate-900 leading-tight">
+          সরকারি ও অনলাইন সেবার <span className="text-cyan-600">স্মার্ট সেন্টার</span>
         </h1>
-        <p className="text-base sm:text-lg text-slate-500 leading-relaxed">
-          Beyond physical products, we offer specialized business services. From high-resolution printing and photocopy to professional studio photography and design studio workflows.
+        <p className="text-slate-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+          চাকরির আবেদন, ই-পাসপোর্ট, জন্ম নিবন্ধন ও NID সংশোধনের নির্ভুল সমাধান। ঘরে বসে রিকোয়েস্ট সাবমিট করুন অথবা দোকানে এসে সময় বাঁচাতে অ্যাপয়েন্টমেন্ট বুকিং করুন।
         </p>
+
+        {/* Quick Action Navigation Bar */}
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/service-helper"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 shadow-md transition-all"
+          >
+            <HelpCircle className="w-4 h-4 text-cyan-400" />
+            স্মার্ট রিকোয়ারমেন্ট গাইড
+          </Link>
+          <Link
+            href="/service-request"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-700 shadow-md shadow-cyan-600/20 transition-all"
+          >
+            <SendHorizontal className="w-4 h-4" />
+            অনলাইনে আবেদন ফরম
+          </Link>
+          <Link
+            href="/appointments"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-50 shadow-sm transition-all"
+          >
+            <Calendar className="w-4 h-4 text-emerald-600" />
+            দোকান অ্যাপয়েন্টমেন্ট বুকিং
+          </Link>
+          <Link
+            href="/track"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-50 shadow-sm transition-all"
+          >
+            <ShieldCheck className="w-4 h-4 text-purple-600" />
+            আবেদন ট্র্যাকিং
+          </Link>
+        </div>
       </div>
 
-      {/* Featured Banner for Printing Studio */}
-      <div className="mb-12 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-700/60">
-        <div className="space-y-3 max-w-xl z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#04BBFD]/20 text-[#04BBFD] text-xs font-bold uppercase tracking-wider border border-[#04BBFD]/30">
-            <Sparkles className="w-3.5 h-3.5" /> Featured Service
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Online Document & Banner Printing</h2>
-          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-            Need thesis binding, laser photocopy, PVC vinyl banners, or passport photos? Use our instant price calculator and upload files online.
-          </p>
+      {/* Search & Category Filter Toolbar */}
+      <div className="mb-8 space-y-4 bg-white p-4 sm:p-6 rounded-3xl border border-slate-200/80 shadow-sm">
+        <div className="relative max-w-xl mx-auto">
+          <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="যেকোনো সেবা খুঁজুন (যেমন: পাসপোর্ট, চাকরির ছবি সাইজ, জন্ম নিবন্ধন...)"
+            className="w-full pl-12 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:bg-white transition-all text-sm sm:text-base"
+          />
         </div>
-        <Link 
-          href="/printing" 
-          className="z-10 bg-[#04BBFD] hover:bg-[#03a0d9] text-white px-7 py-3.5 rounded-full font-bold text-sm inline-flex items-center gap-2 shadow-lg shadow-[#04BBFD]/25 transition-all shrink-0"
-        >
-          <Printer className="w-4 h-4" /> Open Printing Studio <ArrowRight className="w-4 h-4" />
-        </Link>
-        <div className="absolute right-0 bottom-0 opacity-10 pointer-events-none translate-x-12 translate-y-12">
-          <Printer className="w-80 h-80" />
+
+        {/* Category Chips */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none justify-start sm:justify-center">
+          {categories.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setSelectedCategory(c.key)}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
+                selectedCategory === c.key
+                  ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/25"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+              }`}
+            >
+              {c.labelBn}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Services Grid */}
+      {/* Service Cards Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {[1, 2].map((i) => (
-            <div key={i} className="animate-pulse">
-              <div className="bg-slate-100 aspect-[16/9] md:aspect-[4/3] rounded-3xl mb-4"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-72 rounded-3xl bg-slate-100 animate-pulse border border-slate-200" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 p-8">
+          <HelpCircle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-600 font-medium text-lg mb-2">কোনো সেবা খুঁজে পাওয়া যায়নি।</p>
+          <p className="text-slate-400 text-sm mb-6">অন্য কোনো নাম বা ক্যাটাগরি দিয়ে চেষ্টা করুন।</p>
+          <button
+            onClick={() => { setSearch(""); setSelectedCategory("ALL"); }}
+            className="px-6 py-2.5 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"
+          >
+            সব সেবা দেখুন
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((service) => (
+            <div
+              key={service.slug}
+              className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden group hover:border-cyan-300"
+            >
+              <div className="p-6 space-y-4">
+                {/* Header Badge */}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+                    {service.targetAudience || 'সাধারণ নাগরিক'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full text-xs font-medium border border-emerald-100">
+                    <CheckCircle2 className="w-3 h-3" /> সরকারি পোর্টালে ভেরিফাইড
+                  </span>
+                </div>
+
+                {/* Title & Description */}
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 group-hover:text-cyan-700 transition-colors line-clamp-2">
+                    {service.titleBn}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    {service.titleEn}
+                  </p>
+                  <p className="text-sm text-slate-500 mt-2 line-clamp-3 leading-relaxed">
+                    {service.descriptionBn}
+                  </p>
+                </div>
+
+                {/* Specs Pill Summary */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
+                  <div className="inline-flex items-center gap-1 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 font-medium">
+                    <Clock className="w-3.5 h-3.5 text-cyan-600" />
+                    {service.estimatedProcessingTime || '১৫-৩০ মিনিট'}
+                  </div>
+                  <div className="inline-flex items-center gap-1 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100 font-medium">
+                    <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                    {service.requiredDocs?.length || 3}টি প্রমাণক কাগজ
+                  </div>
+                  {service.photoSpecs && (
+                    <div className="inline-flex items-center gap-1 bg-cyan-50/80 px-2.5 py-1 rounded-lg border border-cyan-100 font-medium text-cyan-800">
+                      <Camera className="w-3.5 h-3.5 text-cyan-600" />
+                      {service.photoSpecs.widthPx}x{service.photoSpecs.heightPx} px ছবি
+                    </div>
+                  )}
+                </div>
+
+                {/* Granular Fee Breakdown */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">সরকারি ফি</span>
+                    <span className="text-sm font-bold text-slate-700">
+                      {service.officialGovtFeeBdt > 0 ? `৳${service.officialGovtFeeBdt.toLocaleString()}` : 'সরকারি ফি নেই'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-semibold text-slate-400 block uppercase tracking-wider">দোকান চার্জ</span>
+                    <span className="text-base font-extrabold text-cyan-700">
+                      ৳{service.shopServiceChargeBdt.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div className="p-4 bg-slate-50/70 border-t border-slate-100 grid grid-cols-2 gap-2">
+                <Link
+                  href={`/service-helper?service=${service.slug}`}
+                  className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 text-xs font-bold text-center flex items-center justify-center gap-1 shadow-sm transition-all"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-cyan-600" />
+                  কাগজপত্র ও গাইড
+                </Link>
+                <Link
+                  href={`/service-request?service=${service.slug}`}
+                  className="px-3 py-2 rounded-xl bg-cyan-600 text-white hover:bg-cyan-700 text-xs font-bold text-center flex items-center justify-center gap-1 shadow-md shadow-cyan-600/20 transition-all"
+                >
+                  <SendHorizontal className="w-3.5 h-3.5" />
+                  আবেদন করুন
+                </Link>
+              </div>
             </div>
           ))}
         </div>
-      ) : filteredServices.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6">
-          <p className="text-slate-500 text-lg mb-4">No services available for this selection.</p>
-          <Link href="/services" className="control-button-primary rounded-full px-6 h-11 inline-flex items-center text-sm font-semibold">
-            View All Services
+      )}
+
+      {/* Featured Banner for Physical Printing & Custom Studio */}
+      <div className="mt-16 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-700/60">
+        <div className="space-y-3 max-w-xl z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/20 text-cyan-300 text-xs font-bold uppercase tracking-wider border border-cyan-400/30">
+            <Sparkles className="w-3.5 h-3.5" /> Zero-Pendrive File Drop
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">পেনড্রাইভ ছাড়াই সরাসরি প্রিন্ট পাঠান</h2>
+          <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
+            দোকানে না দাঁড়িয়ে মোবাইল থেকে সরাসরি পিডিএফ বা ছবি ড্রপ করুন। কাউন্টারে এসে তাৎক্ষণিক প্রিন্ট ও ফটোকপি সংগ্রহ করুন।
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3 z-10">
+          <Link 
+            href="/upload-print" 
+            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-6 py-3 rounded-full font-bold text-sm inline-flex items-center gap-2 shadow-lg transition-all"
+          >
+            <SendHorizontal className="w-4 h-4" /> ফাইল ড্রপ করুন <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link 
+            href="/appointments" 
+            className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-3 rounded-full font-bold text-sm inline-flex items-center gap-2 transition-all"
+          >
+            <Calendar className="w-4 h-4" /> অ্যাপয়েন্টমেন্ট শিডিউল
           </Link>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredServices.map((service: any) => (
-            <Link 
-              href={`/services/${service.id}`} 
-              key={service.id} 
-              className="group block relative rounded-3xl overflow-hidden aspect-[16/9] md:aspect-[4/3] interactive-item border border-slate-200/80 shadow-sm"
-            >
-              <MediaImage 
-                asset={service.imageUrl} 
-                fallbackUrl="https://images.unsplash.com/photo-1588508065123-287b28e013da?q=80&w=800&auto=format&fit=crop" 
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent"></div>
-              
-              <div className="absolute inset-0 p-6 sm:p-8 flex flex-col justify-end">
-                <h3 className="text-2xl sm:text-3xl font-extrabold text-white mb-2">{service.name}</h3>
-                <p className="text-slate-300 mb-6 text-sm sm:text-base max-w-lg leading-relaxed line-clamp-2">
-                  {service.description || 'Specialized service backed by experienced technicians.'}
-                </p>
-                
-                <div className="flex items-center justify-between mt-auto">
-                  <span className="inline-block font-bold text-sm bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white border border-white/20">
-                    From ৳{Number(service.sellingPrice).toLocaleString()}
-                  </span>
-                  <span className="text-white text-sm bg-[#04BBFD] hover:bg-[#03a0d9] px-5 py-2 rounded-full font-bold transition-colors shadow-sm">
-                    View Details
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+      </div>
+
     </div>
   )
 }
 
 export default function ServicesPage() {
   return (
-    <Suspense fallback={<div className="max-w-[1400px] mx-auto px-6 py-20 text-center text-slate-400">Loading services...</div>}>
+    <Suspense fallback={<div className="max-w-[1400px] mx-auto p-12 text-center text-slate-400">Loading services...</div>}>
       <ServicesContent />
     </Suspense>
   )

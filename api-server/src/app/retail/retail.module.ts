@@ -28,6 +28,18 @@ import { HrPayrollService } from './hr-payroll.service';
 import { BackupVaultController } from './backup-vault.controller';
 import { BackupVaultService } from './backup-vault.service';
 
+// AI-Powered Internet Service Center Additions
+import { ServiceKnowledgeService } from './service-knowledge.service';
+import { PublicServicesController, AdminServiceKnowledgeController } from './service-knowledge.controller';
+import { CustomerVaultService } from './customer-vault.service';
+import { PublicCustomerVaultController, AdminCustomerVaultController } from './customer-vault.controller';
+import { ServiceSchedulingService } from './service-scheduling.service';
+import { PublicAppointmentsController, AdminServiceSchedulingController } from './service-scheduling.controller';
+import { ServiceApplicationsService } from './service-applications.service';
+import { PublicServiceRequestController, AdminServiceApplicationsController } from './service-applications.controller';
+import { ServiceAssistantService } from './service-assistant.service';
+import { PublicServiceAssistantController } from './service-assistant.controller';
+
 @Module({
   imports: [PrismaModule],
   controllers: [
@@ -44,6 +56,15 @@ import { BackupVaultService } from './backup-vault.service';
     AiCopilotController,
     HrPayrollController,
     BackupVaultController,
+    PublicServicesController,
+    AdminServiceKnowledgeController,
+    PublicCustomerVaultController,
+    AdminCustomerVaultController,
+    PublicAppointmentsController,
+    AdminServiceSchedulingController,
+    PublicServiceRequestController,
+    AdminServiceApplicationsController,
+    PublicServiceAssistantController,
   ],
   providers: [
     HybridIntelligenceService,
@@ -58,6 +79,11 @@ import { BackupVaultService } from './backup-vault.service';
     AiCopilotService,
     HrPayrollService,
     BackupVaultService,
+    ServiceKnowledgeService,
+    CustomerVaultService,
+    ServiceSchedulingService,
+    ServiceApplicationsService,
+    ServiceAssistantService,
   ],
   exports: [
     BakiKhataService,
@@ -71,6 +97,11 @@ import { BackupVaultService } from './backup-vault.service';
     AiCopilotService,
     HrPayrollService,
     BackupVaultService,
+    ServiceKnowledgeService,
+    CustomerVaultService,
+    ServiceSchedulingService,
+    ServiceApplicationsService,
+    ServiceAssistantService,
   ],
 })
 export class RetailModule {}

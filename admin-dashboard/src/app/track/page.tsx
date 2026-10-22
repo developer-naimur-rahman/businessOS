@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { api } from '../../lib/api-client';
 import { 
   Search, ShieldCheck, Wrench, Printer, ShoppingBag, CheckCircle2, 
-  Clock, AlertTriangle, ArrowRight, Phone, MessageSquare, ExternalLink
+  Clock, AlertTriangle, ArrowRight, Phone, MessageSquare, ExternalLink, Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -91,6 +91,7 @@ export default function PublicTrackerPage() {
                     {result.type === 'SERVICE_JOB' ? <Wrench className="w-5 h-5" /> :
                      result.type === 'PRINT_DROP' ? <Printer className="w-5 h-5" /> :
                      result.type === 'WARRANTY_RECORD' ? <ShieldCheck className="w-5 h-5" /> :
+                     result.type === 'INTERNET_SERVICE_APP' ? <Sparkles className="w-5 h-5 text-cyan-400" /> :
                      <ShoppingBag className="w-5 h-5" />}
                   </div>
                   <div>
@@ -116,10 +117,10 @@ export default function PublicTrackerPage() {
                 )}
               </div>
 
-              {/* Visual 4-Step Progress Bar */}
+              {/* Visual Multi-Step Progress Bar */}
               {result.steps && (
                 <div className="py-2">
-                  <div className="grid grid-cols-4 gap-2 relative">
+                  <div className={`grid gap-2 relative ${result.steps.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
                     {result.steps.map((st: any, idx: number) => (
                       <div key={idx} className="flex flex-col items-center text-center">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mb-1.5 transition-colors ${
@@ -129,7 +130,7 @@ export default function PublicTrackerPage() {
                         }`}>
                           {st.completed ? <CheckCircle2 className="w-4 h-4" /> : st.index}
                         </div>
-                        <span className={`text-[11px] font-semibold ${st.completed ? 'text-slate-200' : 'text-slate-500'}`}>
+                        <span className={`text-[10px] sm:text-[11px] font-semibold leading-tight ${st.completed ? 'text-slate-200' : 'text-slate-500'}`}>
                           {st.name}
                         </span>
                       </div>
@@ -138,10 +139,59 @@ export default function PublicTrackerPage() {
                 </div>
               )}
 
+              {/* Deliverables Section for Internet Service Center Applications */}
+              {result.type === 'INTERNET_SERVICE_APP' && result.deliverables && result.deliverables.length > 0 && (
+                <div className="p-4 bg-emerald-950/30 border border-emerald-800/60 rounded-2xl space-y-3">
+                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
+                    <CheckCircle2 className="w-4 h-4" /> ডাউনলোডের জন্য প্রস্তুত অফিসিয়াল কপি (Deliverables)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {result.deliverables.map((deliv: any) => (
+                      <a
+                        key={deliv.id}
+                        href={deliv.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        download
+                        className="p-3 bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-700/50 rounded-xl flex items-center justify-between text-xs font-bold text-white transition-all"
+                      >
+                        <span className="truncate">📄 {deliv.title}</span>
+                        <span className="text-emerald-300 font-bold shrink-0">ডাউনলোড ⬇</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Customer Draft Approval Action */}
+              {result.canCustomerApprove && (
+                <div className="p-4 bg-cyan-950/30 border border-cyan-800/60 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-cyan-300 block">আবেদন ড্রাফট যাচাই ও অনুমোদন:</span>
+                    <p className="text-[11px] text-slate-400">আপনার তথ্যের ড্রাফট প্রস্তুত হয়েছে। অনুমোদন দিলে চূড়ান্ত সরকারি কপি সম্পন্ন হবে।</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.post(`/public/service-request/${result.referenceNumber}/approve`, { notes: 'Approved by customer via tracker' });
+                        toast.success('ড্রাফট সফলভাবে অনুমোদিত হয়েছে!');
+                        const res = await api.get('/public/track', { params: { query: result.referenceNumber } });
+                        if (res.data?.found) setResult(res.data);
+                      } catch (e) {
+                        toast.error('অনুমোদন ব্যর্থ হয়েছে।');
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-extrabold shadow-md transition-all shrink-0"
+                  >
+                    ✓ ড্রাফট অনুমোদন করুন
+                  </button>
+                </div>
+              )}
+
               {/* Financial & Pickup Box */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-2xl space-y-1">
-                  <span className="text-[11px] text-slate-400 block">বিল ও পরিশোধ পরিস্থিতি (Payment Due)</span>
+                  <span className="text-[11px] text-slate-400 block">বিল ও পরিশোধ পরিস্থিতি (Payment Status)</span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-black text-white">৳{result.financials?.totalBdt?.toLocaleString()}</span>
                     {result.financials?.dueAmountBdt > 0 ? (
@@ -152,6 +202,16 @@ export default function PublicTrackerPage() {
                       <span className="text-xs font-bold text-emerald-400 font-mono">(পরিশোধিত / Paid)</span>
                     )}
                   </div>
+                  {result.financials?.officialGovtFeeBdt > 0 && (
+                    <span className="text-[10px] text-slate-400 block">
+                      সরকারি ফি: ৳{result.financials.officialGovtFeeBdt} • দোকান চার্জ: ৳{result.financials.shopServiceChargeBdt}
+                    </span>
+                  )}
+                  {result.financials?.transactionId && (
+                    <span className="text-[10px] text-cyan-400 font-mono block">
+                      TrxID: {result.financials.transactionId} ({result.financials.paymentStatus})
+                    </span>
+                  )}
                 </div>
 
                 <div className="p-4 bg-indigo-950/20 border border-indigo-900/40 rounded-2xl flex flex-col justify-between">
