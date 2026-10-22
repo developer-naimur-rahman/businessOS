@@ -388,7 +388,14 @@ Respond strictly in JSON format (no markdown, no backticks):
       appointmentToken?: string;
     }
   ): Promise<InternetServiceApplication> {
-    if (!dto.customerName || !dto.customerPhone || !dto.serviceSlug) {
+    let customerName = dto.customerName?.trim();
+    if (!customerName && Array.isArray(dto.fieldValues)) {
+      const en = dto.fieldValues.find(f => f.key === 'applicantNameEn')?.value;
+      const bn = dto.fieldValues.find(f => f.key === 'applicantNameBn')?.value;
+      customerName = en || bn || 'Applicant';
+    }
+
+    if (!customerName || !dto.customerPhone || !dto.serviceSlug) {
       throw new BadRequestException('Customer name, phone number, and service selection are required.');
     }
 
@@ -458,7 +465,7 @@ Respond strictly in JSON format (no markdown, no backticks):
       serviceSlug: serviceDef.slug,
       serviceTitleBn: serviceDef.titleBn,
       serviceTitleEn: serviceDef.titleEn,
-      customerName: dto.customerName.trim(),
+      customerName: customerName.trim(),
       customerPhone: dto.customerPhone.trim(),
       customerEmail: dto.customerEmail?.trim(),
       fieldValues: orderedFieldValues,
@@ -497,7 +504,7 @@ Respond strictly in JSON format (no markdown, no backticks):
           status: 'SUBMITTED_FOR_REVIEW',
           timestamp: nowIso,
           notes: 'Customer submitted prepared application with verified documents & review.',
-          author: dto.customerName,
+          author: customerName,
         },
       ],
       createdAt: nowIso,
@@ -524,7 +531,7 @@ Respond strictly in JSON format (no markdown, no backticks):
 
       await this.vaultService.upsertProfile(organizationId, null, {
         phone: dto.customerPhone,
-        nameEn: dto.customerName,
+        nameEn: customerName,
         nameBn: fieldMap['applicantNameBn'] || '',
         dob: fieldMap['dob'] || '',
         nidNumber: fieldMap['nidNumber'] || '',

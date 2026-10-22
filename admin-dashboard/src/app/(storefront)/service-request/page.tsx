@@ -1,4 +1,5 @@
 "use client"
+
 import React, { useEffect, useState, useMemo, Suspense } from "react"
 import { api } from "../../../lib/api-client"
 import Link from "next/link"
@@ -27,7 +28,11 @@ import {
   Eye,
   Camera,
   Check,
-  Edit3
+  Edit3,
+  Trash2,
+  HelpCircle,
+  Phone,
+  Info
 } from "lucide-react"
 
 interface ExtractedFormField {
@@ -52,51 +57,56 @@ function ServiceRequestContent() {
 
   const [services, setServices] = useState<any[]>([])
   const [selectedSlug, setSelectedSlug] = useState(initialSlug)
-  // Step 1: Service & Consent, Step 2: Identity & Vault, Step 3: Document Uploads,
-  // Step 4: AI Extraction & Review/Correction, Step 5: Payment & Delivery, Step 6: Success
+
+  // EXACT WORKFLOW SEQUENCE REQUESTED:
+  // Step 1: Service Selection & Consent
+  // Step 2: Upload Documents (FIRST step after service selection)
+  // Step 3: AI Extraction & Auto-Filled Form
+  // Step 4: Customer Review, Correction & Optional Vault Prefill
+  // Step 5: Service Request, Quotation & Payment
+  // Step 6: Request Confirmation & Tracking
   const [step, setStep] = useState(1)
 
-  // Form State
-  const [phone, setPhone] = useState("")
-  const [vaultLookupLoading, setVaultLookupLoading] = useState(false)
+  // Step 1: Consent
   const [consentAgreed, setConsentAgreed] = useState(false)
-  const [aiConsentAgreed, setAiConsentAgreed] = useState(true)
 
-  // Applicant Profile
-  const [nameEn, setNameEn] = useState("")
-  const [nameBn, setNameBn] = useState("")
-  const [dob, setDob] = useState("")
-  const [nidNumber, setNidNumber] = useState("")
-  const [fatherNameEn, setFatherNameEn] = useState("")
-  const [motherNameEn, setMotherNameEn] = useState("")
-  const [presentAddress, setPresentAddress] = useState("")
-  const [permanentAddress, setPermanentAddress] = useState("")
-  const [email, setEmail] = useState("")
+  // Step 2: Uploaded Documents State
+  const [uploadedDocs, setUploadedDocs] = useState<Array<{ id: string; docType: string; title: string; fileUrl: string; mimeType: string }>>([])
+  const [dragActive, setDragActive] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
-  // Dynamic Service-Specific Fields & Extraction
-  const [dynamicFieldValues, setDynamicFieldValues] = useState<Record<string, string>>({})
-  const [extractedFields, setExtractedFields] = useState<ExtractedFormField[]>([])
+  // Step 3: AI Extraction State
   const [isExtracting, setIsExtracting] = useState(false)
   const [extractionEngine, setExtractionEngine] = useState<string | null>(null)
   const [extractionConfidence, setExtractionConfidence] = useState<number | null>(null)
+  const [extractionCompleted, setExtractionCompleted] = useState(false)
+  const [extractionError, setExtractionError] = useState<string | null>(null)
+
+  // Step 4: Reviewed & Auto-Filled Form State
+  const [extractedFields, setExtractedFields] = useState<ExtractedFormField[]>([])
   const [conflictsDetected, setConflictsDetected] = useState<any[]>([])
   const [customerConfirmedData, setCustomerConfirmedData] = useState(false)
-
-  // Uploaded Files
-  const [uploadedDocs, setUploadedDocs] = useState<Array<{ id: string; docType: string; title: string; fileUrl: string; mimeType: string }>>([])
   const [customerNotes, setCustomerNotes] = useState("")
 
-  // Payment State
+  // Applicant Contact & Optional Vault State
+  const [contactPhone, setContactPhone] = useState("")
+  const [applicantName, setApplicantName] = useState("")
+  const [customerEmail, setCustomerEmail] = useState("")
+  const [vaultLookupLoading, setVaultLookupLoading] = useState(false)
+  const [vaultFoundProfile, setVaultFoundProfile] = useState<any | null>(null)
+  const [showVaultDrawer, setShowVaultDrawer] = useState(false)
+
+  // Step 5: Payment & Delivery State
   const [paymentMethod, setPaymentMethod] = useState<'BKASH' | 'NAGAD' | 'CASH_AT_COUNTER'>('BKASH')
   const [transactionId, setTransactionId] = useState("")
-  const [paymentScreenshotUrl, setPaymentScreenshotUrl] = useState("")
   const [deliveryMode, setDeliveryMode] = useState<'ONLINE_DOWNLOAD' | 'SHOP_PICKUP' | 'COURIER'>('ONLINE_DOWNLOAD')
   const [deliveryAddress, setDeliveryAddress] = useState("")
 
-  // Submission Result
+  // Step 6: Submission Result
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [createdRefNumber, setCreatedRefNumber] = useState<string | null>(null)
 
+  // Load published services catalog
   useEffect(() => {
     async function loadCatalog() {
       try {
@@ -115,62 +125,47 @@ function ServiceRequestContent() {
     return services.find(s => s.slug === selectedSlug) || services[0]
   }, [services, selectedSlug])
 
-  // Look up reusable profile from Customer Vault by phone
-  const handleVaultLookup = async () => {
-    if (!phone || phone.replace(/[^0-9]/g, '').length < 10) {
-      toast.error("সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।")
-      return
-    }
+  // Handle Document Upload
+  const handleFileUpload = (files: FileList | null, docTypeCategory?: string) => {
+    if (!files || files.length === 0) return
+    setUploadError(null)
 
-    setVaultLookupLoading(true)
-    try {
-      const res = await api.get('/public/customer-vault/lookup', { params: { phone } })
-      if (res.data?.found && res.data?.profile) {
-        const p = res.data.profile
-        setNameEn(p.nameEn || "")
-        setNameBn(p.nameBn || "")
-        setDob(p.dob || "")
-        setNidNumber(p.nidNumber || "")
-        setFatherNameEn(p.fatherNameEn || "")
-        setMotherNameEn(p.motherNameEn || "")
-        setPresentAddress(p.presentAddress || "")
-        setPermanentAddress(p.permanentAddress || "")
-        toast.success("কাস্টমার ভল্ট থেকে পূর্বের সংরক্ষিত তথ্য স্বয়ংক্রিয়ভাবে প্রিপপুলেট করা হয়েছে!")
-      } else {
-        toast.info("ভল্টে কোনো পূর্বের তথ্য পাওয়া যায়নি। নতুন তথ্য পূরণ করুন।")
+    Array.from(files).forEach(file => {
+      // Validate file size (< 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setUploadError(`"${file.name}" ফাইলটি ১০ মেগাবাইটের বেশি। অনুগ্রহ করে ছোট ফাইল আপলোড করুন।`)
+        toast.error(`"${file.name}" ফাইলটি ১০ মেগাবাইটের বেশি।`)
+        return
       }
-    } catch (e) {
-      toast.error("ভল্ট লুকআপে সমস্যা হয়েছে।")
-    } finally {
-      setVaultLookupLoading(false)
-    }
-  }
 
-  // Handle Document Upload (converts to base64 DataURL for safe transmission)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    // Limit size to 10MB
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("ফাইলের সাইজ ১০ মেগাবাইটের কম হতে হবে।")
-      return
-    }
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string
-      const newDoc = {
-        id: `doc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        docType,
-        title: file.name,
-        fileUrl: base64,
-        mimeType: file.type || 'application/octet-stream',
+      // Detect document category
+      let docType = docTypeCategory || 'সহায়ক ডকুমেন্ট'
+      const lower = file.name.toLowerCase()
+      if (lower.includes('nid') || lower.includes('smart') || lower.includes('birth') || lower.includes('brc') || lower.includes('নিবন্ধন')) {
+        docType = 'জাতীয় পরিচয়পত্র / জন্ম নিবন্ধন'
+      } else if (lower.includes('photo') || lower.includes('pic') || lower.includes('ছবি')) {
+        docType = 'পাসপোর্ট সাইজ ছবি (৩০০x৩০০)'
+      } else if (lower.includes('sign') || lower.includes('স্বাক্ষর')) {
+        docType = 'স্বাক্ষর স্ক্যান (৩০০x৮০)'
+      } else if (lower.includes('ssc') || lower.includes('hsc') || lower.includes('cert') || lower.includes('mark') || lower.includes('সনদ')) {
+        docType = 'শিক্ষাগত সার্টিফিকেট / মার্কশিট'
       }
-      setUploadedDocs(prev => [...prev, newDoc])
-      toast.success(`${file.name} সফলভাবে যুক্ত হয়েছে!`)
-    }
-    reader.readAsDataURL(file)
+
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string
+        const newDoc = {
+          id: `doc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          docType,
+          title: file.name,
+          fileUrl: base64,
+          mimeType: file.type || 'application/octet-stream',
+        }
+        setUploadedDocs(prev => [...prev, newDoc])
+        toast.success(`"${file.name}" সফলভাবে যুক্ত হয়েছে!`)
+      }
+      reader.readAsDataURL(file)
+    })
   }
 
   const removeDocument = (docId: string) => {
@@ -178,51 +173,47 @@ function ServiceRequestContent() {
     toast.info("ডকুমেন্ট সরানো হয়েছে।")
   }
 
-  // Step C & D: Trigger AI Extraction & Mapping to Service Schema
-  const runAiDocumentExtraction = async () => {
+  // Trigger AI Document Extraction & Dynamic Mapping
+  const executeAiExtraction = async () => {
     if (!currentService) return
     setIsExtracting(true)
+    setExtractionError(null)
+
     try {
       const payload = {
         serviceSlug: currentService.slug,
         documents: uploadedDocs,
-        existingProfile: {
-          nameEn: nameEn.trim(),
-          nameBn: nameBn.trim(),
-          dob: dob.trim(),
-          nidNumber: nidNumber.trim(),
-          fatherNameEn: fatherNameEn.trim(),
-          motherNameEn: motherNameEn.trim(),
-          presentAddress: presentAddress.trim(),
-          permanentAddress: permanentAddress.trim(),
-          phone: phone.trim(),
-        }
+        existingProfile: vaultFoundProfile || (contactPhone ? { phone: contactPhone } : undefined),
       }
 
       const res = await api.post('/public/service-request/extract-and-map', payload)
       if (res.data?.extractedFields) {
         setExtractedFields(res.data.extractedFields)
-        setExtractionEngine(res.data.engineUsed || 'ALGORITHMIC_FALLBACK')
+        setExtractionEngine(res.data.engineUsed || 'AI_GEMINI')
         setExtractionConfidence(res.data.overallConfidence || 0.85)
         setConflictsDetected(res.data.conflictsDetected || [])
+        setExtractionCompleted(true)
 
-        // If top-level applicant values were extracted and not already filled, sync them
+        // Automatically populate applicant contact name & phone if extracted
         for (const f of res.data.extractedFields) {
-          if (f.key === 'applicantNameEn' && f.value && !nameEn) setNameEn(f.value)
-          if (f.key === 'applicantNameBn' && f.value && !nameBn) setNameBn(f.value)
-          if (f.key === 'dob' && f.value && !dob) setDob(f.value)
-          if (f.key === 'nidNumber' && f.value && !nidNumber) setNidNumber(f.value)
-          if (f.key === 'fatherNameEn' && f.value && !fatherNameEn) setFatherNameEn(f.value)
-          if (f.key === 'motherNameEn' && f.value && !motherNameEn) setMotherNameEn(f.value)
-          if (f.key === 'presentAddress' && f.value && !presentAddress) setPresentAddress(f.value)
-          if (f.key === 'permanentAddress' && f.value && !permanentAddress) setPermanentAddress(f.value)
+          if (f.key === 'applicantNameEn' && f.value && !applicantName) {
+            setApplicantName(f.value)
+          }
+          if (f.key === 'phone' && f.value && !contactPhone) {
+            setContactPhone(f.value)
+          }
+          if (f.key === 'presentAddress' && f.value && !deliveryAddress) {
+            setDeliveryAddress(f.value)
+          }
         }
 
-        toast.success("AI ডকুমেন্ট থেকে তথ্য সফলভাবে নিষ্কাশন করেছে! তথ্য যাচাই করুন।")
+        toast.success("AI ডকুমেন্ট থেকে তথ্য বিশ্লেষণ সম্পন্ন করেছে! অনুগ্রহ করে তথ্য যাচাই করুন।")
       }
     } catch (err: any) {
       console.error("AI extraction error", err)
-      toast.error("ডকুমেন্ট নিষ্কাশনে সমস্যা হয়েছে। আপনি সরাসরি ফরম পূরণ করতে পারেন।")
+      setExtractionError("ডকুমেন্ট বিশ্লেষণ করতে সমস্যা হয়েছে। আপনি সরাসরি ফরম পূরণ করতে পারবেন।")
+      toast.error("AI এক্সট্র্যাকশনে সমস্যা হয়েছে। সরাসরি ফরম পূরণ করতে পারবেন।")
+      
       // Initialize fallback fields from service schema
       if (currentService.orderedFields) {
         const fallbacks: ExtractedFormField[] = currentService.orderedFields.map((f: any) => ({
@@ -236,13 +227,14 @@ function ServiceRequestContent() {
         }))
         setExtractedFields(fallbacks)
       }
+      setExtractionCompleted(true)
     } finally {
       setIsExtracting(false)
     }
   }
 
   // Handle inline customer edit on extracted field
-  const handleCustomerFieldEdit = (key: string, newValue: string) => {
+  const handleFieldEdit = (key: string, newValue: string) => {
     setExtractedFields(prev =>
       prev.map(f => {
         if (f.key === key) {
@@ -256,17 +248,12 @@ function ServiceRequestContent() {
       })
     )
 
-    // Sync to top-level if common identity key
-    if (key === 'applicantNameEn') setNameEn(newValue)
-    if (key === 'applicantNameBn') setNameBn(newValue)
-    if (key === 'dob') setDob(newValue)
-    if (key === 'nidNumber') setNidNumber(newValue)
-    if (key === 'presentAddress') setPresentAddress(newValue)
-    if (key === 'permanentAddress') setPermanentAddress(newValue)
+    if (key === 'applicantNameEn') setApplicantName(newValue)
+    if (key === 'presentAddress' && !deliveryAddress) setDeliveryAddress(newValue)
   }
 
   // Resolve conflict on a field
-  const handleResolveConflictInClient = (key: string, chosenValue: string) => {
+  const handleResolveConflict = (key: string, chosenValue: string) => {
     setExtractedFields(prev =>
       prev.map(f => {
         if (f.key === key) {
@@ -281,10 +268,51 @@ function ServiceRequestContent() {
         return f
       })
     )
-    toast.success("অমিল দূর করে সঠিক মান নির্বাচন করা হয়েছে।")
+    toast.success("সঠিক মান নির্ধারণ করা হয়েছে।")
   }
 
-  // Calculate Granular Financials
+  // Optional Customer Vault Lookup
+  const handleVaultLookup = async () => {
+    if (!contactPhone || contactPhone.replace(/[^0-9]/g, '').length < 10) {
+      toast.error("সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন।")
+      return
+    }
+
+    setVaultLookupLoading(true)
+    try {
+      const res = await api.get('/public/customer-vault/lookup', { params: { phone: contactPhone } })
+      if (res.data?.found && res.data?.profile) {
+        const p = res.data.profile
+        setVaultFoundProfile(p)
+        toast.success("কাস্টমার ভল্টে পূর্বের সংরক্ষিত তথ্য পাওয়া গেছে!")
+
+        // Suggest prefilling missing fields from vault
+        setExtractedFields(prev =>
+          prev.map(f => {
+            const vaultVal = p[f.key] || (f.key === 'applicantNameEn' ? p.nameEn : f.key === 'applicantNameBn' ? p.nameBn : f.key === 'dob' ? p.dob : f.key === 'nidNumber' ? p.nidNumber : p.presentAddress);
+            if (!f.value && vaultVal) {
+              return {
+                ...f,
+                value: vaultVal,
+                sourceDocTitle: 'Verified Customer Vault',
+                confidence: 1.0,
+                verificationStatus: 'VERIFIED_BY_STAFF',
+              }
+            }
+            return f
+          })
+        )
+      } else {
+        toast.info("ভল্টে কোনো পূর্বের রেকর্ড পাওয়া যায়নি। নতুন কাস্টমার হিসেবে এগিয়ে যান।")
+      }
+    } catch (e) {
+      toast.error("ভল্ট লুকআপে সমস্যা হয়েছে।")
+    } finally {
+      setVaultLookupLoading(false)
+    }
+  }
+
+  // Financials Calculation
   const financials = useMemo(() => {
     if (!currentService) return { govtFee: 0, shopFee: 0, addon: 0, total: 0 }
     const govtFee = Number(currentService.officialGovtFeeBdt || 0)
@@ -299,33 +327,26 @@ function ServiceRequestContent() {
   }, [currentService, deliveryMode])
 
   // Final Submission to Backend
-  const handleSubmitApplication = async () => {
-    if (!nameEn || !phone) {
-      toast.error("নাম ও মোবাইল নম্বর দেওয়া বাধ্যতামূলক।")
+  const handleSubmitServiceRequest = async () => {
+    const finalCustomerName = applicantName.trim() || (extractedFields.find(f => f.key === 'applicantNameEn')?.value) || 'আবেদনকারী'
+    const finalPhone = contactPhone.trim()
+
+    if (!finalPhone || finalPhone.length < 10) {
+      toast.error("আপনার যোগাযোগের মোবাইল নম্বর দেওয়া বাধ্যতামূলক।")
+      setStep(4)
       return
     }
 
     setIsSubmitting(true)
     try {
-      // Build structured field values list with full provenance retention
-      const finalFieldValues = extractedFields.length > 0 ? extractedFields : (currentService.orderedFields || []).map((f: any) => ({
-        key: f.key,
-        labelBn: f.labelBn,
-        labelEn: f.labelEn,
-        value: f.key === 'applicantNameEn' ? nameEn : f.key === 'dob' ? dob : f.key === 'nidNumber' ? nidNumber : dynamicFieldValues[f.key] || '',
-        order: f.order,
-        confidence: 0.9,
-        verificationStatus: 'MANUAL_EDIT' as const,
-      }))
-
       const payload = {
         serviceSlug: currentService.slug,
-        customerName: nameEn.trim(),
-        customerPhone: phone.trim(),
-        customerEmail: email.trim() || undefined,
+        customerName: finalCustomerName,
+        customerPhone: finalPhone,
+        customerEmail: customerEmail.trim() || undefined,
         deliveryMode,
-        deliveryAddress: deliveryAddress.trim() || presentAddress,
-        fieldValues: finalFieldValues,
+        deliveryAddress: deliveryAddress.trim() || undefined,
+        fieldValues: extractedFields,
         uploadedDocuments: uploadedDocs,
         customerNotes: customerNotes || undefined,
         paymentMethod,
@@ -336,15 +357,52 @@ function ServiceRequestContent() {
       const res = await api.post('/public/service-request', payload)
       if (res.data?.referenceNumber) {
         setCreatedRefNumber(res.data.referenceNumber)
-        setStep(6) // Success step
-        toast.success(`আবেদন সফলভাবে গৃহীত হয়েছে! টোকেন #${res.data.referenceNumber}`)
+        setStep(6) // Success confirmation step
+        toast.success(`সার্ভিস রিকোয়েস্ট সফলভাবে জমা হয়েছে! টোকেন #${res.data.referenceNumber}`)
       }
     } catch (err: any) {
       console.error("Submission failed", err)
-      toast.error(err.response?.data?.message || "আবেদন দাখিলে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।")
+      toast.error(err.response?.data?.message || "রিকোয়েস্ট দাখিলে সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।")
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Exact Status Badge Mapping required by prompt
+  const renderStatusBadge = (field: ExtractedFormField) => {
+    if (field.verificationStatus === 'MANUAL_EDIT') {
+      return (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
+          ✏️ আপনি সংশোধন করেছেন
+        </span>
+      )
+    }
+    if (field.verificationStatus === 'VERIFIED_BY_STAFF' || field.sourceDocTitle === 'Verified Customer Vault') {
+      return (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 border border-emerald-200">
+          🛡️ পূর্বের ভেরিফাইড তথ্য
+        </span>
+      )
+    }
+    if (field.verificationStatus === 'MISSING' || !field.value) {
+      return (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 border border-rose-200">
+          ⚠️ ডকুমেন্টে পাওয়া যায়নি
+        </span>
+      )
+    }
+    if (field.confidence < 0.75 || field.isConflict) {
+      return (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-orange-100 text-orange-900 border border-orange-200">
+          🔍 যাচাই প্রয়োজন
+        </span>
+      )
+    }
+    return (
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-100 text-cyan-900 border border-cyan-200">
+        🤖 AI থেকে পাওয়া
+      </span>
+    )
   }
 
   return (
@@ -361,7 +419,7 @@ function ServiceRequestContent() {
             ডিজিটাল সার্ভিস ও অনলাইন আবেদন ডেস্ক
           </h1>
           <p className="text-xs sm:text-sm text-cyan-100/80 max-w-xl">
-            ডকুমেন্ট আপলোড করুন। AI স্বয়ংক্রিয়ভাবে তথ্য এক্সট্র্যাক্ট করে নির্ভুল ফরম তৈরি করবে। যাচাই করে দোকানে জমা দিন।
+            ডকুমেন্ট আপলোড করুন → AI তথ্য পড়বে → আপনি যাচাই করবেন → দোকানে জমা দিন। সরকারি ওয়েবসাইটে মূল আবেদনটি দোকানের অভিজ্ঞ কর্মী সম্পন্ন করবেন।
           </p>
         </div>
         <div className="flex sm:flex-col items-center gap-2 text-xs text-slate-300 bg-white/5 p-4 rounded-2xl border border-white/10 shrink-0">
@@ -370,15 +428,15 @@ function ServiceRequestContent() {
         </div>
       </div>
 
-      {/* Multi-Step Wizard Progress Bar */}
-      <div className="flex items-center justify-between overflow-x-auto pb-2 gap-2 text-xs font-bold text-slate-600">
+      {/* Multi-Step Wizard Progress Bar - EXACT REORDERED SEQUENCE */}
+      <div className="flex items-center justify-between overflow-x-auto pb-2 gap-2 text-xs font-bold text-slate-600 scrollbar-none">
         {[
           { num: 1, title: '১. সেবা ও সম্মতি' },
-          { num: 2, title: '২. গ্রাহক ভল্ট' },
-          { num: 3, title: '৩. ফাইল আপলোড' },
-          { num: 4, title: '৪. AI এক্সট্র্যাকশন ও রিভিউ' },
+          { num: 2, title: '২. ডকুমেন্ট আপলোড' },
+          { num: 3, title: '৩. AI এক্সট্র্যাকশন' },
+          { num: 4, title: '৪. তথ্য রিভিউ ও সংশোধন' },
           { num: 5, title: '৫. কোটেশন ও পেমেন্ট' },
-          { num: 6, title: '৬. নিশ্চিতকরণ' },
+          { num: 6, title: '৬. সার্ভিস রিকোয়েস্ট নিশ্চিতকরণ' },
         ].map((s) => (
           <div
             key={s.num}
@@ -397,7 +455,9 @@ function ServiceRequestContent() {
         ))}
       </div>
 
-      {/* STEP 1: Service Catalog Selection & Customer Consent */}
+      {/* ========================================================================= */}
+      {/* STEP 1: Service Selection & Consent (No Identity Fields Here!)           */}
+      {/* ========================================================================= */}
       {step === 1 && (
         <div className="bg-white p-6 sm:p-10 rounded-3xl border border-slate-200/90 shadow-sm space-y-8 animate-in fade-in">
           <div>
@@ -438,11 +498,37 @@ function ServiceRequestContent() {
             })}
           </div>
 
-          {/* Customer Data Processing Consent (Section 7 Requirement) */}
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
+          {/* Service Requirements & Photo/Signature Specs Guide */}
+          {currentService && (
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
+              <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                <Info className="w-4 h-4 text-cyan-600" />
+                {currentService.titleBn} এর প্রয়োজনীয় কাগজপত্র ও নির্দেশিকা:
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="space-y-1">
+                  <span className="font-bold text-slate-700 block">প্রয়োজনীয় ডকুমেন্ট:</span>
+                  <ul className="list-disc list-inside text-slate-600 space-y-0.5 text-[11px]">
+                    {currentService.requiredDocuments?.map((doc: string, i: number) => (
+                      <li key={i}>{doc}</li>
+                    )) || <li>NID বা জন্ম নিবন্ধন ও সার্টিফিকেট</li>}
+                  </ul>
+                </div>
+                <div className="space-y-1">
+                  <span className="font-bold text-slate-700 block">ছবি ও স্বাক্ষর স্ট্যান্ডার্ড:</span>
+                  <p className="text-[11px] text-slate-600">
+                    ছবি: ৩০০ × ৩০০ পিক্সেল (সর্বোচ্চ ১০০ KB) | স্বাক্ষর: ৩০০ × ৮০ পিক্সেল (সর্বোচ্চ ৬০ KB)
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Customer Data Processing Consent */}
+          <div className="bg-cyan-50/50 p-5 rounded-2xl border border-cyan-100 space-y-3">
             <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-cyan-600" />
-              ব্যক্তিগত তথ্য প্রক্রিয়াকরণ সম্মতি (Data Privacy Consent)
+              ব্যক্তিগত তথ্য প্রক্রিয়াকরণ সম্মতি (Privacy Consent)
             </h4>
             <p className="text-xs text-slate-600 leading-relaxed">
               আপনার আপলোডকৃত জাতীয় পরিচয়পত্র, ছবি ও আবেদন সংশ্লিষ্ট কাগজপত্র কেবলমাত্র এই অনলাইন আবেদন ফরমটি নির্ভুলভাবে পূরণ করার উদ্দেশ্যে স্বয়ংক্রিয়ভাবে প্রক্রিয়াকরণ করা হবে। আপনার তথ্য সুরক্ষিত থাকবে এবং কোনো সরকারি পাসওয়ার্ড বা ওটিপি সংরক্ষণ করা হবে না।
@@ -467,155 +553,7 @@ function ServiceRequestContent() {
                   toast.error("পরবর্তী ধাপে যেতে তথ্য প্রক্রিয়াকরণ সম্মতি প্রদান করুন।")
                   return
                 }
-                setStep(2)
-              }}
-              className="px-8 py-3 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm shadow-md shadow-cyan-600/20 inline-flex items-center gap-2 transition-all"
-            >
-              পরবর্তী ধাপ (গ্রাহক পরিচিতি) <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 2: Customer Identity & Vault Lookup */}
-      {step === 2 && (
-        <div className="bg-white p-6 sm:p-10 rounded-3xl border border-slate-200/90 shadow-sm space-y-8 animate-in fade-in">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">ধাপ ২: আবেদনকারীর পরিচিতি ও কাস্টমার ভল্ট</h2>
-              <p className="text-xs text-slate-500 mt-0.5">মোবাইল নম্বর দিলে সংরক্ষিত পূর্বের ভেরিফাইড তথ্য চলে আসবে।</p>
-            </div>
-            <span className="text-xs font-semibold text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full border border-cyan-100">
-              নির্বাচিত সেবা: {currentService?.titleBn}
-            </span>
-          </div>
-
-          {/* Phone & Vault Lookup Bar */}
-          <div className="bg-cyan-50/60 p-4 rounded-2xl border border-cyan-100 flex flex-col sm:flex-row items-center gap-3">
-            <div className="flex-1 w-full">
-              <label className="text-xs font-bold text-slate-700 block mb-1">মোবাইল নম্বর (Phone Number) *</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="017XXXXXXXX"
-                className="w-full px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-cyan-500 text-sm font-semibold"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleVaultLookup}
-              disabled={vaultLookupLoading}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold self-end inline-flex items-center justify-center gap-2 transition-all"
-            >
-              {vaultLookupLoading ? "খোঁজা হচ্ছে..." : "🔍 ভল্ট লুকআপ ও প্রিফিল"}
-            </button>
-          </div>
-
-          {/* Core Profile Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">আবেদনকারীর পূর্ণ নাম (English CAPS) *</label>
-              <input
-                type="text"
-                value={nameEn}
-                onChange={(e) => setNameEn(e.target.value.toUpperCase())}
-                placeholder="MD TARIQUL ISLAM"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">আবেদনকারীর নাম (বাংলা)</label>
-              <input
-                type="text"
-                value={nameBn}
-                onChange={(e) => setNameBn(e.target.value)}
-                placeholder="মো: তারিকুল ইসলাম"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">জন্ম তারিখ (Date of Birth) *</label>
-              <input
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">জাতীয় পরিচয়পত্র / ১৭ ডিজিট জন্ম নিবন্ধন নম্বর</label>
-              <input
-                type="text"
-                value={nidNumber}
-                onChange={(e) => setNidNumber(e.target.value)}
-                placeholder="NID বা ডিজিটাল BRC নম্বর"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">পিতার নাম (ইংরেজি)</label>
-              <input
-                type="text"
-                value={fatherNameEn}
-                onChange={(e) => setFatherNameEn(e.target.value)}
-                placeholder="Father's Name"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">মাতার নাম (ইংরেজি)</label>
-              <input
-                type="text"
-                value={motherNameEn}
-                onChange={(e) => setMotherNameEn(e.target.value)}
-                placeholder="Mother's Name"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1">বর্তমান ঠিকানা (Present Address) *</label>
-              <input
-                type="text"
-                value={presentAddress}
-                onChange={(e) => setPresentAddress(e.target.value)}
-                placeholder="বাসা, রোড, থানা, জেলা ও পোস্টকোড"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="font-bold text-slate-700 block mb-1">স্থায়ী ঠিকানা (Permanent Address) *</label>
-              <input
-                type="text"
-                value={permanentAddress}
-                onChange={(e) => setPermanentAddress(e.target.value)}
-                placeholder="গ্রাম, ডাকঘর, থানা ও নিজ জেলা"
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <button
-              onClick={() => setStep(1)}
-              className="px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-1.5 transition-all"
-            >
-              <ArrowLeft className="w-4 h-4" /> পূর্ববর্তী
-            </button>
-            <button
-              onClick={() => {
-                if (!nameEn || !phone) {
-                  toast.error("নাম ও মোবাইল নম্বর দেওয়া বাধ্যতামূলক।")
-                  return
-                }
-                setStep(3)
+                setStep(2) // Directly to Document Upload!
               }}
               className="px-8 py-3 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm shadow-md shadow-cyan-600/20 inline-flex items-center gap-2 transition-all"
             >
@@ -625,73 +563,112 @@ function ServiceRequestContent() {
         </div>
       )}
 
-      {/* STEP 3: Multi-Document Upload (Section 2 Step B Requirement) */}
-      {step === 3 && (
+      {/* ========================================================================= */}
+      {/* STEP 2: Upload Documents (MUST COME BEFORE CUSTOMER VAULT)               */}
+      {/* ========================================================================= */}
+      {step === 2 && (
         <div className="bg-white p-6 sm:p-10 rounded-3xl border border-slate-200/90 shadow-sm space-y-8 animate-in fade-in">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">ধাপ ৩: প্রয়োজনীয় কাগজপত্র ও ছবি আপলোড</h2>
+              <h2 className="text-xl font-bold text-slate-900">ধাপ ২: প্রয়োজনীয় কাগজপত্র ও ছবি আপলোড করুন</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                NID, জন্ম নিবন্ধন, শিক্ষাগত সার্টিফিকেট, ছবি ও স্বাক্ষর আপলোড করুন। AI স্বয়ংক্রিয়ভাবে এগুলো পড়ে ফর্ম পূরণ করবে।
+                NID, জন্ম নিবন্ধন, সার্টিফিকেট, ছবি ও স্বাক্ষর আপলোড করুন। AI স্বয়ংক্রিয়ভাবে পড়ে ফরম পূরণ করে দেবে। কোনো ফর্ম ম্যানুয়ালি আগে লিখতে হবে না।
               </p>
             </div>
-            <span className="text-xs font-bold text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full border border-cyan-100">
-              {uploadedDocs.length} টি ফাইল আপলোড হয়েছে
+            <span className="text-xs font-bold text-cyan-700 bg-cyan-50 px-3 py-1 rounded-full border border-cyan-100 self-start sm:self-center">
+              {uploadedDocs.length} টি ফাইল যুক্ত হয়েছে
             </span>
           </div>
 
-          {/* Required Documents Guide from Service Catalog */}
-          {currentService?.requiredDocuments && currentService.requiredDocuments.length > 0 && (
-            <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200/80 space-y-2">
-              <span className="text-xs font-bold text-amber-900 block flex items-center gap-1.5">
-                <FileText className="w-4 h-4 text-amber-700" />
-                এই সার্ভিসের জন্য প্রয়োজনীয় ডকুমেন্টের তালিকা:
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {currentService.requiredDocuments.map((doc: string, idx: number) => (
-                  <span key={idx} className="text-[11px] font-semibold bg-white text-amber-950 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs">
-                    • {doc}
-                  </span>
-                ))}
-              </div>
+          {/* Drag & Drop Upload Zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragActive(false);
+              handleFileUpload(e.dataTransfer.files);
+            }}
+            className={`border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all ${
+              dragActive ? "border-cyan-600 bg-cyan-50/50 scale-[1.01]" : "border-slate-300 hover:border-cyan-400 bg-slate-50/50"
+            }`}
+          >
+            <UploadCloud className="w-12 h-12 text-cyan-600 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-slate-900">ডকুমেন্ট ড্র্যাগ করে এখানে ছাড়ুন অথবা সিলেক্ট করুন</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              সাপোর্টেড ফরম্যাট: PDF, JPG, PNG, মোবাইল ক্যামেরা ছবি (সর্বোচ্চ ১০MB প্রতি ফাইল)
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <label className="px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer shadow-md inline-flex items-center gap-2 transition-all">
+                <FileText className="w-4 h-4 text-cyan-400" />
+                ফাইল সিলেক্ট করুন
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,application/pdf"
+                  onChange={(e) => handleFileUpload(e.target.files)}
+                  className="hidden"
+                />
+              </label>
+
+              <label className="px-5 py-2.5 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs cursor-pointer shadow-md inline-flex items-center gap-2 transition-all sm:hidden">
+                <Camera className="w-4 h-4" />
+                ক্যামেরা দিয়ে ছবি তুলুন
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => handleFileUpload(e.target.files)}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+
+          {uploadError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>{uploadError}</span>
             </div>
           )}
 
-          {/* Upload Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { type: 'জাতীয় পরিচয়পত্র (NID) / জন্ম নিবন্ধন', desc: 'পিডিএফ বা পরিষ্কার ছবি (উভয় পিঠ)', icon: '🪪' },
-              { type: 'শিক্ষাগত সার্টিফিকেট / মার্কশিট', desc: 'SSC / HSC / ডিগ্রি সনদপত্র বা মার্কশিট', icon: '📜' },
-              { type: 'পাসপোর্ট সাইজ ছবি', desc: '৩০০x৩০০ পিক্সেল সাইজ ল্যাব প্রিন্ট কোয়ালিটি', icon: '📸' },
-              { type: 'আবেদনকারীর স্বাক্ষর (Signature)', desc: 'সাদা কাগজে কালো কালির স্বাক্ষর স্ক্যান', icon: '✍️' },
-              { type: 'চাকরির সার্কুলার / অন্যান্য ফাইল', desc: 'কাজের বিবরণ বা অন্য কোনো প্রাসঙ্গিক ডকুমেন্ট', icon: '📎' },
-            ].map((d, idx) => (
-              <div key={idx} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2 hover:border-cyan-300 transition-all">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <span>{d.icon}</span> {d.type}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500">{d.desc}</p>
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={(e) => handleFileUpload(e, d.type)}
-                  className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white hover:file:bg-cyan-700 cursor-pointer w-full"
-                />
-              </div>
-            ))}
+          {/* Category-Specific Quick Upload Buttons */}
+          <div className="space-y-3 pt-2">
+            <span className="text-xs font-bold text-slate-700 block">সুবিধাজনক ক্যাটাগরি অনুযায়ী ফাইল যুক্ত করুন:</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              {[
+                { title: '🪪 NID বা জন্ম নিবন্ধন', cat: 'জাতীয় পরিচয়পত্র / জন্ম নিবন্ধন' },
+                { title: '📜 সার্টিফিকেট / মার্কশিট', cat: 'শিক্ষাগত সার্টিফিকেট / মার্কশিট' },
+                { title: '📸 পাসপোর্ট ছবি (300x300)', cat: 'পাসপোর্ট সাইজ ছবি (৩০০x৩০০)' },
+                { title: '✍️ স্বাক্ষর স্ক্যান (300x80)', cat: 'স্বাক্ষর স্ক্যান (৩০০x৮০)' },
+              ].map((btn, idx) => (
+                <label
+                  key={idx}
+                  className="p-3 rounded-2xl border border-slate-200 bg-white hover:border-cyan-400 hover:bg-cyan-50/30 cursor-pointer transition-all text-center space-y-1 block shadow-2xs"
+                >
+                  <span className="font-bold text-slate-800 text-xs block">{btn.title}</span>
+                  <span className="text-[10px] text-cyan-700 block">+ ফাইল যুক্ত করুন</span>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e.target.files, btn.cat)}
+                    className="hidden"
+                  />
+                </label>
+              ))}
+            </div>
           </div>
 
           {/* Uploaded Documents List */}
           {uploadedDocs.length > 0 && (
             <div className="space-y-3 pt-4 border-t border-slate-100">
-              <span className="text-xs font-bold text-slate-700 block">আপলোডকৃত ফাইলের তালিকা:</span>
+              <span className="text-xs font-bold text-slate-700 block">আপলোডকৃত ফাইলের তালিকা ({uploadedDocs.length} টি):</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {uploadedDocs.map((doc) => (
-                  <div key={doc.id} className="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between text-xs shadow-2xs">
-                    <div className="flex items-center gap-2 truncate pr-2">
-                      <span className="w-6 h-6 rounded-lg bg-cyan-100 text-cyan-800 font-bold flex items-center justify-center shrink-0 text-[10px]">
+                  <div key={doc.id} className="p-3 rounded-2xl bg-white border border-slate-200 flex items-center justify-between text-xs shadow-2xs">
+                    <div className="flex items-center gap-2.5 truncate pr-2">
+                      <span className="w-7 h-7 rounded-xl bg-cyan-100 text-cyan-800 font-bold flex items-center justify-center shrink-0 text-xs">
                         ✓
                       </span>
                       <div className="truncate">
@@ -702,10 +679,10 @@ function ServiceRequestContent() {
                     <button
                       type="button"
                       onClick={() => removeDocument(doc.id)}
-                      className="text-slate-400 hover:text-rose-600 font-bold text-xs p-1"
+                      className="text-slate-400 hover:text-rose-600 p-1 rounded-lg"
                       title="মুছে ফেলুন"
                     >
-                      ✕
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 ))}
@@ -713,97 +690,132 @@ function ServiceRequestContent() {
             </div>
           )}
 
-          {/* Customer Voice/Written Special Note */}
-          <div className="space-y-2 pt-4 border-t border-slate-100">
-            <label className="text-xs font-bold text-slate-700 block">
-              অতিরিক্ত নির্দেশিকা বা কোনো বিশেষ সংশোধন থাকলে লিখুন:
-            </label>
-            <textarea
-              rows={2}
-              value={customerNotes}
-              onChange={(e) => setCustomerNotes(e.target.value)}
-              placeholder="যেমন: সার্টিফিকেটে নামের বানান বা পিতার নামে অমিল আছে, ইত্যাদি..."
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:bg-white text-xs"
-            />
-          </div>
-
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
             <button
-              onClick={() => setStep(2)}
+              onClick={() => setStep(1)}
               className="px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-1.5 transition-all"
             >
               <ArrowLeft className="w-4 h-4" /> পূর্ববর্তী
             </button>
             <button
               onClick={async () => {
-                setStep(4)
-                // Automatically run extraction if documents were uploaded and not yet extracted
-                if (uploadedDocs.length > 0 && extractedFields.length === 0) {
-                  await runAiDocumentExtraction()
-                } else if (extractedFields.length === 0 && currentService?.orderedFields) {
-                  // Fallback initialization
-                  const init: ExtractedFormField[] = currentService.orderedFields.map((f: any) => ({
-                    key: f.key,
-                    labelBn: f.labelBn,
-                    labelEn: f.labelEn,
-                    value: f.key === 'applicantNameEn' ? nameEn : f.key === 'dob' ? dob : f.key === 'nidNumber' ? nidNumber : '',
-                    order: f.order,
-                    confidence: f.key === 'applicantNameEn' && nameEn ? 0.9 : 0,
-                    verificationStatus: f.key === 'applicantNameEn' && nameEn ? 'VERIFIED_BY_STAFF' : 'MISSING',
-                  }))
-                  setExtractedFields(init)
+                if (uploadedDocs.length === 0) {
+                  toast.warning("কোনো ডকুমেন্ট আপলোড করেননি। আপনি কি সরাসরি ফর্ম পূরণ করতে চান?")
                 }
+                setStep(3)
+                await executeAiExtraction()
               }}
               className="px-8 py-3 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm shadow-md shadow-cyan-600/20 inline-flex items-center gap-2 transition-all"
             >
-              পরবর্তী ধাপ (AI এক্সট্র্যাকশন ও রিভিউ) <ArrowRight className="w-4 h-4" />
+              পরবর্তী ধাপ (AI এক্সট্র্যাকশন শুরু করুন) <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 4: AI Document Extraction, Dynamic Schema Form & Customer Review / Correction (Section 2 Steps C, D, E) */}
+      {/* ========================================================================= */}
+      {/* STEP 3: AI Extraction & Auto-Filled Form Progress State                   */}
+      {/* ========================================================================= */}
+      {step === 3 && (
+        <div className="bg-white p-6 sm:p-12 rounded-3xl border border-slate-200/90 shadow-sm space-y-8 animate-in fade-in text-center">
+          
+          {isExtracting ? (
+            <div className="py-12 space-y-6 max-w-md mx-auto">
+              <div className="w-20 h-20 rounded-full bg-cyan-50 border-4 border-cyan-500 border-t-transparent animate-spin mx-auto flex items-center justify-center">
+                <Sparkles className="w-8 h-8 text-cyan-600" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-xl font-black text-slate-900">ডকুমেন্ট বিশ্লেষণ ও ফিল্ড ম্যাপিং চলছে...</h2>
+                <p className="text-xs text-slate-500">
+                  AI আপনার আপলোডকৃত ফাইলগুলো থেকে নাম, জন্ম তারিখ, NID নম্বর ও অন্যান্য তথ্য স্বয়ংক্রিয়ভাবে পড়ছে।
+                </p>
+              </div>
+              <div className="space-y-2 text-left bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs">
+                {uploadedDocs.map((d, i) => (
+                  <div key={d.id} className="flex items-center justify-between text-slate-700">
+                    <span className="truncate max-w-[240px]">📄 {d.title}</span>
+                    <span className="text-cyan-700 font-bold animate-pulse">প্রসেসিং...</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 space-y-6 max-w-lg mx-auto">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10" />
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-cyan-100 text-cyan-800">
+                  {extractionEngine === 'AI_GEMINI' ? '✨ Gemini AI Engine' : '⚡ Heuristic Engine'}
+                </span>
+                <h2 className="text-2xl font-black text-slate-900">ডকুমেন্ট বিশ্লেষণ সফলভাবে সম্পন্ন হয়েছে!</h2>
+                <p className="text-xs text-slate-500">
+                  ডকুমেন্ট থেকে প্রাপ্ত তথ্য দিয়ে স্বয়ংক্রিয়ভাবে আবেদন ফরমটি পূরণ করা হয়েছে। পরবর্তী ধাপে গিয়ে তথ্যগুলো যাচাই ও ভুল থাকলে সংশোধন করুন।
+                </p>
+              </div>
+
+              {extractionConfidence !== null && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs flex items-center justify-between">
+                  <span className="text-slate-600">গড় নির্ভুলতা স্কোর (Confidence):</span>
+                  <span className="font-extrabold text-emerald-600 text-sm">{Math.round(extractionConfidence * 100)}%</span>
+                </div>
+              )}
+
+              <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={executeAiExtraction}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center justify-center gap-2 transition-all"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> পুনরায় এক্সট্র্যাক্ট করুন
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(4)}
+                  className="w-full sm:w-auto px-8 py-3 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm shadow-md shadow-cyan-600/20 inline-flex items-center justify-center gap-2 transition-all"
+                >
+                  তথ্য রিভিউ ও সংশোধনে যান <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* STEP 4: Customer Review, Correction & Optional Vault Prefill             */}
+      {/* ========================================================================= */}
       {step === 4 && (
         <div className="bg-white p-6 sm:p-10 rounded-3xl border border-slate-200/90 shadow-sm space-y-8 animate-in fade-in">
           
-          {/* Header & Re-scan Action */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-800">
-                  {extractionEngine === 'AI_GEMINI' ? '✨ Gemini AI Engine' : '⚡ Heuristic Extraction'}
-                </span>
-                {extractionConfidence !== null && (
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    কনফিডেন্স: {Math.round(extractionConfidence * 100)}%
-                  </span>
-                )}
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-                ধাপ ৪: AI এক্সট্র্যাক্টকৃত আবেদন ডাটা রিভিউ ও সংশোধন
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                ধাপ ৪: AI পূরণকৃত আবেদন তথ্য রিভিউ ও সংশোধন
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                ডকুমেন্ট থেকে সংগৃহীত তথ্য নিচে প্রদর্শন করা হয়েছে। কোনো তথ্য পরিবর্তন করতে চাইলে সরাসরি এডিট করুন।
+                নিচে প্রতিটি ফিল্ডের মান মনোযোগ দিয়ে দেখুন। কোনো বানান বা তথ্যে ভুল থাকলে ক্লিক করে সংশোধন করুন।
               </p>
             </div>
 
             <button
               type="button"
-              onClick={runAiDocumentExtraction}
-              disabled={isExtracting}
-              className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold inline-flex items-center gap-2 shadow-sm self-start sm:self-center transition-all"
+              onClick={() => { setStep(2); }}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold inline-flex items-center gap-1.5 self-start sm:self-center transition-all"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isExtracting ? 'animate-spin' : ''}`} />
-              {isExtracting ? "AI বিশ্লেষণ চলছে..." : "পুনরায় AI বিশ্লেষণ করুন"}
+              <UploadCloud className="w-3.5 h-3.5 text-cyan-600" />
+              আরো ডকুমেন্ট আপলোড করুন
             </button>
           </div>
 
-          {/* Conflict Warnings Box (Section 2 Step E Requirement) */}
+          {/* Conflict Warnings Box if detected */}
           {conflictsDetected.length > 0 && (
             <div className="bg-rose-50 p-4 rounded-2xl border border-rose-200 space-y-3">
               <div className="flex items-center gap-2 text-rose-800 font-bold text-xs">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>সতর্কতা: আপলোডকৃত ডকুমেন্টের মধ্যে অথবা পূর্বের তথ্যে গরমিল শনাক্ত হয়েছে:</span>
+                <span>সতর্কতা: আপলোডকৃত ডকুমেন্টের মধ্যে গরমিল শনাক্ত হয়েছে:</span>
               </div>
               <div className="space-y-2">
                 {conflictsDetected.map((conf, idx) => (
@@ -812,130 +824,130 @@ function ServiceRequestContent() {
                       <span className="font-bold text-rose-950 block">ফিল্ড: {conf.fieldKey}</span>
                       <span className="text-slate-600 text-[11px]">{conf.messageBn}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleResolveConflictInClient(conf.fieldKey, nameEn || '')}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-[10px] font-bold rounded-lg"
-                      >
-                        ভল্টের মান রাখুন
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleResolveConflictInClient(conf.fieldKey, '')}
-                        className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded-lg"
-                      >
-                        ম্যানুয়ালি লিখুন
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleResolveConflict(conf.fieldKey, '')}
+                      className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold rounded-lg self-end sm:self-center"
+                    >
+                      ম্যানুয়ালি ঠিক করুন
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Photo & Signature Preview Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {uploadedDocs.filter(d => d.docType.includes('ছবি') || d.docType.includes('স্বাক্ষর') || d.mimeType.startsWith('image/')).map((imgDoc, idx) => (
-              <div key={idx} className="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl overflow-hidden bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                  <img src={imgDoc.fileUrl} alt={imgDoc.title} className="w-full h-full object-cover" />
+          {/* Dynamic Application Fields (Service-Specific Schema) */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-cyan-600" />
+              {currentService.titleBn} সংক্রান্ত আবেদন ফিল্ডসমূহ:
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              {extractedFields.map((field) => (
+                <div
+                  key={field.key}
+                  className={`p-4 rounded-2xl border transition-all space-y-2 ${
+                    field.isConflict
+                      ? "border-rose-300 bg-rose-50/50"
+                      : field.verificationStatus === 'MANUAL_EDIT'
+                      ? "border-amber-300 bg-amber-50/30"
+                      : field.verificationStatus === 'VERIFIED_BY_STAFF'
+                      ? "border-emerald-300 bg-emerald-50/30"
+                      : "border-slate-200 bg-slate-50/60 hover:bg-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 block">
+                      {field.order}. {field.labelBn} <span className="text-[10px] text-slate-400 font-normal">({field.labelEn})</span>
+                    </span>
+
+                    {/* Exact Bengali Status Badges required */}
+                    {renderStatusBadge(field)}
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={field.key === 'dob' ? 'date' : 'text'}
+                      value={field.value || ""}
+                      onChange={(e) => handleFieldEdit(field.key, e.target.value)}
+                      placeholder={`মান লিখুন (${field.labelEn})`}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-cyan-500 text-sm font-semibold"
+                    />
+                  </div>
+
+                  {/* Provenance: Source Document & Confidence */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                    <span className="truncate max-w-[200px]">উৎস: {field.sourceDocTitle || "সরাসরি ইনপুট"}</span>
+                    {field.confidence > 0 && (
+                      <span className="font-bold text-emerald-600">
+                        {Math.round(field.confidence * 100)}%
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-900 block">{imgDoc.docType}</span>
-                  <span className="text-[11px] text-slate-500 block truncate max-w-[200px]">{imgDoc.title}</span>
-                  <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md inline-block">
-                    ✓ ছবি সংযুক্ত আছে
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          {/* Dynamic Ordered Application Fields (Editable by Customer with Provenance) */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-cyan-600" />
-                আবেদন ফরমের সাজানো ফিল্ডসমূহ (Service Schema Fields):
-              </h3>
-              <span className="text-[11px] text-slate-400">
-                ফিল্ডের মান পরিবর্তন করলে স্ট্যাটাস 'সংশোধিত' হিসেবে সংরক্ষিত হবে
+          {/* Optional Customer Vault Drawer (OPTIONAL: For returning customers) */}
+          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between cursor-pointer" onClick={() => setShowVaultDrawer(!showVaultDrawer)}>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-cyan-600" />
+                <span className="text-xs font-bold text-slate-800">
+                  কাস্টমার ভল্ট (ঐচ্ছিক): পূর্বে কি আমাদের দোকান থেকে সেবা নিয়েছেন?
+                </span>
+              </div>
+              <span className="text-xs text-cyan-700 font-bold">
+                {showVaultDrawer ? "লুকান ▲" : "খুলুন ▼"}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              {extractedFields.map((field) => {
-                const confPercent = Math.round(field.confidence * 100)
-                return (
-                  <div
-                    key={field.key}
-                    className={`p-4 rounded-2xl border transition-all space-y-2 ${
-                      field.isConflict
-                        ? "border-rose-300 bg-rose-50/50"
-                        : field.verificationStatus === 'MANUAL_EDIT'
-                        ? "border-amber-300 bg-amber-50/30"
-                        : field.verificationStatus === 'VERIFIED_BY_STAFF'
-                        ? "border-emerald-300 bg-emerald-50/30"
-                        : "border-slate-200 bg-slate-50/60 hover:bg-white"
-                    }`}
+            {showVaultDrawer && (
+              <div className="pt-2 space-y-3 animate-in fade-in">
+                <p className="text-[11px] text-slate-500">
+                  আপনার মোবাইল নম্বর দিলে ভল্ট থেকে পূর্বের ভেরিফাইড তথ্য দিয়ে খালি ফিল্ডগুলো পূরণ করা যাবে। নতুন কাস্টমার হলে এটি পূরণ না করলেও চলবে।
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <input
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="017XXXXXXXX"
+                    className="w-full sm:w-64 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVaultLookup}
+                    disabled={vaultLookupLoading}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 block">
-                        {field.order}. {field.labelBn} <span className="text-[10px] text-slate-400">({field.labelEn})</span>
-                      </span>
-
-                      {/* Provenance Status Badges */}
-                      <div className="flex items-center gap-1.5">
-                        {field.verificationStatus === 'MANUAL_EDIT' && (
-                          <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
-                            ✏️ আপনি সংশোধন করেছেন
-                          </span>
-                        )}
-                        {field.verificationStatus === 'VERIFIED_BY_STAFF' && (
-                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                            🛡️ ভল্ট ভেরিফাইড
-                          </span>
-                        )}
-                        {field.verificationStatus === 'EXTRACTED' && (
-                          <span className="text-[10px] font-bold text-cyan-800 bg-cyan-100 px-2 py-0.5 rounded-md">
-                            🤖 AI নিষ্কাশিত
-                          </span>
-                        )}
-                        {field.verificationStatus === 'MISSING' && (
-                          <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-md">
-                            ⚠️ পূরণ করুন
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="relative">
-                      <input
-                        type={field.key === 'dob' ? 'date' : 'text'}
-                        value={field.value || ""}
-                        onChange={(e) => handleCustomerFieldEdit(field.key, e.target.value)}
-                        placeholder={`মান লিখুন (${field.labelEn})`}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 focus:ring-2 focus:ring-cyan-500 text-sm font-semibold"
-                      />
-                    </div>
-
-                    {/* Source Document & Confidence Pill */}
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                      <span>উৎস: {field.sourceDocTitle || "সরাসরি ইনপুট"}</span>
-                      {field.confidence > 0 && (
-                        <span className={`font-bold ${confPercent >= 80 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                          নির্ভুলতা: {confPercent}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                    {vaultLookupLoading ? "খোঁজা হচ্ছে..." : "🔍 ভল্ট রেকর্ড খুঁজুন"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Explicit Customer Review Checkbox (Section 2 Step E Requirement) */}
+          {/* Customer Mandatory Contact Phone (for SMS updates & shop communication) */}
+          <div className="bg-cyan-50/60 p-4 rounded-2xl border border-cyan-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-bold text-slate-900 block">আপনার যোগাযোগের মোবাইল নম্বর *</span>
+              <span className="text-[11px] text-slate-500 block">আবেদন সম্পন্ন হলে এসএমএস ও ডেলিভারি নোটিফিকেশন পাঠাতে প্রয়োজন।</span>
+            </div>
+            <input
+              type="tel"
+              required
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder="017XXXXXXXX"
+              className="px-4 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 font-mono font-bold text-sm w-full sm:w-56 focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+
+          {/* Explicit Customer Review Checkbox */}
           <div className="p-4 rounded-2xl bg-slate-900 text-white flex items-start gap-3">
             <input
               type="checkbox"
@@ -951,7 +963,7 @@ function ServiceRequestContent() {
 
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
             <button
-              onClick={() => setStep(3)}
+              onClick={() => setStep(2)}
               className="px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center gap-1.5 transition-all"
             >
               <ArrowLeft className="w-4 h-4" /> পূর্ববর্তী
@@ -962,25 +974,39 @@ function ServiceRequestContent() {
                   toast.error("তথ্য সঠিক আছে মর্মে নিচের চেকবক্সে টিক দিন।")
                   return
                 }
+                if (!contactPhone || contactPhone.length < 10) {
+                  toast.error("যোগাযোগের জন্য সঠিক মোবাইল নম্বর দিন।")
+                  return
+                }
                 setStep(5)
               }}
               className="px-8 py-3 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm shadow-md shadow-cyan-600/20 inline-flex items-center gap-2 transition-all"
             >
-              পরবর্তী ধাপ (ফি কোটেশন ও পেমেন্ট) <ArrowRight className="w-4 h-4" />
+              পরবর্তী ধাপ (কোটেশন ও পেমেন্ট) <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 5: Fee Quotation, Payment & Delivery (Section 2 Step F) */}
+      {/* ========================================================================= */}
+      {/* STEP 5: Service Request, Quotation & Payment (Not Govt Submission!)       */}
+      {/* ========================================================================= */}
       {step === 5 && (
         <div className="bg-white p-6 sm:p-10 rounded-3xl border border-slate-200/90 shadow-sm space-y-8 animate-in fade-in">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">ধাপ ৫: ফি বিবরণ, পেমেন্ট ও ডেলিভারি মাধ্যম</h2>
+            <h2 className="text-xl font-bold text-slate-900">ধাপ ৫: সার্ভিস ফি কোটেশন ও পেমেন্ট</h2>
             <p className="text-xs text-slate-500 mt-0.5">সরকারি ফি ও শপ সার্ভিস চার্জের নির্ভুল হিসাব।</p>
           </div>
 
-          {/* Financial Breakdown Card */}
+          {/* MANDATORY PROMPT STATEMENT BANNER */}
+          <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 flex items-start gap-3">
+            <Info className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+            <p className="text-xs sm:text-sm font-bold leading-relaxed">
+              “আপনি আপনার ডকুমেন্ট ও তথ্য যাচাই করে সার্ভিস রিকোয়েস্ট জমা দিচ্ছেন। সরকারি ওয়েবসাইটে আবেদনটি দোকানের কর্মী সম্পন্ন করবেন।”
+            </p>
+          </div>
+
+          {/* Granular Financial Quotation Card */}
           <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl space-y-4">
             <h3 className="text-sm font-bold text-cyan-300 uppercase tracking-wider">সার্ভিস ফি কোটেশন</h3>
             <div className="space-y-2 text-xs sm:text-sm">
@@ -1079,17 +1105,19 @@ function ServiceRequestContent() {
               <ArrowLeft className="w-4 h-4" /> পূর্ববর্তী
             </button>
             <button
-              onClick={handleSubmitApplication}
+              onClick={handleSubmitServiceRequest}
               disabled={isSubmitting}
               className="px-10 py-3.5 rounded-full bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white font-extrabold text-sm shadow-lg shadow-cyan-600/30 inline-flex items-center gap-2 transition-all"
             >
-              {isSubmitting ? "আবেদন দাখিল হচ্ছে..." : "✓ প্রস্তুতকৃত আবেদন দোকানে জমা দিন"}
+              {isSubmitting ? "রিকোয়েস্ট দাখিল হচ্ছে..." : "✓ সার্ভিস রিকোয়েস্ট দোকানে জমা দিন"}
             </button>
           </div>
         </div>
       )}
 
-      {/* STEP 6: Success Confirmation & Reference Token */}
+      {/* ========================================================================= */}
+      {/* STEP 6: Request Confirmation & Tracking                                  */}
+      {/* ========================================================================= */}
       {step === 6 && createdRefNumber && (
         <div className="bg-white p-8 sm:p-12 rounded-3xl border border-slate-200/90 shadow-xl text-center space-y-6 animate-in zoom-in-95 duration-500 max-w-lg mx-auto">
           <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center">
@@ -1097,14 +1125,14 @@ function ServiceRequestContent() {
           </div>
 
           <div>
-            <h2 className="text-2xl font-black text-slate-900">আবেদন সফলভাবে গৃহীত হয়েছে!</h2>
+            <h2 className="text-2xl font-black text-slate-900">সার্ভিস রিকোয়েস্ট সফলভাবে গৃহীত হয়েছে!</h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              আপনার প্রস্তুতকৃত আবেদন ডাটা ও ডকুমেন্টস আমাদের কম্পিউটার সার্ভিস সেন্টারে পৌঁছেছে।
+              আপনার প্রস্তুতকৃত আবেদন ডাটা ও ডকুমেন্টস আমাদের কম্পিউটার সার্ভিস সেন্টারে পৌঁছেছে। আমাদের দক্ষ কর্মী আপনার তথ্য অনুযায়ী সরকারি ওয়েবসাইটে আবেদন সম্পন্ন করবেন।
             </p>
           </div>
 
           <div className="bg-slate-900 text-white p-6 rounded-2xl space-y-2">
-            <span className="text-xs font-semibold text-cyan-300 uppercase tracking-widest block">আবেদন রেফারেন্স টোকেন</span>
+            <span className="text-xs font-semibold text-cyan-300 uppercase tracking-widest block">সার্ভিস রিকোয়েস্ট টোকেন</span>
             <div className="text-3xl font-black text-white tracking-wider font-mono">
               {createdRefNumber}
             </div>
