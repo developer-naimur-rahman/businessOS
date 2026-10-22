@@ -27,7 +27,20 @@ export interface InternetServiceDef {
   slug: string;
   titleBn: string;
   titleEn: string;
-  category: 'GOVT_JOB' | 'PASSPORT' | 'CIVIL_REG' | 'NID' | 'VISA' | 'TAX_TIN' | 'BRTA' | 'PHOTO_DOC';
+  category:
+    | 'GOVT_JOB'
+    | 'PASSPORT'
+    | 'CIVIL_REG'
+    | 'NID'
+    | 'VISA'
+    | 'TAX_TIN'
+    | 'BRTA'
+    | 'PHOTO_DOC'
+    | 'VIDEO_EDITING'
+    | 'GRAPHIC_DESIGN'
+    | 'DIGITAL_MARKETING'
+    | 'CYBERSECURITY'
+    | 'PRINT_PHOTOCOPY';
   descriptionBn: string;
   descriptionEn: string;
   targetAudience: string;
@@ -442,6 +455,261 @@ export const DEFAULT_INTERNET_SERVICES: InternetServiceDef[] = [
     officialSourceUrl: 'https://businessos.local',
     officialSourceTitle: 'BusinessOS Studio & Photo Engine',
     lastVerifiedDate: '2026-10-20',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-real-estate-walkthrough',
+    slug: 'real-estate-walkthrough-editing',
+    titleBn: 'রিয়েল এস্টেট প্রপার্টি ওয়াকথ্রু ভিডিও এডিটিং',
+    titleEn: 'Real Estate Walkthrough Video Editing',
+    category: 'VIDEO_EDITING',
+    descriptionBn: 'সিনেমেটিক প্রপার্টি ট্যুর, ড্রোন ফুটেজ স্ট্যাবিলাইজেশন, কালার গ্রেডিং, ফ্লোর প্ল্যান এবং ব্র্যান্ডেড ইনফরমেশন কলআউট।',
+    descriptionEn: 'High-end cinematic property walkthrough editing with drone stabilization, LUT color grading, motion title cards, and floor plans.',
+    targetAudience: 'রিয়েল এস্টেট ডেভেলপার, ল্যান্ডলর্ড, ব্রোকার ও আর্কিটেক্ট',
+    requiredDocs: [
+      { nameBn: 'প্রজেক্ট ব্রিফ ও স্পেসিফিকেশন', nameEn: 'Project Brief / Google Doc', type: 'SCAN', isOptional: false, acceptedFormats: ['application/pdf', 'text/plain'], maxSizeBytes: 5242880, notesBn: 'প্রপার্টি সাইজ, রুম সংখ্যা, ফিচার ও হাইলাইটস' },
+      { nameBn: 'র ফুটেজ লিঙ্ক (Drive/Dropbox/WeTransfer)', nameEn: 'Raw Footage Cloud Link', type: 'SCAN', isOptional: false, acceptedFormats: ['text/plain', 'application/pdf'], maxSizeBytes: 1048576, notesBn: 'ক্লিপ ডাউনলোড লিঙ্ক ও অডিও ফাইল' },
+      { nameBn: 'কোম্পানি লোগো ও ব্র্যান্ড কালার', nameEn: 'Brand Logo & Guidelines', type: 'PHOTO', isOptional: true, acceptedFormats: ['image/png', 'image/jpeg'], maxSizeBytes: 5242880 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'footageLink', labelBn: 'কাঁচা ফুটেজ ডাউনলোড লিঙ্ক (Drive / Dropbox)', labelEn: 'Raw Footage Cloud Link', type: 'text', required: true },
+      { order: 2, key: 'aspectRatio', labelBn: 'ভিডিও এসপেক্ট রেশিও', labelEn: 'Aspect Ratio', type: 'select', required: true, options: ['16:9 (Landscape 4K/1080p - YouTube & Website)', '9:16 (Vertical Full HD - Reels & TikTok)', '1:1 (Square - Feed Ad)', 'Both 16:9 and 9:16 Bundle'] },
+      { order: 3, key: 'targetDuration', labelBn: 'টার্গেট ডিউরেশন', labelEn: 'Target Duration', type: 'select', required: true, options: ['Short Highlight (30 - 60s)', 'Full Walkthrough (2 - 3 minutes)', 'Extended Architectural Tour (5+ minutes)'] },
+      { order: 4, key: 'musicMood', labelBn: 'ব্যাকগ্রাউন্ড মিউজিক মুড', labelEn: 'Background Music Mood', type: 'select', required: true, options: ['Luxury & Elegant Piano/Ambient', 'Modern Corporate & Energetic', 'Cinematic Drone Acoustic', 'No Music (Natural Audio Only)'] },
+      { order: 5, key: 'propertyHighlights', labelBn: 'প্রপার্টির বিশেষ হাইলাইটস', labelEn: 'Property Key Highlights', type: 'textarea', required: false, helpTextBn: 'উদাঃ সুইমিং পুল, মাস্টার বেডরুম, সাউথ ফেসিং বারান্দা ইত্যাদি।' }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 3500,
+    estimatedProcessingTime: '২৪ থেকে ৪৮ ঘণ্টা',
+    deliveryModes: ['ONLINE_DOWNLOAD'],
+    whatToBringToShopBn: ['পেনড্রাইভ বা এক্সটারনাল হার্ডড্রাইভে 4K/HD র ফুটেজ নিয়ে আসতে পারেন অথবা ড্রাইভ লিঙ্ক দিতে পারেন।'],
+    commonMistakesBn: ['খুব বেশি কাঁপুনি যুক্ত ফুটেজ বা কম আলোতে ধারণকৃত ফুটেজ', 'সম্পূর্ণ ফুটেজ একসাথে জিপ না করে এলোমেলো আপলোড'],
+    preparationInstructionsBn: ['আপনার ব্র্যান্ড লোগো পিএনজি ফরম্যাটে এবং সঠিক ঠিকানার ইনফো টেক্সট ফাইলে প্রস্তুত রাখুন।'],
+    checklistItemsBn: ['ফুটেজ ক্লাউড লিংক এক্সেস পাবলিক বা ভিউয়ার অনুমতি দেওয়া', 'দরকারি টেক্সট বা প্রপার্টি বিবরণ দেওয়া হয়েছে'],
+    officialSourceUrl: 'https://businessos.local/services/video-editing',
+    officialSourceTitle: 'BusinessOS Creative Media Labs',
+    lastVerifiedDate: '2026-10-21',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-real-estate-reels',
+    slug: 'real-estate-reels-short-form',
+    titleBn: 'রিয়েল এস্টেট রিলস ও শর্ট-ফর্ম ভিডিও এডিটিং',
+    titleEn: 'Real Estate Reels & TikToks Short-Form',
+    category: 'VIDEO_EDITING',
+    descriptionBn: 'ইনস্টাগ্রাম, ফেসবুক ও টিকটকের জন্য আকর্ষণীয় হুক, গতিশীল কাট, সাবটাইটেল এবং সাউন্ড ইফেক্ট সম্বলিত ভাইরাল রিলস।',
+    descriptionEn: 'High-retention vertical 9:16 short-form reels for real estate agents with animated captions, speed ramps, and trending beats.',
+    targetAudience: 'রিয়েলটর, কনটেন্ট ক্রিয়েটর ও ডিজিটাল এজেন্সি',
+    requiredDocs: [
+      { nameBn: 'ভার্টিক্যাল ভিডিও ক্লিপস বা ড্রাইভ লিংক', nameEn: 'Raw Mobile/Camera Clips', type: 'SCAN', isOptional: false, acceptedFormats: ['text/plain', 'application/pdf'], maxSizeBytes: 1048576 },
+      { nameBn: 'এজেন্ট ছবি বা ব্র্যান্ড লোগো', nameEn: 'Agent Photo / Logo', type: 'PHOTO', isOptional: true, acceptedFormats: ['image/png', 'image/jpeg'], maxSizeBytes: 5242880 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'footageLink', labelBn: 'ভিডিও ফুটেজ গুগল ড্রাইভ / ড্রপবক্স লিঙ্ক', labelEn: 'Raw Footage Link', type: 'text', required: true },
+      { order: 2, key: 'reelTheme', labelBn: 'রিলস স্টাইল', labelEn: 'Reel Style', type: 'select', required: true, options: ['Fast Paced with Alex Hormozi Captions', 'Cinematic Aesthetic Luxury', 'Voiceover + B-Roll Tour', 'Price Quiz / Hook Style'] },
+      { order: 3, key: 'hookText', labelBn: 'প্রথম ৩ সেকেন্ডের হুক টেক্সট (ঐচ্ছিক)', labelEn: 'Hook Text (Optional)', type: 'text', required: false }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 1200,
+    estimatedProcessingTime: '১২ থেকে ২৪ ঘণ্টা',
+    deliveryModes: ['ONLINE_DOWNLOAD'],
+    whatToBringToShopBn: ['মোবাইল বা ক্যামেরার রিলস ফুটেজ পেনড্রাইভে নিয়ে আসুন।'],
+    commonMistakesBn: ['হরিজোন্টাল ফুটেজ জোর করে ক্রপ করা', 'অস্পষ্ট কথা বা নয়েজপূর্ণ অডিও'],
+    preparationInstructionsBn: ['আপনার রিলসের প্রথম ৩ সেকেন্ডের কথা বা হুক ঠিক করে দিন।'],
+    checklistItemsBn: ['ফুটেজ লিঙ্ক পাবলিকলি ডাউনলোডযোগ্য', 'সাবটাইটেলের জন্য স্পেলিং নিশ্চিত করা'],
+    officialSourceUrl: 'https://businessos.local/services/video-editing',
+    officialSourceTitle: 'BusinessOS Video Studio',
+    lastVerifiedDate: '2026-10-21',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-talking-head-editing',
+    slug: 'talking-head-editing',
+    titleBn: 'ইউটিউব ও কোর্স টকিং-হেড ভিডিও এডিটিং',
+    titleEn: 'Talking-Head YouTube & Course Video Editing',
+    category: 'VIDEO_EDITING',
+    descriptionBn: 'ইউটিউব ও অনলাইন কোর্সের জন্য নয়েজ রিমুভাল, কালার কারেকশন, স্মার্ট জুম, প্রাসঙ্গিক বি-রোল, মোশন গ্রাফিক্স ও সাউন্ড ডিজাইন।',
+    descriptionEn: 'Professional talking head editing with jump cut cleanup, dynamic zooms, pop-up motion titles, sound FX, and engaging b-roll storytelling.',
+    targetAudience: 'ইউটিউবার, ট্রেইনার, শিক্ষক ও পডকাস্টার',
+    requiredDocs: [
+      { nameBn: 'মূল ভিডিও ফুটেজ লিঙ্ক', nameEn: 'Main A-Roll Footage Link', type: 'SCAN', isOptional: false, acceptedFormats: ['text/plain'], maxSizeBytes: 1048576 },
+      { nameBn: 'প্রেজেন্টেশন স্লাইড বা রেফারেন্স (প্রযোজ্য ক্ষেত্রে)', nameEn: 'Slides / Reference Assets', type: 'SCAN', isOptional: true, acceptedFormats: ['application/pdf', 'image/png'], maxSizeBytes: 10485760 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'footageLink', labelBn: 'ফুটেজ ড্রাইভ লিঙ্ক', labelEn: 'Footage Cloud Link', type: 'text', required: true },
+      { order: 2, key: 'editingIntensity', labelBn: 'এডিটিং ধরন ও গতি', labelEn: 'Editing Style', type: 'select', required: true, options: ['Clean Course / Educational (Minimalist & Professional)', 'YouTube High-Retention (Fast Cuts, Sound Effects, B-roll)', 'Documentary Style (Cinematic narrative)'] },
+      { order: 3, key: 'estimatedMinutes', labelBn: 'ভিডিওর দৈর্ঘ্য (মিনিট)', labelEn: 'Estimated Length in Minutes', type: 'number', required: true }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 2000,
+    estimatedProcessingTime: '২৪ থেকে ৩৬ ঘণ্টা',
+    deliveryModes: ['ONLINE_DOWNLOAD'],
+    whatToBringToShopBn: ['রেকর্ডকৃত ভিডিও মেমোরি কার্ড বা ড্রাইভে নিয়ে আসতে পারেন।'],
+    commonMistakesBn: ['খারাপ অডিও কোয়ালিটি', 'ক্লিপের সাথে কোনো টাইমকোড বা কাট নোট না থাকা'],
+    preparationInstructionsBn: ['ভিডিওর অপ্রয়োজনীয় অংশ বা রিটেক নোট দিলে কাজ দ্রুত সম্পন্ন হয়।'],
+    checklistItemsBn: ['অডিও আলাদা রেকর্ড থাকলে সেটিও লিঙ্কে যুক্ত করা'],
+    officialSourceUrl: 'https://businessos.local/services/video-editing',
+    officialSourceTitle: 'BusinessOS Creator Studio',
+    lastVerifiedDate: '2026-10-21',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-motion-graphics-promo',
+    slug: 'motion-graphics-promo',
+    titleBn: 'প্রমোশনাল মোশন গ্রাফিক্স ও ২ডি এনিমেশন',
+    titleEn: 'Motion Graphics & Brand Promo Videos',
+    category: 'VIDEO_EDITING',
+    descriptionBn: 'কোম্পানি বা প্রোডাক্ট লঞ্চের আকর্ষণীয় মোশন গ্রাফিক্স, লোগো ইন্ট্রো, টেক্সট এনিমেশন ও বিজ্ঞাপন ভিডিও।',
+    descriptionEn: 'Custom 2D motion graphics, brand logo stingers, kinetic typography, and product explainer videos.',
+    targetAudience: 'স্টার্টআপ, কর্পোরেট ব্যবসা ও ডিজিটাল মার্কেটার',
+    requiredDocs: [
+      { nameBn: 'স্ক্রিপ্ট বা ভয়েসওভার ফাইল', nameEn: 'Script or Voiceover Audio', type: 'SCAN', isOptional: false, acceptedFormats: ['text/plain', 'application/pdf'], maxSizeBytes: 5242880 },
+      { nameBn: 'ভেক্টর লোগো (AI/EPS/PNG)', nameEn: 'Vector Logo Files', type: 'PHOTO', isOptional: false, acceptedFormats: ['image/png', 'application/pdf'], maxSizeBytes: 10485760 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'scriptText', labelBn: 'ভিডিও স্ক্রিপ্ট বা মেসেজ সংক্ষেপে লিখুন', labelEn: 'Video Script or Message', type: 'textarea', required: true },
+      { order: 2, key: 'videoDurationSec', labelBn: 'ভিডিও দৈর্ঘ্য (সেকেন্ড)', labelEn: 'Duration in Seconds', type: 'select', required: true, options: ['15 Seconds (Social Media Stinger / Ad)', '30 Seconds (Standard Commercial)', '60 Seconds (Full Product Explainer)'] }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 4500,
+    estimatedProcessingTime: '২ থেকে ৩ কার্যদিবস',
+    deliveryModes: ['ONLINE_DOWNLOAD'],
+    whatToBringToShopBn: ['আপনার ব্র্যান্ড কালার কোড ও ভেক্টর লোগো ফাইল।'],
+    commonMistakesBn: ['লো রেজ্যুলেশন জেপিজি লোগো দেওয়া', 'ভয়েসওভারের গতি নির্ধারণ না করা'],
+    preparationInstructionsBn: ['আপনার কাঙ্ক্ষিত ভিজ্যুয়াল স্টাইলের ১-২টি রেফারেন্স ভিডিও লিংক প্রদান করুন।'],
+    checklistItemsBn: ['স্ক্রিপ্ট ফাইনাল ও অনুমোদিত', 'লোগো স্বচ্ছ ব্যাকগ্রাউন্ডে সংরক্ষিত'],
+    officialSourceUrl: 'https://businessos.local/services/motion-graphics',
+    officialSourceTitle: 'BusinessOS Motion Lab',
+    lastVerifiedDate: '2026-10-21',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-brand-logo-design',
+    slug: 'brand-identity-logo-design',
+    titleBn: 'ব্র্যান্ড আইডেন্টিটি ও ভেক্টর লোগো ডিজাইন',
+    titleEn: 'Brand Identity & Vector Logo Design',
+    category: 'GRAPHIC_DESIGN',
+    descriptionBn: 'সম্পূর্ণ ইউনিক, ভেক্টর-বেসড প্রফেশনাল লোগো ডিজাইন, কালার প্যালেট, টাইপোগ্রাফি ও সোশ্যাল মিডিয়া কিট।',
+    descriptionEn: 'Comprehensive brand identity design including scalable vector logo, monochrome variants, typography guidelines, and social media branding kit.',
+    targetAudience: 'নতুন ব্যবসা প্রতিষ্ঠান, ই-কমার্স ব্র্যান্ড ও শপ ওনার',
+    requiredDocs: [
+      { nameBn: 'ব্র্যান্ড নেইম ও সংক্ষিপ্ত কনসেপ্ট', nameEn: 'Brand Brief & Preferred Style', type: 'SCAN', isOptional: false, acceptedFormats: ['text/plain', 'application/pdf'], maxSizeBytes: 2097152 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'businessName', labelBn: 'ব্যবসা বা ব্র্যান্ডের নাম', labelEn: 'Business Name', type: 'text', required: true },
+      { order: 2, key: 'tagline', labelBn: 'স্লোগান / ট্যাগলাইন (যদি থাকে)', labelEn: 'Tagline / Slogan', type: 'text', required: false },
+      { order: 3, key: 'industry', labelBn: 'ব্যবসার ধরন / ইন্ডাস্ট্রি', labelEn: 'Industry / Niche', type: 'text', required: true },
+      { order: 4, key: 'preferredColors', labelBn: 'পছন্দের কালার টোন', labelEn: 'Preferred Color Scheme', type: 'select', required: true, options: ['Tech Blue & Cyan', 'Luxury Gold & Black', 'Organic Green & Earthy', 'Vibrant Red & Orange', 'Creative Multi-color'] }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 2500,
+    estimatedProcessingTime: '২৪ থেকে ৪৮ ঘণ্টা',
+    deliveryModes: ['ONLINE_DOWNLOAD'],
+    whatToBringToShopBn: ['আপনার পছন্দের ২-৩টি লোগো রেফারেন্স দেখালে সুবিধা হয়।'],
+    commonMistakesBn: ['স্পষ্ট উদ্দেশ্য ও অডিয়েন্স নির্দিষ্ট না করা'],
+    preparationInstructionsBn: ['নামের বানান এবং স্লোগান সতর্কতার সাথে যাচাই করে অর্ডার দিন।'],
+    checklistItemsBn: ['AI, EPS, SVG, PNG সব ফরম্যাট ডেলিভারি অন্তর্ভুক্ত'],
+    officialSourceUrl: 'https://businessos.local/services/graphics',
+    officialSourceTitle: 'BusinessOS Design Studio',
+    lastVerifiedDate: '2026-10-21',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-meta-google-ads',
+    slug: 'meta-google-ads-campaign',
+    titleBn: 'টার্গেটেড মেটা ও গুগল অ্যাড ক্যাম্পেইন ম্যানেজমেন্ট',
+    titleEn: 'Targeted Meta & Google Ads Campaign Management',
+    category: 'DIGITAL_MARKETING',
+    descriptionBn: 'ফেসবুক ও ইনস্টাগ্রামে সঠিক ক্রেতা টার্গেটিং, পিক্সেল ট্র্যাকিং, কনভার্সন অপ্টিমাইজেশন ও আরও বেশি সেলস জেনারেশন।',
+    descriptionEn: 'Data-driven Meta and Google Ads campaign setup, custom audience segmentation, conversion API tracking, and high-ROAS creative management.',
+    targetAudience: 'অনলাইন শপ, স্থানীয় রিটেইল ব্র্যান্ড ও সার্ভিস প্রোভাইডার',
+    requiredDocs: [
+      { nameBn: 'প্রোডাক্ট / সার্ভিস ক্যাটালগ বা ফটো', nameEn: 'Product / Service Media Assets', type: 'PHOTO', isOptional: false, acceptedFormats: ['image/jpeg', 'image/png'], maxSizeBytes: 10485760 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'pageUrl', labelBn: 'ফেসবুক পেইজ বা ওয়েবসাইটের লিঙ্ক', labelEn: 'Facebook Page or Website Link', type: 'text', required: true },
+      { order: 2, key: 'campaignGoal', labelBn: 'ক্যাম্পেইনের মূল লক্ষ্য', labelEn: 'Campaign Objective', type: 'select', required: true, options: ['ইনবক্স মেসেজ ও অর্ডার কালেকশন (Messages & WhatsApp)', 'ওয়েবসাইট সেলস ও কনভার্সন (Website Purchase)', 'ব্র্যান্ড অ্যাওয়ারনেস ও পেজ লাইকস (Page Growth)', 'লিড সংগ্রহ ও ফর্ম ফিলাপ (Lead Generation)'] },
+      { order: 3, key: 'targetLocation', labelBn: 'টার্গেটেড এরিয়া / শহর', labelEn: 'Target Geography', type: 'text', required: true }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 1800,
+    estimatedProcessingTime: '১২ থেকে ২৪ ঘণ্টা',
+    deliveryModes: ['ONLINE_DOWNLOAD'],
+    whatToBringToShopBn: ['আপনার ফেসবুক পেজের অ্যাডমিন এক্সেস বা বিজনেস ম্যানেজার লিঙ্ক প্রস্তুত রাখুন।'],
+    commonMistakesBn: ['অ্যাড একাউন্ট পলিসি লঙ্ঘন করে এমন নিষিদ্ধ পণ্য প্রচার'],
+    preparationInstructionsBn: ['আপনার দৈনিক বাজেট এবং টার্গেট পণ্যের অফার রেডি রাখুন।'],
+    checklistItemsBn: ['মেটা বিজনেস ম্যানেজারে পার্টনার বা এক্সেস শেয়ার করা'],
+    officialSourceUrl: 'https://businessos.local/services/digital-marketing',
+    officialSourceTitle: 'BusinessOS Digital Growth Agency',
+    lastVerifiedDate: '2026-10-21',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-business-2fa-hardening',
+    slug: 'business-2fa-hardening',
+    titleBn: 'বিজনেস একাউন্ট ২এফএ সিকিউরিটি ও ব্যাকআপ হার্ডেনিং',
+    titleEn: 'Business Account 2FA Security & Backup Hardening',
+    category: 'CYBERSECURITY',
+    descriptionBn: 'সোশ্যাল মিডিয়া পেজ, বিজনেস ইমেইল এবং অ্যাড অ্যাকাউন্টের হ্যাকিং প্রতিরোধে ২-ফ্যাক্টর অথেনটিকেশন, ব্যাকআপ কি এবং অ্যাক্সেস অডিট।',
+    descriptionEn: 'Approved security posture setup: Multi-factor authentication (MFA/2FA), hardware key setup, session revocation, and security audit against account takeover.',
+    targetAudience: 'ছোট ও মাঝারি ব্যবসা, শপ ওনার এবং ফেসবুক পেজ অ্যাডমিন',
+    requiredDocs: [
+      { nameBn: 'ব্যবসা ও পেজের পরিচিতি ডকুমেন্ট', nameEn: 'Page/Business Identity Document', type: 'SCAN', isOptional: false, acceptedFormats: ['image/jpeg', 'image/png', 'application/pdf'], maxSizeBytes: 5242880 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'platformToSecure', labelBn: 'যে প্ল্যাটফর্ম নিরাপদ করতে চান', labelEn: 'Platform to Secure', type: 'select', required: true, options: ['ফেসবুক পেজ ও মেটা বিজনেস পোর্টফোলিও', 'গুগল ওয়ার্কস্পেস / জিমেইল বিজনেস একাউন্ট', 'ওয়ার্ডপ্রেস ওয়েবসাইট ও সি-প্যানেল', 'সম্পূর্ণ অল-ইন-ওয়ান বিজনেস সিকিউরিটি সেটআপ'] },
+      { order: 2, key: 'contactPhone', labelBn: 'জরুরি যোগাযোগের ফোন নম্বর', labelEn: 'Emergency Contact Phone', type: 'text', required: true }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 1500,
+    estimatedProcessingTime: '২ থেকে ৪ ঘণ্টা (সরাসরি দোকান কাউন্টারে বা রিমোটে)',
+    deliveryModes: ['SHOP_PICKUP', 'ONLINE_DOWNLOAD'],
+    whatToBringToShopBn: ['নিরাপদ ডিভাইস (ল্যাপটপ বা মোবাইল) সরাসরি দোকানে নিয়ে আসলে সবচেয়ে নিরাপদভাবে সেটআপ করা যায়।'],
+    commonMistakesBn: ['টু-ফ্যাক্টর ব্যাকআপ কোড কোথাও সংরক্ষণ না করা'],
+    preparationInstructionsBn: ['কখনোই কারো সাথে আপনার পাসওয়ার্ড বা ওটিপি এসএমএস শেয়ার করবেন না।'],
+    checklistItemsBn: ['অথেন্টিকেটর অ্যাপে ব্যাকআপ কনফিগার সম্পন্ন', 'জরুরি রিকভারি কোড নিরাপদ প্রিন্ট আকারে সংরক্ষণ'],
+    officialSourceUrl: 'https://businessos.local/services/cybersecurity',
+    officialSourceTitle: 'BusinessOS IT Security Desk',
+    lastVerifiedDate: '2026-10-21',
+    verificationStatus: 'VERIFIED',
+    isActive: true
+  },
+  {
+    id: 'srv-bulk-document-print',
+    slug: 'bulk-document-print-binding',
+    titleBn: 'উচ্চগতির ডকুমেন্ট প্রিন্ট, ফটোকপি ও স্পাইরাল বাইন্ডিং',
+    titleEn: 'High-Speed Document Print, Photocopy & Binding',
+    category: 'PRINT_PHOTOCOPY',
+    descriptionBn: 'পিডিএফ বুকলেট প্রিন্ট, সাদা-কালো ও রঙিন ফটোকপি, প্রজেক্ট রিপোর্ট বাইন্ডিং ও ল্যামিনেশন। ফাইল আপলোড করে দোকানে প্রস্তুত পেয়ে যান।',
+    descriptionEn: 'High-volume auto-duplex laser printing, monochrome and color copies, spiral comb binding, and thermal lamination.',
+    targetAudience: 'শিক্ষার্থী, অফিস সহকারী, শিক্ষক ও যেকোনো সাধারণ গ্রাহক',
+    requiredDocs: [
+      { nameBn: 'প্রিন্টযোগ্য ফাইল (PDF / Word)', nameEn: 'Print-ready Document', type: 'SCAN', isOptional: false, acceptedFormats: ['application/pdf', 'application/msword'], maxSizeBytes: 52428800 }
+    ],
+    orderedFields: [
+      { order: 1, key: 'paperSize', labelBn: 'কাগজের সাইজ', labelEn: 'Paper Size', type: 'select', required: true, options: ['A4 80 GSM (Standard Office)', 'Legal Size (Stamps & Agreements)', 'Letter Size', '100 GSM Premium Presentation Paper'] },
+      { order: 2, key: 'colorMode', labelBn: 'কালার মোড', labelEn: 'Color Mode', type: 'select', required: true, options: ['Black & White (B&W) Laser', 'Full Color Laser (High Resolution)'] },
+      { order: 3, key: 'duplex', labelBn: 'প্রিন্ট স্টাইল', labelEn: 'Print Sides', type: 'select', required: true, options: ['Double Sided (বোথ সাইড - পৃষ্ঠা সাশ্রয়ী)', 'Single Sided (এক সাইড)'] },
+      { order: 4, key: 'binding', labelBn: 'বাইন্ডিং প্রয়োজন আছে কি?', labelEn: 'Binding Option', type: 'select', required: true, options: ['No Binding (শুধু প্রিন্ট কপি)', 'Spiral Comb Binding with Plastic Covers', 'Stapler Corner Pin', 'Hard Cover Project Binding'] }
+    ],
+    officialGovtFeeBdt: 0,
+    shopServiceChargeBdt: 50,
+    estimatedProcessingTime: '১০ থেকে ২০ মিনিট',
+    deliveryModes: ['SHOP_PICKUP', 'COURIER'],
+    whatToBringToShopBn: ['আপনার টোকেন নম্বর কাউন্টারে দেখিয়ে সরাসরি প্রিন্ট কপি সংগ্রহ করুন।'],
+    commonMistakesBn: ['পাসওয়ার্ড প্রটেক্টেড পিডিএফ আপলোড করা'],
+    preparationInstructionsBn: ['প্রিন্ট করার আগে ডকুমেন্টের মার্জিন ও পৃষ্ঠা ক্রম ঠিক আছে কিনা দেখে নিন।'],
+    checklistItemsBn: ['টোকেন নম্বর সাথে রাখা'],
+    officialSourceUrl: 'https://businessos.local/printing',
+    officialSourceTitle: 'BusinessOS Print & Copy Station',
+    lastVerifiedDate: '2026-10-21',
     verificationStatus: 'VERIFIED',
     isActive: true
   }

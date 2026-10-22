@@ -32,7 +32,11 @@ import { BackupVaultService } from './backup-vault.service';
 import { ServiceKnowledgeService } from './service-knowledge.service';
 import { PublicServicesController, AdminServiceKnowledgeController } from './service-knowledge.controller';
 import { CustomerVaultService } from './customer-vault.service';
-import { PublicCustomerVaultController, AdminCustomerVaultController } from './customer-vault.controller';
+import {
+  PublicCustomerVaultController,
+  AdminCustomerVaultController,
+  AuthenticatedCustomerVaultController,
+} from './customer-vault.controller';
 import { ServiceSchedulingService } from './service-scheduling.service';
 import { PublicAppointmentsController, AdminServiceSchedulingController } from './service-scheduling.controller';
 import { ServiceApplicationsService } from './service-applications.service';
@@ -59,6 +63,7 @@ import { PublicServiceAssistantController } from './service-assistant.controller
     PublicServicesController,
     AdminServiceKnowledgeController,
     PublicCustomerVaultController,
+    AuthenticatedCustomerVaultController,
     AdminCustomerVaultController,
     PublicAppointmentsController,
     AdminServiceSchedulingController,

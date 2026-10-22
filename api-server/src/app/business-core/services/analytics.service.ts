@@ -212,4 +212,139 @@ export class AnalyticsService {
       }
     };
   }
+
+  /**
+   * Phase 8: Operational Customer Intelligence for Owner/Manager
+   */
+  async getCustomerIntelligence(organizationId: string) {
+    // 1. Customer metrics
+    const allCustomers = await this.prisma.customer.findMany({
+      where: { organizationId },
+      include: {
+        sales: { select: { id: true, total: true, saleDate: true } }
+      }
+    });
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const newCustomers = allCustomers.filter(c => new Date(c.createdAt) >= thirtyDaysAgo);
+    const returningCustomers = allCustomers.filter(c => c.sales.length > 1);
+
+    // 2. Internet Service Applications & Categories
+    const appLogs = await this.prisma.auditLog.findMany({
+      where: {
+        organizationId,
+        entityType: 'InternetServiceApplication',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
+
+    const applications = appLogs.map(l => (l.newData as any) || {});
+    const categoryCount: Record<string, number> = {};
+    let pendingAppsCount = 0;
+    let completedAppsCount = 0;
+    let missingDocsCount = 0;
+    let appRevenueTotal = 0;
+
+    applications.forEach(app => {
+      const cat = app.category || app.serviceCategory || 'GENERAL';
+      categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+
+      if (['DRAFT', 'AWAITING_CUSTOMER_INFO', 'AWAITING_PAYMENT', 'SUBMITTED_FOR_REVIEW', 'IN_PROGRESS'].includes(app.status)) {
+        pendingAppsCount++;
+      }
+      if (['COMPLETED', 'DELIVERED', 'READY_FOR_PICKUP'].includes(app.status)) {
+        completedAppsCount++;
+      }
+      if (app.missingDocuments && app.missingDocuments.length > 0) {
+        missingDocsCount += app.missingDocuments.length;
+      }
+      appRevenueTotal += Number(app.financials?.totalAmountBdt || 0);
+    });
+
+    // 3. Sales Payments: Cash vs Digital
+    const payments = await this.prisma.salePayment.findMany({
+      where: { organizationId },
+      select: { method: true, amount: true }
+    });
+
+    let cashPaymentsTotal = 0;
+    let digitalPaymentsTotal = 0;
+
+    payments.forEach(p => {
+      const amt = Number(p.amount);
+      if (p.method === 'CASH') {
+        cashPaymentsTotal += amt;
+      } else {
+        digitalPaymentsTotal += amt;
+      }
+    });
+
+    // 4. Outstanding Balances from unpaid/partial sales
+    const unpaidSales = await this.prisma.sale.findMany({
+      where: {
+        organizationId,
+        paymentStatus: { in: ['UNPAID', 'PARTIALLY_PAID'] },
+        status: { not: 'CANCELLED' }
+      },
+      include: {
+        payments: { select: { amount: true } }
+      }
+    });
+
+    let outstandingBalanceTotal = 0;
+    unpaidSales.forEach(s => {
+      const paid = s.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const due = Number(s.total) - paid;
+      if (due > 0) outstandingBalanceTotal += due;
+    });
+
+    // 5. Customer Vault Intelligence
+    const vaultLogs = await this.prisma.auditLog.findMany({
+      where: {
+        organizationId,
+        entityType: 'CustomerVaultProfile',
+      },
+      take: 200,
+    });
+
+    const uniqueVaultProfiles = new Set(vaultLogs.map(l => l.entityId)).size;
+    let totalDynamicFields = 0;
+    vaultLogs.forEach(l => {
+      const p = (l.newData as any) || {};
+      if (p.dynamicFields) totalDynamicFields += p.dynamicFields.length;
+    });
+
+    return {
+      customers: {
+        totalCustomers: allCustomers.length,
+        newCustomers30Days: newCustomers.length,
+        returningCustomers: returningCustomers.length,
+        retentionRate: allCustomers.length > 0 ? ((returningCustomers.length / allCustomers.length) * 100).toFixed(1) + '%' : '0%',
+      },
+      services: {
+        totalApplications: applications.length,
+        pendingApplications: pendingAppsCount,
+        completedApplications: completedAppsCount,
+        missingDocumentsCount: missingDocsCount,
+        totalServiceRevenueBdt: appRevenueTotal,
+        categoryBreakdown: categoryCount,
+      },
+      payments: {
+        cashPaymentsBdt: cashPaymentsTotal,
+        digitalPaymentsBdt: digitalPaymentsTotal,
+        totalCollectedBdt: cashPaymentsTotal + digitalPaymentsTotal,
+        cashSharePct: (cashPaymentsTotal + digitalPaymentsTotal) > 0 ? ((cashPaymentsTotal / (cashPaymentsTotal + digitalPaymentsTotal)) * 100).toFixed(1) + '%' : '0%',
+        outstandingBalanceBdt: outstandingBalanceTotal,
+      },
+      vaultIntelligence: {
+        savedVaultProfiles: uniqueVaultProfiles,
+        totalDynamicFieldsExtracted: totalDynamicFields,
+        reusableVerifiedFieldsEstimated: totalDynamicFields + (uniqueVaultProfiles * 8),
+      }
+    };
+  }
 }
+

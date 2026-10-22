@@ -46,11 +46,18 @@ export class CustomerAuthService {
     return this.login(customer);
   }
 
-  async loginWithCredentials(email: string, pass: string): Promise<any> {
+  async loginWithCredentials(emailOrPhone: string, pass: string): Promise<any> {
     const orgId = await this.getDefaultOrganizationId();
+    const cleanPhone = (emailOrPhone || '').replace(/[^0-9]/g, '');
     
     const customer = await prisma.customer.findFirst({
-      where: { organizationId: orgId, email }
+      where: {
+        organizationId: orgId,
+        OR: [
+          { email: emailOrPhone.trim().toLowerCase() },
+          ...(cleanPhone.length >= 10 ? [{ phone: { contains: cleanPhone.slice(-10) } }] : [])
+        ]
+      }
     });
 
     if (!customer || !customer.password) {
@@ -64,14 +71,35 @@ export class CustomerAuthService {
   }
 
   async login(customer: any) {
-    const payload = { sub: customer.id, type: 'customer' };
+    const payload = { sub: customer.id, type: 'customer', orgId: customer.organizationId };
     return {
       access_token: this.jwtService.sign(payload),
       customer: {
         id: customer.id,
         name: customer.name,
         email: customer.email,
+        phone: customer.phone,
       }
     };
+  }
+
+  async getMe(customerId: string) {
+    const orgId = await this.getDefaultOrganizationId();
+    const customer = await prisma.customer.findFirst({
+      where: { organizationId: orgId, id: customerId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        address: true,
+        status: true,
+        createdAt: true,
+      }
+    });
+    if (!customer) {
+      throw new NotFoundException('Customer profile not found');
+    }
+    return customer;
   }
 }

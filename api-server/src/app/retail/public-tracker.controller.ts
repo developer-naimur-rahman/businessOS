@@ -83,8 +83,14 @@ export class PublicTrackerController {
           transactionId: app.paymentEvidence?.transactionId || null
         },
         deliveryMode: app.deliveryMode || 'ONLINE_DOWNLOAD',
-        deliverables: app.deliverables || [],
-        missingDocuments: app.missingDocuments || [],
+        deliverables: (app.deliverables || []).map((d: any) => ({
+          title: d.title,
+          docType: d.docType,
+          hasFile: !!d.fileUrlOrBase64,
+          requiresAuth: true,
+          message: 'Please log in to your Customer Account to securely view and download your documents.'
+        })),
+        missingDocuments: (app.missingDocuments || []).map((m: any) => typeof m === 'string' ? m : (m.nameBn || m.nameEn || 'Required Document')),
         canCustomerApprove: app.status === 'READY_FOR_APPROVAL',
         dates: {
           receivedAt: app.createdAt || matchedApp.createdAt
@@ -92,7 +98,7 @@ export class PublicTrackerController {
         assignedStaff: app.assignedStaffName || 'Internet Service Specialist',
         pickupNote: app.deliveryMode === 'SHOP_PICKUP'
           ? `Show Token #${app.referenceNumber} at our service counter to collect your printed application documents.`
-          : 'You can download your application confirmation slip, resized photo, or admit card directly below.'
+          : 'You can view tracking status here. Log in to your customer account to download official documents.'
       };
     }
 

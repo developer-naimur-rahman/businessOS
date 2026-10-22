@@ -45,14 +45,19 @@ function ServicesContent() {
   }, [])
 
   const categories = [
-    { key: 'ALL', labelBn: 'সকল অনলাইন সেবা', labelEn: 'All Services' },
+    { key: 'ALL', labelBn: 'সকল ডিজিটাল ও অনলাইন সেবা', labelEn: 'All Services' },
+    { key: 'VIDEO_EDITING', labelBn: 'ভিডিও এডিটিং ও রিলস', labelEn: 'Video Editing & Reels' },
+    { key: 'GRAPHIC_DESIGN', labelBn: 'গ্রাফিক ডিজাইন ও লোগো', labelEn: 'Graphic Design & Logo' },
+    { key: 'DIGITAL_MARKETING', labelBn: 'ডিজিটাল মার্কেটিং ও অ্যাডস', labelEn: 'Digital Marketing & Ads' },
+    { key: 'CYBERSECURITY', labelBn: 'সাইবার সিকিউরিটি ও আইটি', labelEn: 'Cybersecurity & IT' },
     { key: 'GOVT_JOB', labelBn: 'সরকারি ও টেলিটক চাকরি', labelEn: 'Govt Job Applications' },
     { key: 'PASSPORT', labelBn: 'ই-পাসপোর্ট নতুন ও নবায়ন', labelEn: 'E-Passport' },
     { key: 'CIVIL_REG', labelBn: 'জন্ম নিবন্ধন সংশোধন', labelEn: 'Birth Registration' },
     { key: 'NID', labelBn: 'NID ও ভোটার কার্ড', labelEn: 'NID & Voter Services' },
     { key: 'VISA', labelBn: 'ভিসা ও দূতাবাস ডকুমেন্ট', labelEn: 'Visa Assistance' },
     { key: 'TAX_TIN', labelBn: 'ই-টিআইএন ও আয়কর', labelEn: 'e-TIN Tax' },
-    { key: 'PHOTO_DOC', labelBn: 'ফটো স্টুডিও ও প্রিন্ট', labelEn: 'Photo Studio & Print' },
+    { key: 'PHOTO_DOC', labelBn: 'ফটো স্টুডিও রিসাইজ', labelEn: 'Photo Studio Preset' },
+    { key: 'PRINT_PHOTOCOPY', labelBn: 'প্রিন্টিং ও ফটোকপি', labelEn: 'Printing & Binding' },
   ]
 
   const filtered = useMemo(() => {

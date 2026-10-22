@@ -1,17 +1,16 @@
 "use client"
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { api } from '../lib/api-client';
 
-interface Customer {
+export interface Customer {
   id: string;
   name: string;
   email: string;
   phone?: string;
 }
 
-
-interface CustomerAuthState {
+export interface CustomerAuthState {
   customer: Customer | null;
   token: string | null;
   isAuthenticated: boolean;
@@ -19,22 +18,34 @@ interface CustomerAuthState {
   logout: () => void;
 }
 
-const dummyStorage = {
-  getItem: () => null,
-  setItem: () => {},
-  removeItem: () => {},
-};
-
-export const useCustomerAuthStore = create<CustomerAuthState>((set) => ({
-  customer: null,
-  token: null,
-  isAuthenticated: false,
-  login: (token: string, customer: Customer) => {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    set({ customer, token, isAuthenticated: true });
-  },
-  logout: () => {
-    delete api.defaults.headers.common['Authorization'];
-    set({ customer: null, token: null, isAuthenticated: false });
-  },
-}));
+export const useCustomerAuthStore = create<CustomerAuthState>()(
+  persist(
+    (set) => ({
+      customer: null,
+      token: null,
+      isAuthenticated: false,
+      login: (token: string, customer: Customer) => {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('customer_access_token', token);
+        }
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        set({ customer, token, isAuthenticated: true });
+      },
+      logout: () => {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('customer_access_token');
+        }
+        delete api.defaults.headers.common['Authorization'];
+        set({ customer: null, token: null, isAuthenticated: false });
+      },
+    }),
+    {
+      name: 'customer-auth-storage',
+      onRehydrateStorage: () => (state) => {
+        if (state?.token) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${state.token}`;
+        }
+      },
+    }
+  )
+);

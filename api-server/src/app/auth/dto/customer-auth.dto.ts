@@ -1,8 +1,8 @@
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CustomerLoginDto {
-  @IsEmail({}, { message: 'A valid email address is required.' })
-  @IsNotEmpty({ message: 'Email address cannot be empty.' })
+  @IsString()
+  @IsNotEmpty({ message: 'Email address or phone number is required.' })
   email: string;
 
   @IsString()

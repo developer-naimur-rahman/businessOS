@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Request } from '@nestjs/common';
 import { CustomerAuthService } from './customer-auth.service';
 import { CustomerLoginDto, CustomerRegisterDto } from './dto/customer-auth.dto';
 import { RateLimit, RateLimitGuard } from '../common/guards/rate-limit.guard';
+import { CustomerJwtAuthGuard } from './guards/customer-jwt-auth.guard';
 
 @Controller('public/auth')
 @UseGuards(RateLimitGuard)
@@ -18,6 +19,12 @@ export class CustomerAuthController {
   @RateLimit({ limit: 10, ttlSeconds: 60 })
   async register(@Body() body: CustomerRegisterDto) {
     return this.customerAuthService.register(body);
+  }
+
+  @UseGuards(CustomerJwtAuthGuard)
+  @Get('me')
+  async getMe(@Request() req: any) {
+    return this.customerAuthService.getMe(req.user.customerId);
   }
 }
 

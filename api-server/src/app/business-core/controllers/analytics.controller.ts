@@ -16,4 +16,10 @@ export class AnalyticsController {
     const period = days ? parseInt(days, 10) : 30;
     return this.analyticsService.getDashboardData(req.user.organizationId, period);
   }
+
+  @Get('customer-intelligence')
+  @RequirePermissions('reports.dashboard.view')
+  async getCustomerIntelligence(@Request() req) {
+    return this.analyticsService.getCustomerIntelligence(req.user.organizationId);
+  }
 }

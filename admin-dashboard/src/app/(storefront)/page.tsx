@@ -5,7 +5,7 @@ import { STATIC_CATALOG } from "../../config/static-catalog"
 import React, { useEffect, useState } from "react"
 import { api } from "../../lib/api-client"
 import Link from "next/link"
-import { ArrowRight, Star, ChevronLeft, ChevronRight, ShoppingCart, ShieldCheck, Truck, RefreshCcw, HeadphonesIcon, Flame, Heart } from "lucide-react"
+import { ArrowRight, Star, ChevronLeft, ChevronRight, ShoppingCart, ShieldCheck, Truck, RefreshCcw, HeadphonesIcon, Flame, Heart, Sparkles, FileText, CheckCircle2, Video, Palette, Megaphone, Lock, Printer, Layers, UploadCloud, Search, ShieldAlert, Cpu } from "lucide-react"
 import { MediaImage } from "../../components/ui/media-image"
 import { useCartStore } from "../../store/useCartStore"
 import { useWishlistStore } from "../../store/useWishlistStore"
@@ -384,6 +384,230 @@ export default function StorefrontHomePage() {
 
         </div>
       </div>
+
+      {/* Phase 6: AI-Powered Customer Intelligence Core Advantage Section */}
+      <section className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 pt-10 pb-6">
+        <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white rounded-3xl p-8 sm:p-12 border border-slate-800 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="relative z-10 max-w-4xl mx-auto text-center space-y-4 mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 text-xs font-bold tracking-wider uppercase">
+              <Sparkles className="w-4 h-4 text-cyan-400" /> AI Vault & Smart Service System
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight text-white leading-tight">
+              “আপনার তথ্য একবার, <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">প্রয়োজনীয় সেবা বারবার</span>—আরও সহজে।”
+            </h2>
+            <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-3xl mx-auto">
+              আপনার প্রয়োজনীয় ডকুমেন্ট থেকে AI-এর সাহায্যে তথ্য সাজান, নিজের প্রোফাইলে সংরক্ষণ করুন এবং ভবিষ্যতের বিভিন্ন সেবায় প্রয়োজনীয় তথ্য পুনরায় ব্যবহার করুন। আপনার তথ্য পর্যালোচনা করুন, ভুল সংশোধন করুন এবং নিজের অ্যাকাউন্ট থেকে কাজের অগ্রগতি দেখুন।
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+              <Link
+                href="/account"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-cyan-500/25"
+              >
+                <Cpu className="w-4 h-4" /> আমার AI ভল্ট ড্যাশবোর্ড
+              </Link>
+              <Link
+                href="/service-request"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20 transition-all backdrop-blur-sm"
+              >
+                <UploadCloud className="w-4 h-4" /> ডকুমেন্ট আপলোড ও আবেদন
+              </Link>
+              <Link
+                href="/track"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm border border-slate-700 transition-all"
+              >
+                <Search className="w-4 h-4" /> আবেদন ও অর্ডার ট্র্যাকিং
+              </Link>
+            </div>
+          </div>
+
+          {/* Core Feature Pillars */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+            <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:border-cyan-500/40 transition-colors">
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-4">
+                  <UploadCloud className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-lg text-white mb-2">মাল্টি-ডকুমেন্ট এআই এক্সট্রাকশন</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  এনআইডি, সার্টিফিকেট, ও পাসপোর্ট থেকে স্বয়ংক্রিয়ভাবে নির্ভুল তথ্য বের করে সাজিয়ে দেয়।
+                </p>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-xs text-cyan-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> ১০০% নির্ভুল OCR অ্যাসিস্ট্যান্ট
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:border-blue-500/40 transition-colors">
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center mb-4">
+                  <Layers className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-lg text-white mb-2">এক তথ্যের বহুবিধ ব্যবহার</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  একবার সংরক্ষিত তথ্য চাকরির আবেদন, পাসপোর্ট কিংবা যেকোনো সেবায় বারবার অটো-ফিল করুন।
+                </p>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-xs text-blue-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> সময় ও ঝামেলা সাশ্রয়ী
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:border-purple-500/40 transition-colors">
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-4">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-lg text-white mb-2">গ্রাহক নিয়ন্ত্রণ ও সম্পাদনা</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  যেকোনো তথ্য আপনি নিজে পরীক্ষা করে এডিট, ফিল্ড সংশোধন বা নতুন ফিল্ড যোগ করতে পারবেন।
+                </p>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-xs text-purple-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> হিউম্যান-ইন-দ্য-লুপ নিরাপত্তা
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:border-emerald-500/40 transition-colors">
+              <div>
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-4">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-lg text-white mb-2">ব্যাংক-গ্রেড গোপনীয়তা</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  আইডি ছাড়া কেউ আপনার তথ্য দেখতে পারবে না। শুধুমাত্র আপনার অনুমতিক্রমে সেবা প্রসেস হয়।
+                </p>
+              </div>
+              <div className="mt-4 pt-4 border-t border-slate-800/80 text-xs text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> নিরাপদ এনক্রিপ্টেড ডাটা ভল্ট
+              </div>
+            </div>
+          </div>
+
+          {/* Unified Marketplace Categories Grid */}
+          <div className="mt-16 pt-12 border-t border-slate-800 relative z-10">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+              <div>
+                <h3 className="text-2xl font-bold text-white">আমাদের সম্পূর্ণ ডিজিটাল সার্ভিস সেন্টার</h3>
+                <p className="text-slate-400 text-sm">অনলাইন সরকারি সেবা থেকে ক্রিয়েটিভ এজেন্সি সমাধান—সব এক ছাদের নিচে</p>
+              </div>
+              <Link href="/services" className="text-cyan-400 font-bold text-sm flex items-center gap-1 hover:gap-2 transition-all">
+                সকল সার্ভিস দেখুন <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                {
+                  title: 'সরকারি ও অনলাইন সেবা',
+                  en: 'Government & Citizen Services',
+                  desc: 'টেলিটক সরকারি চাকরির আবেদন, ই-পাসপোর্ট, জন্ম নিবন্ধন ও NID সংশোধনের নির্ভুল সমাধান।',
+                  icon: FileText,
+                  href: '/services?category=GOVT_JOB',
+                  badge: 'স্মার্ট সেন্টার',
+                  color: 'from-blue-600/20 to-cyan-600/10 text-cyan-400 border-cyan-500/30'
+                },
+                {
+                  title: 'ভিডিও এডিটিং ও মোশন গ্রাফিক্স',
+                  en: 'Video Editing & Motion Graphics',
+                  desc: 'রিয়েল এস্টেট প্রপার্টি ওয়াকথ্রু, ভাইরাল রিলস, টকিং-হেড ও প্রমোশনাল ভিডিও এডিটিং।',
+                  icon: Video,
+                  href: '/services?category=VIDEO_EDITING',
+                  badge: 'প্রফেশনাল স্টুডিও',
+                  color: 'from-rose-600/20 to-amber-600/10 text-rose-400 border-rose-500/30'
+                },
+                {
+                  title: 'গ্রাফিক ডিজাইন ও লোগো',
+                  en: 'Graphic Design & Brand Identity',
+                  desc: 'ইউনিক ব্র্যান্ড আইডেন্টিটি, ভেক্টর লোগো ডিজাইন ও সোশ্যাল মিডিয়া ক্রিয়েটিভ ব্যানার।',
+                  icon: Palette,
+                  href: '/services?category=GRAPHIC_DESIGN',
+                  badge: 'ক্রিয়েটিভ ডিজাইন',
+                  color: 'from-purple-600/20 to-pink-600/10 text-purple-400 border-purple-500/30'
+                },
+                {
+                  title: 'ডিজিটাল মার্কেটিং ও অ্যাডস',
+                  en: 'Targeted Digital Marketing',
+                  desc: 'মেটা ও গুগল অ্যাড ক্যাম্পেইন, সেলস ফানেল ও সোশ্যাল মিডিয়া পেজ গ্রোথ ম্যানেজমেন্ট।',
+                  icon: Megaphone,
+                  href: '/services?category=DIGITAL_MARKETING',
+                  badge: 'সেলস গ্রোথ',
+                  color: 'from-amber-600/20 to-emerald-600/10 text-amber-400 border-amber-500/30'
+                },
+                {
+                  title: 'সাইবার সিকিউরিটি ও ২এফএ',
+                  en: 'Cybersecurity & Account Hardening',
+                  desc: 'বিজনেস একাউন্ট ২এফএ সিকিউরিটি, পেজ হ্যাকিং প্রতিরোধ ও ডিজিটাল এসেট সুরক্ষা।',
+                  icon: Lock,
+                  href: '/services?category=CYBERSECURITY',
+                  badge: 'সিকিউরিটি ডট',
+                  color: 'from-emerald-600/20 to-teal-600/10 text-emerald-400 border-emerald-500/30'
+                },
+                {
+                  title: 'উচ্চগতির প্রিন্টিং ও ফটোকপি',
+                  en: 'Laser Printing & Spiral Binding',
+                  desc: 'A4 লেজার অটো-ডুপ্লেক্স প্রিন্ট, ফটোকপি, প্রজেক্ট বাইন্ডিং ও পাসপোর্ট ফটো স্টুডিও।',
+                  icon: Printer,
+                  href: '/printing',
+                  badge: 'কাউন্টার এক্সপ্রেস',
+                  color: 'from-slate-700/30 to-slate-800/20 text-slate-300 border-slate-700'
+                }
+              ].map((item, i) => (
+                <Link
+                  key={i}
+                  href={item.href}
+                  className={`bg-gradient-to-br ${item.color} backdrop-blur border rounded-2xl p-6 flex flex-col justify-between hover:scale-[1.02] transition-all duration-300 group`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                        <item.icon className="w-5 h-5" />
+                      </div>
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/10 border border-white/10">
+                        {item.badge}
+                      </span>
+                    </div>
+                    <h4 className="text-lg font-bold text-white mb-1 group-hover:text-cyan-300 transition-colors">{item.title}</h4>
+                    <p className="text-xs text-slate-400 font-medium mb-3">{item.en}</p>
+                    <p className="text-xs text-slate-300 leading-relaxed">{item.desc}</p>
+                  </div>
+                  <div className="mt-6 flex items-center justify-between text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">
+                    <span>সার্ভিস বিস্তারিত ও অর্ডার</span>
+                    <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* 5-Step Process Workflow */}
+          <div className="mt-16 pt-12 border-t border-slate-800 relative z-10">
+            <div className="text-center max-w-2xl mx-auto mb-10">
+              <h3 className="text-2xl font-bold text-white">কিভাবে কাজ করে আমাদের স্মার্ট সার্ভিস সিস্টেম?</h3>
+              <p className="text-slate-400 text-sm mt-1">৫টি সহজ ধাপে সম্পূর্ণ ঝামেলামুক্ত আবেদন ও ডেলিভারি</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              {[
+                { step: '০১', title: 'ডকুমেন্ট আপলোড', sub: 'ছবি, এনআইডি বা ফাইল ড্রপ করুন' },
+                { step: '০২', title: 'এআই অটো-এক্সট্র্যাক্ট', sub: 'স্বয়ংক্রিয়ভাবে তথ্য নির্ভুলভাবে রিড করে' },
+                { step: '০৩', title: 'গ্রাহক রিভিউ ও কারেকশন', sub: 'নিজে দেখে ভুল থাকলে এডিট করুন' },
+                { step: '০৪', title: 'অফিসিয়াল প্রসেসিং', sub: 'দোকান এক্সপার্ট দ্বারা সরকারি ফরম পূরণ' },
+                { step: '০৫', title: 'ডেলিভারি ও ট্র্যাকিং', sub: 'অনলাইন ডাউনলোড বা কাউন্টার থেকে প্রিন্ট সংগ্রহ' }
+              ].map((s, idx) => (
+                <div key={idx} className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 text-center relative group hover:border-cyan-500/40 transition-colors">
+                  <div className="text-2xl font-black text-cyan-400/80 mb-2">{s.step}</div>
+                  <div className="text-sm font-bold text-white mb-1">{s.title}</div>
+                  <div className="text-xs text-slate-400">{s.sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </section>
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-12 md:py-20 w-full space-y-20">
         

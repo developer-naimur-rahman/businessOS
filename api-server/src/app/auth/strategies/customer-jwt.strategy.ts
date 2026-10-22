@@ -25,7 +25,8 @@ export class CustomerJwtStrategy extends PassportStrategy(Strategy, 'customer-jw
     
     return {
       customerId: payload.sub,
-      type: 'customer'
+      type: 'customer',
+      orgId: payload.orgId
     };
   }
 }
