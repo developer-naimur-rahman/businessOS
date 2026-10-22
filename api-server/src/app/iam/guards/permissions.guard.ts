@@ -67,6 +67,7 @@ export class PermissionsGuard implements CanActivate {
       // Manager role defaults
       if (isManager) {
         if (
+          required.startsWith('services.') ||
           required.startsWith('businesscore.') ||
           required.startsWith('catalog.') ||
           required.startsWith('sales.') ||

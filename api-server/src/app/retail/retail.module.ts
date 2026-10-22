@@ -44,6 +44,8 @@ import { PublicServiceRequestController, AdminServiceApplicationsController } fr
 import { ServiceAssistantService } from './service-assistant.service';
 import { PublicServiceAssistantController } from './service-assistant.controller';
 import { NotificationService } from '../common/notifications/notification.service';
+import { UniversalDocumentService } from './universal-document.service';
+import { AdminUniversalDocumentController, PublicUniversalDocumentController } from './universal-document.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -71,6 +73,8 @@ import { NotificationService } from '../common/notifications/notification.servic
     PublicServiceRequestController,
     AdminServiceApplicationsController,
     PublicServiceAssistantController,
+    AdminUniversalDocumentController,
+    PublicUniversalDocumentController,
   ],
   providers: [
     HybridIntelligenceService,
@@ -91,6 +95,7 @@ import { NotificationService } from '../common/notifications/notification.servic
     ServiceApplicationsService,
     ServiceAssistantService,
     NotificationService,
+    UniversalDocumentService,
   ],
   exports: [
     BakiKhataService,
@@ -101,6 +106,7 @@ import { NotificationService } from '../common/notifications/notification.servic
     DigitalServicesService,
     QuotationsService,
     NotificationService,
+    UniversalDocumentService,
     MachineHealthService,
     AiCopilotService,
     HrPayrollService,
