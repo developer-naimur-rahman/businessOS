@@ -211,10 +211,16 @@ function ServiceRequestContent() {
       }
     } catch (err: any) {
       console.error("AI extraction error", err)
-      setExtractionError("ডকুমেন্ট বিশ্লেষণ করতে সমস্যা হয়েছে। আপনি সরাসরি ফরম পূরণ করতে পারবেন।")
-      toast.error("AI এক্সট্র্যাকশনে সমস্যা হয়েছে। সরাসরি ফরম পূরণ করতে পারবেন।")
+      const isTooLarge = err.response?.status === 413
+      const serverMsg = err.response?.data?.message
+      const displayMsg = isTooLarge
+        ? "আপলোডকৃত ফাইলের আকার অনেক বড় (সর্বোচ্চ ৫০ মেগাবাইট অনুমোদিত)। অনুগ্রহ করে ছোট সাইজের ফাইল দিন অথবা সরাসরি ফরম পূরণ করুন।"
+        : (typeof serverMsg === 'string' ? serverMsg : "ডকুমেন্ট বিশ্লেষণ সার্ভিসে সাময়িক সমস্যা হয়েছে। আপনি সরাসরি ফরম পূরণ করতে পারবেন অথবা পুনরায় চেষ্টা করতে পারেন।")
+
+      setExtractionError(displayMsg)
+      toast.error(isTooLarge ? "ফাইলের আকার অনেক বড়!" : "AI এক্সট্র্যাকশনে সমস্যা হয়েছে। সরাসরি ফরম পূরণ করতে পারবেন।")
       
-      // Initialize fallback fields from service schema
+      // Initialize fallback fields from service schema so customer can fill manually
       if (currentService.orderedFields) {
         const fallbacks: ExtractedFormField[] = currentService.orderedFields.map((f: any) => ({
           key: f.key,
@@ -227,6 +233,8 @@ function ServiceRequestContent() {
         }))
         setExtractedFields(fallbacks)
       }
+      setExtractionEngine('ALGORITHMIC_FALLBACK')
+      setExtractionConfidence(0)
       setExtractionCompleted(true)
     } finally {
       setIsExtracting(false)
@@ -737,6 +745,42 @@ function ServiceRequestContent() {
                     <span className="text-cyan-700 font-bold animate-pulse">প্রসেসিং...</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          ) : extractionError ? (
+            <div className="py-8 space-y-6 max-w-lg mx-auto">
+              <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 mx-auto flex items-center justify-center">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+
+              <div className="space-y-3">
+                <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800">
+                  ⚠️ স্বয়ংক্রিয় রিডিং বিকল্প
+                </span>
+                <h2 className="text-xl font-black text-slate-900">ডকুমেন্ট থেকে স্বয়ংক্রিয় তথ্য পড়া যায়নি</h2>
+                <div className="text-xs text-amber-800 bg-amber-50 p-3.5 rounded-2xl border border-amber-200 text-left">
+                  {extractionError}
+                </div>
+                <p className="text-xs text-slate-500">
+                  চিন্তার কিছু নেই! আপনার আপলোডকৃত ফাইলসমূহ সুরক্ষিত আছে। আপনি সরাসরি আবেদন ফরমটি পূরণ করতে পারেন অথবা পুনরায় চেষ্টা করতে পারেন।
+                </p>
+              </div>
+
+              <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={executeAiExtraction}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs inline-flex items-center justify-center gap-2 transition-all"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> পুনরায় চেষ্টা করুন
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(4)}
+                  className="w-full sm:w-auto px-8 py-3 rounded-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-sm shadow-md shadow-cyan-600/20 inline-flex items-center justify-center gap-2 transition-all"
+                >
+                  ম্যানুয়ালি ফরম পূরণ করুন <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
           ) : (

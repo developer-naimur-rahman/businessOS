@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, Request, HttpCode, HttpStatus } from '@nestjs/common';
 import { ServiceApplicationsService } from './service-applications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrganizationContextGuard } from '../common/guards/organization-context.guard';
@@ -16,6 +16,7 @@ export class PublicServiceRequestController {
   }
 
   @Post('extract-and-map')
+  @HttpCode(HttpStatus.OK)
   async extractAndMap(@Body() body: any) {
     return this.applicationsService.extractAndMapApplication(body);
   }

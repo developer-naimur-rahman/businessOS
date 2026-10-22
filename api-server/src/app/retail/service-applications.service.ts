@@ -121,7 +121,7 @@ export class ServiceApplicationsService {
   async extractAndMapApplication(
     dto: {
       serviceSlug: string;
-      documents: Array<{ id: string; docType: string; title: string; fileUrl: string; mimeType: string }>;
+      documents: Array<{ id?: string; docType?: string; title?: string; fileUrl?: string; mimeType?: string; extractedText?: string }>;
       existingProfile?: any;
       organizationId?: string;
     }
@@ -133,6 +133,10 @@ export class ServiceApplicationsService {
     overallConfidence: number;
     engineUsed: 'AI_GEMINI' | 'ALGORITHMIC_FALLBACK';
   }> {
+    if (!dto?.serviceSlug) {
+      throw new BadRequestException('serviceSlug is required');
+    }
+
     let organizationId = dto.organizationId;
     if (!organizationId) {
       const org = await this.prisma.organization.findFirst();
@@ -141,14 +145,13 @@ export class ServiceApplicationsService {
 
     const serviceDef = await this.knowledgeService.getServiceBySlugOrId(dto.serviceSlug, organizationId);
     const orderedFields = serviceDef.orderedFields || [];
+    const documents = Array.isArray(dto?.documents) ? dto.documents : [];
 
-    // Document snippets, extracted text, and metadata
-    const docSummaries = dto.documents.map((d: any, i) => {
-      const isBase64 = d.fileUrl && d.fileUrl.startsWith('data:');
-      const snippet = isBase64 ? d.fileUrl.slice(0, 1500) : (d.fileUrl || '');
-      const text = d.extractedText ? `${d.extractedText} ` : '';
-      return `Document #${i + 1}: Title="${d.title}", Type="${d.docType}", Mime="${d.mimeType}", Content="${text}${snippet}"`;
-    }).join('\n\n');
+    // Document metadata and text summaries for prompt context
+    const docSummaries = documents.map((d: any, i) => {
+      const text = d.extractedText ? ` Text="${d.extractedText.slice(0, 500)}"` : '';
+      return `Document #${i + 1}: Title="${d.title || 'Untitled'}", Type="${d.docType || 'DOCUMENT'}", Mime="${d.mimeType || 'unknown'}"${text}`;
+    }).join('\n');
 
     const fieldsSchemaDescription = orderedFields.map(f =>
       `FieldKey: "${f.key}", Order: ${f.order}, LabelBn: "${f.labelBn}", LabelEn: "${f.labelEn}", Type: "${f.type}", Required: ${f.required}`
@@ -158,7 +161,7 @@ export class ServiceApplicationsService {
     let geminiSuccess = false;
     let geminiResult: any = null;
 
-    if (geminiApiKey && geminiApiKey.length > 5 && !geminiApiKey.includes('placeholder') && dto.documents.length > 0) {
+    if (geminiApiKey && geminiApiKey.length > 5 && !geminiApiKey.includes('placeholder') && documents.length > 0) {
       try {
         const prompt = `You are an expert OCR & identity document parser for Bangladesh citizen and government portals (Teletalk, BPSC, E-Passport, BDRIS, NID Wing, NBR TIN).
 Target Service: "${serviceDef.titleBn}" (${serviceDef.titleEn})
@@ -192,18 +195,45 @@ Respond strictly in JSON format (no markdown, no backticks):
   ]
 }`;
 
+        const parts: any[] = [{ text: prompt }];
+
+        // Attach actual visual documents for Gemini multimodal OCR
+        for (const d of documents) {
+          if (d.fileUrl && typeof d.fileUrl === 'string' && d.fileUrl.startsWith('data:')) {
+            const match = d.fileUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+              const mimeType = match[1]?.trim();
+              const base64Data = match[2]?.trim();
+              const isSupportedMime =
+                mimeType.startsWith('image/') ||
+                mimeType === 'application/pdf' ||
+                mimeType === 'text/plain';
+
+              // Limit inline payload per document to 15MB base64
+              if (isSupportedMime && base64Data && base64Data.length > 20 && base64Data.length < 15 * 1024 * 1024) {
+                parts.push({
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data,
+                  },
+                });
+              }
+            }
+          }
+        }
+
         const model = 'gemini-3.5-flash-lite';
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 12000);
+        const timeout = setTimeout(() => controller.abort(), 18000);
 
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            contents: [{ parts }],
             generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
           }),
         });
@@ -213,9 +243,15 @@ Respond strictly in JSON format (no markdown, no backticks):
           const json = await res.json();
           const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) {
-            geminiResult = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
-            geminiSuccess = true;
+            try {
+              geminiResult = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+              geminiSuccess = true;
+            } catch (pErr) {
+              this.logger.warn(`Failed to parse Gemini JSON output. Using algorithmic heuristics.`);
+            }
           }
+        } else {
+          this.logger.warn(`Gemini API returned status ${res.status}. Falling back to Algorithmic Heuristics.`);
         }
       } catch (err: any) {
         this.logger.warn(`Gemini document mapping failed: ${err.message}. Falling back to Algorithmic Heuristics.`);
@@ -239,7 +275,7 @@ Respond strictly in JSON format (no markdown, no backticks):
         const found = geminiResult.fields.find((gf: any) => gf.key === f.key);
         if (found && found.value && String(found.value).trim()) {
           val = String(found.value).trim();
-          sourceTitle = found.sourceDocTitle || dto.documents[0]?.title || 'Uploaded Document';
+          sourceTitle = found.sourceDocTitle || documents[0]?.title || 'Uploaded Document';
           conf = Number(found.confidence) || 0.85;
           conflict = !!found.isConflict;
           conflictDetail = found.conflictDetails || '';
@@ -248,14 +284,14 @@ Respond strictly in JSON format (no markdown, no backticks):
       }
 
       // 2. Algorithmic Fallback Heuristics if Gemini didn't extract this field
-      if (!val && dto.documents.length > 0) {
-        const fullContent = dto.documents.map((d: any) => `${d.title} ${d.extractedText || ''} ${d.fileUrl?.slice(0, 500)}`).join(' ');
+      if (!val && documents.length > 0) {
+        const fullContent = documents.map((d: any) => `${d.title || ''} ${d.extractedText || ''}`).join(' ');
 
         if (f.key.toLowerCase().includes('nid') || f.key.toLowerCase().includes('reg')) {
           const nidMatch = fullContent.match(/\b(19\d{15}|20\d{15}|\d{17}|\d{13}|\d{10})\b/);
           if (nidMatch) {
             val = nidMatch[0];
-            sourceTitle = dto.documents[0].title;
+            sourceTitle = documents[0]?.title || 'Uploaded Document';
             conf = 0.88;
             status = 'EXTRACTED';
           }
@@ -263,7 +299,7 @@ Respond strictly in JSON format (no markdown, no backticks):
           const dobMatch = fullContent.match(/\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b/);
           if (dobMatch) {
             val = dobMatch[0];
-            sourceTitle = dto.documents[0].title;
+            sourceTitle = documents[0]?.title || 'Uploaded Document';
             conf = 0.85;
             status = 'EXTRACTED';
           }
@@ -271,7 +307,7 @@ Respond strictly in JSON format (no markdown, no backticks):
           const enMatch = fullContent.match(/Name:\s*([A-Za-z\s.]+)/i) || fullContent.match(/\b(MD\s+[A-Za-z\s]+)\b/);
           if (enMatch) {
             val = enMatch[1].trim().toUpperCase();
-            sourceTitle = dto.documents[0].title;
+            sourceTitle = documents[0]?.title || 'Uploaded Document';
             conf = 0.82;
             status = 'EXTRACTED';
           }
@@ -279,7 +315,7 @@ Respond strictly in JSON format (no markdown, no backticks):
           const bnMatch = fullContent.match(/নাম:\s*([^\n,.]+)/) || fullContent.match(/মো:\s*([^\n,.]+)/);
           if (bnMatch) {
             val = (bnMatch[1] || bnMatch[0]).trim();
-            sourceTitle = dto.documents[0].title;
+            sourceTitle = documents[0]?.title || 'Uploaded Document';
             conf = 0.82;
             status = 'EXTRACTED';
           }
@@ -287,7 +323,7 @@ Respond strictly in JSON format (no markdown, no backticks):
           const fatMatch = fullContent.match(/পিতা:\s*([^\n,.]+)/) || fullContent.match(/Father:\s*([A-Za-z\s.]+)/i);
           if (fatMatch) {
             val = fatMatch[1].trim();
-            sourceTitle = dto.documents[0].title;
+            sourceTitle = documents[0]?.title || 'Uploaded Document';
             conf = 0.80;
             status = 'EXTRACTED';
           }
@@ -295,7 +331,7 @@ Respond strictly in JSON format (no markdown, no backticks):
           const motMatch = fullContent.match(/মাতা:\s*([^\n,.]+)/) || fullContent.match(/Mother:\s*([A-Za-z\s.]+)/i);
           if (motMatch) {
             val = motMatch[1].trim();
-            sourceTitle = dto.documents[0].title;
+            sourceTitle = documents[0]?.title || 'Uploaded Document';
             conf = 0.80;
             status = 'EXTRACTED';
           }
@@ -303,7 +339,7 @@ Respond strictly in JSON format (no markdown, no backticks):
           const addrMatch = fullContent.match(/ঠিকানা:\s*([^\n]+)/) || fullContent.match(/Address:\s*([^\n]+)/i);
           if (addrMatch) {
             val = addrMatch[1].trim();
-            sourceTitle = dto.documents[0].title;
+            sourceTitle = documents[0]?.title || 'Uploaded Document';
             conf = 0.78;
             status = 'EXTRACTED';
           }

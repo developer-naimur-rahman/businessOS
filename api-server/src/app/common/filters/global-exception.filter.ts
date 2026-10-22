@@ -62,6 +62,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message = 'Invalid data provided for database operation.';
       error = 'Validation Error';
       this.logger.warn(`Prisma validation error on ${request.method} ${request.url}: ${exception.message}`);
+    } else if (
+      (exception as any)?.type === 'entity.too.large' ||
+      (exception as any)?.status === 413 ||
+      (exception as any)?.name === 'PayloadTooLargeError'
+    ) {
+      status = HttpStatus.PAYLOAD_TOO_LARGE;
+      message = 'ফাইলের আকার অনেক বড় (সর্বোচ্চ ৫০ মেগাবাইট অনুমোদিত)। অনুগ্রহ করে ছোট সাইজের ফাইল দিন। / Payload too large (Max 50MB allowed).';
+      error = 'Payload Too Large';
+      this.logger.warn(`Payload too large on ${request.method} ${request.url}`);
     } else {
       // General unexpected errors
       const err = exception as any;
