@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { 
   Sparkles, X, Send, Bot, User, ArrowRight, TrendingUp, 
   DollarSign, Package, ExternalLink, RefreshCw, Layers, CheckCircle2 
@@ -21,6 +21,8 @@ interface ChatMessage {
 
 export function AdminAiCopilot() {
   const [isOpen, setIsOpen] = useState(false)
+  const pathname = usePathname()
+  const isPos = pathname?.includes("/admin/pos")
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -163,14 +165,18 @@ export function AdminAiCopilot() {
       {/* Floating Co-Pilot Launcher */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 text-white p-3.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-white/20 group"
+        className={`fixed z-40 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 text-white p-3 sm:p-3.5 rounded-full shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 border border-white/20 group ${
+          isPos
+            ? "bottom-4 left-4 md:left-72 shadow-indigo-900/30"
+            : "bottom-5 right-5 sm:bottom-6 sm:right-6"
+        }`}
         aria-label="Open AI Co-Pilot"
       >
         <div className="relative">
-          <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+          <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 animate-pulse" />
           <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-indigo-900"></span>
         </div>
-        <span className="text-xs font-black tracking-wide hidden sm:inline pr-1">
+        <span className="text-[11px] sm:text-xs font-black tracking-wide hidden sm:inline pr-1">
           AI Co-Pilot
         </span>
       </button>

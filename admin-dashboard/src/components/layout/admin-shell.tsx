@@ -94,7 +94,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <Header 
           onMenuClick={() => setMobileSidebarOpen(true)} 
         />
-        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isPosRoute || isDesignStudioEditor ? '' : 'p-4 sm:p-8'}`}>
+        <main className={`flex-1 overflow-y-auto custom-scrollbar overscroll-contain ${isPosRoute || isDesignStudioEditor ? '' : 'p-4 sm:p-8'}`}>
           <div className={isPosRoute || isDesignStudioEditor ? 'h-full' : 'max-w-[1200px] mx-auto'}>
             {children}
           </div>

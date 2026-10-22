@@ -130,7 +130,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         )}
       </div>
       
-      <div className="flex-1 overflow-y-auto custom-scrollbar py-5 px-3 space-y-6">
+      <div className="flex-1 overflow-y-auto custom-scrollbar overscroll-contain py-5 px-3 space-y-6">
         {groups.map((group) => (
           <div key={group.label}>
             <h3 className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -174,7 +174,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   return (
     <>
-      <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-full">
+      <aside className="w-64 flex-shrink-0 hidden md:flex flex-col h-full max-h-screen overflow-hidden overscroll-contain">
         {sidebarContent}
       </aside>
 
@@ -184,7 +184,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs"
             onClick={onClose} 
           />
-          <aside className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white z-50 shadow-2xl animate-in slide-in-from-left duration-300">
+          <aside className="fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white z-50 shadow-2xl animate-in slide-in-from-left duration-300 overflow-hidden flex flex-col overscroll-contain">
             {sidebarContent}
           </aside>
         </div>

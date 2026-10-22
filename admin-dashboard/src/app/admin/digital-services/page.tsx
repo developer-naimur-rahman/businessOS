@@ -147,84 +147,84 @@ export default function DigitalServicesPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+    <div className="p-3 sm:p-6 lg:p-8 space-y-5 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Smartphone className="w-7 h-7 text-pink-600" /> Digital Utility Desk & MFS Float
+          <h1 className="text-base sm:text-xl lg:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <Smartphone className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600 shrink-0" /> Digital Utility Desk & MFS Float
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
             bKash/Nagad agent wallets, Flexiload, Palli Bidyut bills & online government services
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setAdjustModalOpen(true)}
-            className="px-3.5 py-2.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+            className="px-3 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
           >
-            <Wallet className="w-4 h-4 text-indigo-600" /> Adjust Float
+            <Wallet className="w-3.5 h-3.5 text-indigo-600" /> Adjust Float
           </button>
           <button
             onClick={() => setTrxModalOpen(true)}
-            className="px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-pink-600/20 flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-pink-600/20 flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" /> Quick Transaction
+            <Plus className="w-3.5 h-3.5" /> Quick Transaction
           </button>
           <button
             onClick={fetchSummary}
-            className="w-10 h-10 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center transition-colors"
+            className="w-9 h-9 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center transition-colors"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-500 mb-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs font-bold text-slate-500 mb-1.5">
             <span>Total Digital Float</span>
-            <Wallet className="w-4 h-4 text-indigo-600" />
+            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
           </div>
-          <div className="text-2xl font-black text-slate-900">
+          <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono">
             ৳{summary?.metrics?.totalDigitalFloatBdt?.toLocaleString() || '0'}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Across all 5 agent wallets</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Across all 5 agent wallets</p>
         </div>
 
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-500 mb-2">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs font-bold text-slate-500 mb-1.5">
             <span>Physical Cash Drawer</span>
-            <Banknote className="w-4 h-4 text-emerald-600" />
+            <Banknote className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
           </div>
-          <div className="text-2xl font-black text-emerald-600">
+          <div className="text-lg sm:text-2xl font-black text-emerald-600 font-mono">
             ৳{summary?.metrics?.cashDrawerBdt?.toLocaleString() || '0'}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Cash in register till</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Cash in register till</p>
         </div>
 
-        <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-500 mb-2">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs font-bold text-slate-500 mb-1.5">
             <span>Today's Transactions</span>
-            <History className="w-4 h-4 text-blue-600" />
+            <History className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
           </div>
-          <div className="text-2xl font-black text-slate-900">
+          <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono">
             {summary?.metrics?.todayCount || 0}
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Volume: ৳{summary?.metrics?.todayVolumeBdt?.toLocaleString() || '0'}</p>
+          <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Volume: ৳{summary?.metrics?.todayVolumeBdt?.toLocaleString() || '0'}</p>
         </div>
 
-        <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-3xl p-5 text-white shadow-md shadow-pink-500/20">
-          <div className="flex items-center justify-between text-xs font-bold text-pink-100 mb-2">
+        <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white shadow-md shadow-pink-500/20">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs font-bold text-pink-100 mb-1.5">
             <span>Today's Net Profit</span>
-            <TrendingUp className="w-4 h-4 text-pink-200" />
+            <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-pink-200" />
           </div>
-          <div className="text-2xl font-black text-white">
+          <div className="text-lg sm:text-2xl font-black text-white font-mono">
             ৳{summary?.metrics?.todayCommissionsAndFeesBdt?.toLocaleString() || '0'}
           </div>
-          <p className="text-[11px] text-pink-100 mt-1">Commissions & service fees</p>
+          <p className="text-[10px] sm:text-[11px] text-pink-100 mt-0.5">Commissions & service fees</p>
         </div>
       </div>
 

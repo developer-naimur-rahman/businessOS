@@ -114,6 +114,18 @@ declare global {
       closedAt?: string;
       closingData?: any;
     };
+    digitalServices: {
+      balances: Record<string, number>;
+      transactions: any[];
+    };
+    documentStudio: {
+      templates: any[];
+      orders: any[];
+    };
+    serviceScheduling: {
+      settings: any;
+      appointments: any[];
+    };
   } | undefined;
 }
 
@@ -488,6 +500,181 @@ function initStore() {
     cashRegister: {
       openingBalance: 5000,
       isClosed: false,
+    },
+    digitalServices: {
+      balances: {
+        BKASH_AGENT: 42500,
+        NAGAD_AGENT: 28900,
+        ROCKET_AGENT: 15200,
+        FLEXILOAD_SIM: 6450,
+        POLY_BIDYUT_UTILITY: 8200,
+        PHYSICAL_CASH_DRAWER: 14500,
+      },
+      transactions: [
+        {
+          id: 'ds-tx-1',
+          trxId: 'TRX-BK-98214',
+          transactionType: 'MFS_CASH_IN',
+          wallet: 'BKASH_AGENT',
+          recipientPhoneOrAccount: '01712-345678',
+          customerName: 'Monir Hossain',
+          amountBdt: 2000,
+          serviceChargeOrFeeBdt: 0,
+          commissionEarnedBdt: 8,
+          createdAt: new Date(Date.now() - 3600000).toISOString()
+        },
+        {
+          id: 'ds-tx-2',
+          trxId: 'TRX-NG-55120',
+          transactionType: 'MFS_CASH_OUT',
+          wallet: 'NAGAD_AGENT',
+          recipientPhoneOrAccount: '01890-123456',
+          customerName: 'Shahinur Islam',
+          amountBdt: 5000,
+          serviceChargeOrFeeBdt: 0,
+          commissionEarnedBdt: 22.5,
+          createdAt: new Date(Date.now() - 7200000).toISOString()
+        },
+        {
+          id: 'ds-tx-3',
+          trxId: 'TRX-FX-10492',
+          transactionType: 'MOBILE_RECHARGE',
+          wallet: 'FLEXILOAD_SIM',
+          recipientPhoneOrAccount: '01711-889900',
+          customerName: 'Farhana Yeasmin',
+          amountBdt: 199,
+          serviceChargeOrFeeBdt: 0,
+          commissionEarnedBdt: 5,
+          createdAt: new Date(Date.now() - 10800000).toISOString()
+        },
+        {
+          id: 'ds-tx-4',
+          trxId: 'TRX-PB-77401',
+          transactionType: 'ELECTRICITY_UTILITY_BILL',
+          wallet: 'POLY_BIDYUT_UTILITY',
+          recipientPhoneOrAccount: 'SMS A/C: 1048829104',
+          customerName: 'Abdur Razzak',
+          amountBdt: 1450,
+          serviceChargeOrFeeBdt: 20,
+          commissionEarnedBdt: 5,
+          createdAt: new Date(Date.now() - 14400000).toISOString()
+        }
+      ]
+    },
+    documentStudio: {
+      templates: [
+        {
+          id: 'minimal-clean',
+          titleBn: 'মিনিমাল ক্লিন সিভি ও রিজিউম',
+          titleEn: 'Minimal Clean Professional Resume',
+          category: 'CV_RESUME',
+          description: 'Single column ATS-friendly clean layout suitable for modern corporate and entry jobs.',
+          priceBdt: 150
+        },
+        {
+          id: 'modern-tech',
+          titleBn: 'মডার্ন আইটি ও টেক বায়োডাটা',
+          titleEn: 'Modern Tech Curriculum Vitae',
+          category: 'CV_RESUME',
+          description: 'Dual column design with prominent skills radar, GitHub/Portfolio links, and project achievements.',
+          priceBdt: 200
+        },
+        {
+          id: 'corporate-bd',
+          titleBn: 'কর্পোরেট এক্সিকিউটিভ সিভি',
+          titleEn: 'Corporate Executive Resume',
+          category: 'CV_RESUME',
+          description: 'Prestigious layout with photo placeholder, professional experience chronology, and referee blocks.',
+          priceBdt: 250
+        },
+        {
+          id: 'marriage-biodata',
+          titleBn: 'বিবাহের বায়োডাটা ফরম্যাট',
+          titleEn: 'Bangla Marriage Bio-data',
+          category: 'LEGAL_CIVIC',
+          description: 'Traditional standard Islamic and civic marriage curriculum format with family background section.',
+          priceBdt: 120
+        },
+        {
+          id: 'agreement-stamp',
+          titleBn: '৩০০ টাকার নন-জুডিশিয়াল স্ট্যাম্প এগ্রিমেন্ট',
+          titleEn: 'Non-Judicial 300 Tk Stamp Agreement',
+          category: 'LEGAL_CIVIC',
+          description: 'Exact margin-calibrated template for Bangladesh Government non-judicial stamp paper printing.',
+          priceBdt: 300
+        },
+        {
+          id: 'house-rent-deed',
+          titleBn: 'বাড়ি ভাড়া চুক্তিপত্র দলিল',
+          titleEn: 'House Rent Agreement Deed',
+          category: 'LEGAL_CIVIC',
+          description: 'Standard tenancy contract between landlord and tenant with advance and clause provisions.',
+          priceBdt: 250
+        }
+      ],
+      orders: [
+        {
+          id: 'doc-ord-1',
+          orderNumber: 'DOC-2026-881',
+          templateId: 'minimal-clean',
+          templateName: 'মিনিমাল ক্লিন সিভি ও রিজিউম',
+          category: 'CV_RESUME',
+          customerName: 'Shakil Mahmud',
+          customerPhone: '01819-223344',
+          status: 'COMPLETED',
+          priceBdt: 150,
+          createdAt: new Date(Date.now() - 18000000).toISOString()
+        },
+        {
+          id: 'doc-ord-2',
+          orderNumber: 'DOC-2026-882',
+          templateId: 'agreement-stamp',
+          templateName: '৩০০ টাকার নন-জুডিশিয়াল স্ট্যাম্প এগ্রিমেন্ট',
+          category: 'LEGAL_CIVIC',
+          customerName: 'Rafiqul Islam & Brothers',
+          customerPhone: '01712-998877',
+          status: 'IN_PROGRESS',
+          priceBdt: 300,
+          createdAt: new Date(Date.now() - 36000000).toISOString()
+        }
+      ]
+    },
+    serviceScheduling: {
+      settings: {
+        openingTime: '09:30',
+        closingTime: '20:30',
+        breakStart: '13:30',
+        breakEnd: '14:30',
+        defaultSlotMinutes: 20,
+        maxConcurrentPerSlot: 2,
+        workingDays: [6, 0, 1, 2, 3, 4]
+      },
+      appointments: [
+        {
+          id: 'apt-1',
+          tokenNumber: 'APT-101',
+          customerName: 'Tariqul Islam',
+          customerPhone: '01712-445566',
+          serviceTitleBn: 'ল্যাপটপ ডিসপ্লে ও হিঞ্জ রিপ্লেসমেন্ট',
+          date: todayStr,
+          slotTime: '11:00 AM - 11:30 AM',
+          status: 'CONFIRMED',
+          notes: 'Customer bringing Dell Inspiron 15',
+          createdAt: new Date(Date.now() - 7200000).toISOString()
+        },
+        {
+          id: 'apt-2',
+          tokenNumber: 'APT-102',
+          customerName: 'Kazi Mahbub',
+          customerPhone: '01819-334455',
+          serviceTitleBn: 'পাসপোর্ট ও পুলিশ ক্লিয়ারেন্স আবেদন কনসালটেন্সি',
+          date: todayStr,
+          slotTime: '03:00 PM - 03:30 PM',
+          status: 'CHECKED_IN',
+          notes: 'Documents verified at counter',
+          createdAt: new Date(Date.now() - 14400000).toISOString()
+        }
+      ]
     }
   };
 
@@ -847,5 +1034,270 @@ export const demoStore = {
     }
 
     return { found: false, message: 'প্রদত্ত নম্বর বা রেফারেন্স দিয়ে কোনো অর্ডার অথবা জব খুঁজে পাওয়া যায়নি।' };
+  },
+
+  addApplicationDeliverable(appIdOrRef: string, deliverable: any) {
+    const app = this.getApplicationByRef(appIdOrRef);
+    if (!app) return null;
+    if (!app.deliverables) app.deliverables = [];
+    const item = {
+      id: genId('del'),
+      title: deliverable.title || 'Official Delivered Document',
+      fileUrl: deliverable.fileUrl || deliverable.url || '/sample-deliverable.pdf',
+      deliverableType: deliverable.deliverableType || 'FINAL_DOWNLOAD_APPLICATION',
+      uploadedAt: new Date().toISOString()
+    };
+    app.deliverables.unshift(item);
+    return item;
+  },
+
+  // --- DIGITAL SERVICES & MFS ---
+  getDigitalSummary() {
+    const ds = this.store.digitalServices;
+    const balances = ds.balances;
+    const transactions = ds.transactions;
+    const totalDigitalFloatBdt = (balances.BKASH_AGENT || 0) + (balances.NAGAD_AGENT || 0) + (balances.ROCKET_AGENT || 0) + (balances.FLEXILOAD_SIM || 0) + (balances.POLY_BIDYUT_UTILITY || 0);
+    const cashDrawerBdt = balances.PHYSICAL_CASH_DRAWER || 0;
+    
+    const todayVolumeBdt = transactions.reduce((acc, t) => acc + (t.amountBdt || 0), 0);
+    const todayCommissionsAndFeesBdt = transactions.reduce((acc, t) => acc + (t.commissionEarnedBdt || 0) + (t.serviceChargeOrFeeBdt || 0), 0);
+
+    return {
+      metrics: {
+        totalDigitalFloatBdt,
+        cashDrawerBdt,
+        todayCount: transactions.length,
+        todayVolumeBdt,
+        todayCommissionsAndFeesBdt
+      },
+      balances,
+      recentTransactions: transactions
+    };
+  },
+
+  recordDigitalTransaction(data: any) {
+    const ds = this.store.digitalServices;
+    const txId = data.trxId || `TRX-${Date.now().toString().slice(-6)}`;
+    const tx = {
+      id: genId('tx'),
+      trxId: txId,
+      transactionType: data.transactionType,
+      wallet: data.wallet,
+      recipientPhoneOrAccount: data.recipientPhoneOrAccount,
+      customerName: data.customerName || 'Walk-in Customer',
+      amountBdt: Number(data.amountBdt || 0),
+      serviceChargeOrFeeBdt: Number(data.serviceChargeOrFeeBdt || 0),
+      commissionEarnedBdt: Number(data.commissionEarnedBdt || 0),
+      notes: data.notes,
+      createdAt: new Date().toISOString()
+    };
+
+    if (data.wallet && ds.balances[data.wallet] !== undefined) {
+      if (data.transactionType === 'MFS_CASH_IN') {
+        ds.balances[data.wallet] -= tx.amountBdt;
+        ds.balances.PHYSICAL_CASH_DRAWER = (ds.balances.PHYSICAL_CASH_DRAWER || 0) + tx.amountBdt;
+      } else if (data.transactionType === 'MFS_CASH_OUT') {
+        ds.balances[data.wallet] += tx.amountBdt;
+        ds.balances.PHYSICAL_CASH_DRAWER = Math.max(0, (ds.balances.PHYSICAL_CASH_DRAWER || 0) - tx.amountBdt);
+      } else if (data.transactionType === 'MOBILE_RECHARGE' || data.transactionType === 'ELECTRICITY_UTILITY_BILL') {
+        ds.balances[data.wallet] = Math.max(0, (ds.balances[data.wallet] || 0) - tx.amountBdt);
+        ds.balances.PHYSICAL_CASH_DRAWER = (ds.balances.PHYSICAL_CASH_DRAWER || 0) + tx.amountBdt + tx.serviceChargeOrFeeBdt;
+      }
+    }
+
+    ds.transactions.unshift(tx);
+    return tx;
+  },
+
+  adjustDigitalFloat(wallet: string, type: 'DEPOSIT_ADD' | 'WITHDRAW_DEDUCT', amount: number, reason?: string) {
+    const ds = this.store.digitalServices;
+    if (ds.balances[wallet] === undefined) {
+      ds.balances[wallet] = 0;
+    }
+    if (type === 'DEPOSIT_ADD') {
+      ds.balances[wallet] += amount;
+    } else {
+      ds.balances[wallet] = Math.max(0, ds.balances[wallet] - amount);
+    }
+    return { success: true, balance: ds.balances[wallet], reason };
+  },
+
+  // --- DOCUMENT STUDIO ---
+  getDocumentTemplates() {
+    return this.store.documentStudio.templates;
+  },
+
+  getDocumentOrders(category?: string, status?: string, search?: string) {
+    let list = [...this.store.documentStudio.orders];
+    if (category && category !== 'ALL') {
+      list = list.filter(o => o.category === category);
+    }
+    if (status && status !== 'ALL') {
+      list = list.filter(o => o.status === status);
+    }
+    if (search && search.trim()) {
+      const q = search.toLowerCase().trim();
+      list = list.filter(o => 
+        o.orderNumber.toLowerCase().includes(q) ||
+        o.customerName.toLowerCase().includes(q) ||
+        o.customerPhone.includes(q)
+      );
+    }
+    return {
+      orders: list,
+      metrics: {
+        totalOrders: list.length,
+        totalRevenueBdt: list.reduce((acc, o) => acc + (o.priceBdt || 0), 0)
+      }
+    };
+  },
+
+  // --- SERVICE SCHEDULING ---
+  getSchedulingSettings() {
+    return this.store.serviceScheduling.settings;
+  },
+
+  saveSchedulingSettings(settings: any) {
+    this.store.serviceScheduling.settings = {
+      ...this.store.serviceScheduling.settings,
+      ...settings
+    };
+    return this.store.serviceScheduling.settings;
+  },
+
+  getAppointments(date?: string, status?: string) {
+    let list = [...this.store.serviceScheduling.appointments];
+    if (date) {
+      list = list.filter(a => a.date === date);
+    }
+    if (status && status !== 'ALL') {
+      list = list.filter(a => a.status === status);
+    }
+    return list;
+  },
+
+  updateAppointmentStatus(tokenNumber: string, status: any) {
+    const apt = this.store.serviceScheduling.appointments.find(a => a.tokenNumber === tokenNumber);
+    if (!apt) return null;
+    apt.status = status;
+    apt.updatedAt = new Date().toISOString();
+    return apt;
+  },
+
+  // --- COMPREHENSIVE BUSINESS ANALYTICS ---
+  getAnalyticsDashboard(days: number = 30) {
+    const now = new Date();
+    const baseDailyIncome = 12400;
+    const baseDailyCost = 8400;
+
+    const chartData = [];
+    for (let i = days; i >= 1; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().split('T')[0];
+      const variance = Math.sin(i * 0.7) * 2600 + Math.cos(i * 0.4) * 1800;
+      const income = Math.round(baseDailyIncome + variance);
+      const cost = Math.round(baseDailyCost + variance * 0.65);
+      chartData.push({
+        date: dateStr,
+        income,
+        cost,
+        profit: income - cost,
+        type: 'actual'
+      });
+    }
+
+    // 7 days forward prediction
+    for (let j = 1; j <= 7; j++) {
+      const d = new Date(now.getTime() + j * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().split('T')[0];
+      const forecastVariance = Math.sin((j + 10) * 0.5) * 2200;
+      const forecastIncome = Math.round(baseDailyIncome + 1200 + forecastVariance);
+      chartData.push({
+        date: dateStr,
+        forecastIncome,
+        type: 'forecast'
+      });
+    }
+
+    const totalIncome = chartData
+      .filter(c => c.type === 'actual')
+      .reduce((acc, c) => acc + (c.income || 0), 0);
+    const totalCost = chartData
+      .filter(c => c.type === 'actual')
+      .reduce((acc, c) => acc + (c.cost || 0), 0);
+    const grossProfit = totalIncome - totalCost;
+    const profitMargin = totalIncome > 0 ? (grossProfit / totalIncome) * 100 : 0;
+
+    const alerts = [
+      {
+        title: "বিক্রি প্রবৃদ্ধি ও পিক টাইম বিশ্লেষণ",
+        message: "বিকাল ৩:০০ টা থেকে সন্ধ্যা ৭:০০ টা পর্যন্ত ফটোস্ট্যাট, অনলাইন আবেদন ও কম্পিউটার অ্যাক্সেসরিজে ৭০% লেনদেন সম্পন্ন হচ্ছে।",
+        action: "পিক সময়ে কাউন্টারে সার্বক্ষণিক ২ জন স্টাফ নিয়োজিত রাখুন এবং ক্যাশ ড্রয়ার ব্যালেন্স বজায় রাখুন।",
+        type: "info"
+      },
+      {
+        title: "কম্পিউটার হার্ডওয়্যার মার্জিন হাইপার-গ্রোথ",
+        message: "SSD, RAM ও ওয়াইফাই রাউটার ক্যাটাগরিতে গড় গ্রস প্রফিট মার্জিন ৩২.৪%-এ উন্নীত হয়েছে।",
+        action: "চলতি সপ্তাহে ক্যাবল ও স্টোরেজ ডিভাইসের হোলসেল স্টক আরও ২০% বৃদ্ধি করার সুপারিশ।",
+        type: "warning"
+      },
+      {
+        title: "ডিজিটাল বাকি খাতা বকেয়া সতর্কতা",
+        message: "লোকাল গ্রাহক ও স্কুল-কলেজের মোট বাকি বকেয়া ৳১৮,৫০০ অতিক্রম করেছে।",
+        action: "স্বয়ংক্রিয় বাংলা এসএমএস রিমাইন্ডার পাঠিয়ে বকেয়া দ্রুত আদায়ের উদ্যোগ নিন।",
+        type: "critical"
+      }
+    ];
+
+    const categoryBreakdown = [
+      { category: "Computer & Mobile Accessories", revenue: Math.round(totalIncome * 0.38), margin: 34.2, orders: Math.round(days * 4.2) },
+      { category: "Storage & PC Hardware", revenue: Math.round(totalIncome * 0.28), margin: 28.5, orders: Math.round(days * 2.1) },
+      { category: "Photocopy & High-Speed Printing", revenue: Math.round(totalIncome * 0.16), margin: 48.0, orders: Math.round(days * 8.5) },
+      { category: "Govt & University Online Applications", revenue: Math.round(totalIncome * 0.11), margin: 62.0, orders: Math.round(days * 3.4) },
+      { category: "MFS Commission & Utility Bills", revenue: Math.round(totalIncome * 0.07), margin: 95.0, orders: Math.round(days * 6.8) },
+    ];
+
+    const paymentMethodStats = [
+      { method: "Physical Cash Till", amount: Math.round(totalIncome * 0.58), percentage: 58 },
+      { method: "bKash Agent & Personal", amount: Math.round(totalIncome * 0.24), percentage: 24 },
+      { method: "Nagad MFS Counter", amount: Math.round(totalIncome * 0.12), percentage: 12 },
+      { method: "Baki / Due Account", amount: Math.round(totalIncome * 0.06), percentage: 6 },
+    ];
+
+    const topSellingProducts = [
+      { name: "USB Optical Mouse (Plug & Play)", quantitySold: Math.round(days * 1.8), revenueBdt: Math.round(days * 1.8 * 450), profitBdt: Math.round(days * 1.8 * 170) },
+      { name: "64GB USB 3.0 Pendrive", quantitySold: Math.round(days * 1.2), revenueBdt: Math.round(days * 1.2 * 650), profitBdt: Math.round(days * 1.2 * 190) },
+      { name: "A4 Photo Quality Color Print", quantitySold: Math.round(days * 14), revenueBdt: Math.round(days * 14 * 15), profitBdt: Math.round(days * 14 * 9.5) },
+      { name: "SSD 512GB NVMe High Speed", quantitySold: Math.round(days * 0.6), revenueBdt: Math.round(days * 0.6 * 3800), profitBdt: Math.round(days * 0.6 * 750) },
+      { name: "Job Application Typing & Print Out", quantitySold: Math.round(days * 2.2), revenueBdt: Math.round(days * 2.2 * 150), profitBdt: Math.round(days * 2.2 * 115) },
+    ];
+
+    return {
+      timeframe: `${days}_DAYS`,
+      metrics: {
+        totalIncome,
+        totalCost,
+        grossProfit,
+        profitMargin,
+        totalOrders: Math.round(days * 6.5),
+        avgOrderValueBdt: Math.round(totalIncome / (days * 6.5)),
+        totalBakiDueBdt: 18500,
+        netProfit: Math.round(grossProfit * 0.78)
+      },
+      chartData,
+      alerts,
+      categoryBreakdown,
+      paymentMethodStats,
+      topSellingProducts,
+      inventoryRisk: [
+        { sku: "RAM-DDR4-8G", name: "RAM 8GB DDR4 3200MHz", currentStock: 2, safetyThreshold: 5, status: "LOW_STOCK" },
+        { sku: "CAT6-CABLE-ROLL", name: "Cat6 Ethernet Cable Box", currentStock: 1, safetyThreshold: 3, status: "LOW_STOCK" },
+        { sku: "PENDRIVE-128G", name: "128GB High Speed Pendrive", currentStock: 3, safetyThreshold: 6, status: "LOW_STOCK" }
+      ],
+      methodology: {
+        forecastMethod: "ARIMA-X + Trend Holt-Winters",
+        horizon: "+7 Days Rolling Multi-Tier"
+      }
+    };
   }
 };

@@ -55,7 +55,10 @@
 
 @layer utilities {
   .layout-shell {
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
     display: flex;
     width: 100%;
     max-width: 1600px;
@@ -65,6 +68,32 @@
     border-left: 1px solid rgba(226, 232, 240, 0.6);
     border-right: 1px solid rgba(226, 232, 240, 0.6);
     box-shadow: 0 0 40px -15px rgba(0,0,0,0.05);
+    overflow: hidden;
+  }
+
+  @media (max-width: 640px) {
+    /* Refined mobile typography across admin dashboard */
+    .layout-shell h1,
+    .layout-shell .text-3xl,
+    .layout-shell .text-4xl {
+      font-size: 1.25rem !important;
+      line-height: 1.35 !important;
+    }
+    .layout-shell h2,
+    .layout-shell .text-2xl {
+      font-size: 1.1rem !important;
+      line-height: 1.35 !important;
+    }
+    .layout-shell h3,
+    .layout-shell .text-xl {
+      font-size: 1rem !important;
+      line-height: 1.35 !important;
+    }
+    .layout-shell .p-8,
+    .layout-shell .p-6,
+    .layout-shell .p-10 {
+      padding: 0.875rem !important;
+    }
   }
 
   .surface-base {
