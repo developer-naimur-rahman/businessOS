@@ -4,12 +4,14 @@ import { api } from "../../../lib/api-client"
 import { 
   Search, ShoppingCart, UserCircle, Plus, Minus, CreditCard, ScanLine, 
   Trash2, PauseCircle, FolderOpen, Split, Monitor, Zap, Check, X,
-  Banknote, Smartphone, Receipt, ArrowRight, ShieldCheck, Clock
+  Banknote, Smartphone, Receipt, ArrowRight, ShieldCheck, Clock, Wrench
 } from "lucide-react"
 import { POSSuccessModal } from "../../../components/pos/POSSuccessModal"
 import { ReceiptTemplate } from "../../../components/pos/ReceiptTemplate"
 import { A4InvoiceTemplate } from "../../../components/pos/A4InvoiceTemplate"
 import { VariantSelectorModal } from "../../../components/pos/VariantSelectorModal"
+import { QuickCustomChargeModal } from "../../../components/pos/QuickCustomChargeModal"
+import { ServiceJobHandoffModal } from "../../../components/pos/ServiceJobHandoffModal"
 import { stringToColor } from "../../../lib/colorUtils"
 import { toast } from "sonner"
 
@@ -51,6 +53,11 @@ export default function AdminPOSPage() {
   const [completedSale, setCompletedSale] = useState<any>(null)
   const [printMode, setPrintMode] = useState<'NONE' | 'RECEIPT' | 'A4'>('NONE')
   const [selectedProductForVariants, setSelectedProductForVariants] = useState<any>(null)
+
+  // Quick Custom Service & Service Job Handoff State
+  const [isCustomChargeModalOpen, setIsCustomChargeModalOpen] = useState(false)
+  const [isServiceHandoffModalOpen, setIsServiceHandoffModalOpen] = useState(false)
+  const [linkedServiceJob, setLinkedServiceJob] = useState<any | null>(null)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
@@ -363,6 +370,13 @@ export default function AdminPOSPage() {
         return
       }
 
+      // F7: Service Job Delivery Handoff Modal
+      if (e.key === 'F7') {
+        e.preventDefault()
+        setIsServiceHandoffModalOpen(prev => !prev)
+        return
+      }
+
       // F8: Split Payment Modal
       if (e.key === 'F8') {
         e.preventDefault()
@@ -409,6 +423,10 @@ export default function AdminPOSPage() {
           setIsHoldModalOpen(false)
         } else if (isHeldDrawerOpen) {
           setIsHeldDrawerOpen(false)
+        } else if (isCustomChargeModalOpen) {
+          setIsCustomChargeModalOpen(false)
+        } else if (isServiceHandoffModalOpen) {
+          setIsServiceHandoffModalOpen(false)
         } else if (searchQuery) {
           setSearchQuery('')
           searchInputRef.current?.blur()
@@ -475,15 +493,15 @@ export default function AdminPOSPage() {
   }
 
 
-  const addToCart = (variant: any, product: any) => {
+  const addToCart = (variant: any, product: any, overridePrice?: number, overrideName?: string) => {
     setCart(prev => {
-      const existing = prev.find(item => item.variantId === variant.id)
-      if (existing) {
-        return prev.map(item => item.variantId === variant.id ? { ...item, quantity: item.quantity + 1 } : item)
+      const existing = prev.find(item => item.variantId === variant.id && !item._itemKey)
+      if (existing && overridePrice === undefined) {
+        return prev.map(item => (item.variantId === variant.id && !item._itemKey) ? { ...item, quantity: item.quantity + 1 } : item)
       }
-      const price = Number(variant.posPrice || variant.retailPrice || product.sellingPrice || 0)
+      const price = overridePrice !== undefined ? Number(overridePrice) : Number(variant.posPrice || variant.retailPrice || product.sellingPrice || 0)
       const attrs = variant.attributes?.map((a: any) => a.attributeValue?.value).join(' / ')
-      const name = attrs ? `${product.name} - ${attrs}` : product.name
+      const name = overrideName || (attrs ? `${product.name} - ${attrs}` : product.name)
       
       return [...prev, { 
         variantId: variant.id, 
@@ -491,14 +509,117 @@ export default function AdminPOSPage() {
         name, 
         sku: variant.sku, 
         sellingPrice: price, 
-        quantity: 1 
+        quantity: 1,
+        customUnitPrice: overridePrice,
+        customName: overrideName
       }]
     })
   }
 
-  const updateQuantity = (variantId: string, delta: number) => {
+  const addQuickPresetService = (serviceKeyword: string, fallbackPrice: number, bnLabel?: string) => {
+    const lower = serviceKeyword.toLowerCase()
+    const matched = products.find(p => p.name.toLowerCase().includes(lower) || (p.type === 'SERVICE' && p.name.toLowerCase().includes(lower)))
+
+    if (matched) {
+      const activeVariant = matched.variants?.find((v: any) => v.status === 'ACTIVE') || matched.variants?.[0] || {
+        id: matched.id,
+        sku: matched.code || `SKU-${matched.id.slice(0, 8)}`,
+        retailPrice: Number(matched.sellingPrice || fallbackPrice),
+        posPrice: Number(matched.sellingPrice || fallbackPrice)
+      }
+      
+      setCart(prev => {
+        const existing = prev.find(item => item.variantId === activeVariant.id && !item._itemKey)
+        if (existing) {
+          return prev.map(item => (item.variantId === activeVariant.id && !item._itemKey) ? { ...item, quantity: item.quantity + 1 } : item)
+        }
+        return [...prev, {
+          variantId: activeVariant.id,
+          productId: matched.id,
+          name: bnLabel ? `${bnLabel}` : matched.name,
+          sku: activeVariant.sku,
+          sellingPrice: Number(activeVariant.posPrice || activeVariant.retailPrice || matched.sellingPrice || fallbackPrice),
+          quantity: 1
+        }]
+      })
+      playScanBeep(true)
+      toast.success(`যোগ হয়েছে: ${bnLabel || matched.name} (৳${matched.sellingPrice || fallbackPrice})`)
+      return
+    }
+
+    const anyService = products.find(p => p.type === 'SERVICE') || products[0]
+    if (anyService) {
+      const variant = anyService.variants?.[0] || { id: anyService.id, sku: 'SVC-QUICK' }
+      const customKey = `quick-svc-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+      
+      setCart(prev => [...prev, {
+        variantId: variant.id,
+        productId: anyService.id,
+        name: bnLabel || serviceKeyword,
+        sku: variant.sku,
+        sellingPrice: fallbackPrice,
+        quantity: 1,
+        customUnitPrice: fallbackPrice,
+        customName: bnLabel || serviceKeyword,
+        _itemKey: customKey
+      }])
+      playScanBeep(true)
+      toast.success(`যোগ হয়েছে: ${bnLabel || serviceKeyword} (৳${fallbackPrice})`)
+    } else {
+      toast.error("ক্যাটালগ পণ্য লোড হয়নি।")
+    }
+  }
+
+  const handleAddCustomCharge = (name: string, price: number, qty: number) => {
+    const anyService = products.find(p => p.type === 'SERVICE') || products[0]
+    if (anyService) {
+      const variant = anyService.variants?.[0] || { id: anyService.id, sku: 'SVC-CUSTOM' }
+      const customKey = `custom-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+
+      setCart(prev => [...prev, {
+        variantId: variant.id,
+        productId: anyService.id,
+        name: name,
+        sku: variant.sku,
+        sellingPrice: price,
+        quantity: qty,
+        customUnitPrice: price,
+        customName: name,
+        _itemKey: customKey
+      }])
+      playScanBeep(true)
+      toast.success(`কাস্টম চার্জ যোগ করা হয়েছে: ${name} (৳${price} x ${qty})`)
+    }
+  }
+
+  const handleImportServiceJob = (job: any) => {
+    const anyService = products.find(p => p.type === 'SERVICE') || products[0]
+    if (anyService) {
+      const variant = anyService.variants?.[0] || { id: anyService.id, sku: 'SVC-JOB' }
+      const customKey = `job-${job.ref}-${Date.now()}`
+      const lineName = `[সার্ভিস ডেলিভারি: ${job.ref}] ${job.title}`
+
+      setCart(prev => [...prev, {
+        variantId: variant.id,
+        productId: anyService.id,
+        name: lineName,
+        sku: variant.sku,
+        sellingPrice: job.dueBdt,
+        quantity: 1,
+        customUnitPrice: job.dueBdt,
+        customName: lineName,
+        _itemKey: customKey
+      }])
+      setLinkedServiceJob(job)
+      playScanBeep(true)
+      toast.success(`সার্ভিস জব #${job.ref} কার্টে বকেয়া বিল যোগ করা হয়েছে!`)
+    }
+  }
+
+  const updateQuantity = (keyOrVariantId: string, delta: number) => {
     setCart(prev => prev.map(item => {
-      if (item.variantId === variantId) {
+      const matchKey = item._itemKey || item.variantId
+      if (matchKey === keyOrVariantId) {
         const newQ = Math.max(1, item.quantity + delta)
         return { ...item, quantity: newQ }
       }
@@ -506,8 +627,8 @@ export default function AdminPOSPage() {
     }))
   }
 
-  const removeFromCart = (variantId: string) => {
-    setCart(prev => prev.filter(item => item.variantId !== variantId))
+  const removeFromCart = (keyOrVariantId: string) => {
+    setCart(prev => prev.filter(item => (item._itemKey || item.variantId) !== keyOrVariantId))
   }
 
   // Categories extraction
@@ -659,7 +780,9 @@ export default function AdminPOSPage() {
         lines: cart.map(item => ({
           variantId: item.variantId,
           quantity: item.quantity,
-          discount: 0
+          discount: 0,
+          customUnitPrice: item.customUnitPrice,
+          customName: item.customName || item.name,
         })),
         payments: paymentsPayload
       })
@@ -677,6 +800,32 @@ export default function AdminPOSPage() {
             productCode: product?.sku || line.skuSnapshot
           }
         })
+      }
+
+      // Auto complete linked service job if present
+      if (linkedServiceJob) {
+        try {
+          if (linkedServiceJob.type === 'SERVICE_JOB') {
+            await api.patch(`/admin/service-jobs/${linkedServiceJob.id}/status`, {
+              status: 'DELIVERED',
+              remarks: `Delivered via POS Invoice #${response.data.orderNumber || response.data.id}`
+            })
+          } else if (linkedServiceJob.type === 'INTERNET_APP') {
+            await api.patch(`/admin/service-applications/${linkedServiceJob.ref}/status`, {
+              status: 'DELIVERED',
+              remarks: `Delivered via POS Invoice #${response.data.orderNumber || response.data.id}`
+            })
+          } else if (linkedServiceJob.type === 'PRINT_DROP') {
+            await api.patch(`/admin/print-queue/${linkedServiceJob.id}/status`, {
+              status: 'BILLED_COMPLETED',
+              finalCostBdt: Number(linkedServiceJob.dueBdt || 0)
+            })
+          }
+          toast.success(`সার্ভিস জব #${linkedServiceJob.ref} সম্পন্ন ও ডেলিভারি মার্ক করা হয়েছে!`)
+          setLinkedServiceJob(null)
+        } catch (jobErr) {
+          console.warn("Failed to update service job status:", jobErr)
+        }
       }
 
       toast.success(
@@ -758,11 +907,12 @@ export default function AdminPOSPage() {
         lines: cart.map(item => ({
           variantId: item.variantId,
           quantity: item.quantity,
-          discount: 0
+          discount: 0,
+          customUnitPrice: item.customUnitPrice,
+          customName: item.customName || item.name,
         })),
         payments: paymentsPayload
       })
-
 
       const enrichedSale = {
         ...response.data,
@@ -775,6 +925,32 @@ export default function AdminPOSPage() {
             productCode: product?.sku || line.skuSnapshot
           }
         })
+      }
+
+      // Auto complete linked service job if present
+      if (linkedServiceJob) {
+        try {
+          if (linkedServiceJob.type === 'SERVICE_JOB') {
+            await api.patch(`/admin/service-jobs/${linkedServiceJob.id}/status`, {
+              status: 'DELIVERED',
+              remarks: `Delivered via POS Invoice #${response.data.orderNumber || response.data.id}`
+            })
+          } else if (linkedServiceJob.type === 'INTERNET_APP') {
+            await api.patch(`/admin/service-applications/${linkedServiceJob.ref}/status`, {
+              status: 'DELIVERED',
+              remarks: `Delivered via POS Invoice #${response.data.orderNumber || response.data.id}`
+            })
+          } else if (linkedServiceJob.type === 'PRINT_DROP') {
+            await api.patch(`/admin/print-queue/${linkedServiceJob.id}/status`, {
+              status: 'BILLED_COMPLETED',
+              finalCostBdt: Number(linkedServiceJob.dueBdt || 0)
+            })
+          }
+          toast.success(`সার্ভিস জব #${linkedServiceJob.ref} সম্পন্ন ও ডেলিভারি মার্ক করা হয়েছে!`)
+          setLinkedServiceJob(null)
+        } catch (jobErr) {
+          console.warn("Failed to update service job status:", jobErr)
+        }
       }
 
       toast.success("Split payment sale processed successfully!")
@@ -860,6 +1036,13 @@ export default function AdminPOSPage() {
               >
                 <Split className="w-3.5 h-3.5 mr-1" /> F8: Split Tender
               </button>
+              <button 
+                onClick={() => setIsServiceHandoffModalOpen(true)}
+                className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-lg flex items-center font-semibold transition-colors border border-teal-200 cursor-pointer"
+                title="সার্ভিস বা মেরামতের বকেয়া বিল কালেকশন ও ডেলিভারি (F7)"
+              >
+                <Wrench className="w-3.5 h-3.5 mr-1 text-teal-600" /> F7: সার্ভিস ডেলিভারি
+              </button>
             </div>
 
             <button 
@@ -872,7 +1055,7 @@ export default function AdminPOSPage() {
           </div>
 
           {/* POS Header / Search */}
-          <div className="flex items-center gap-3 mb-3 shrink-0">
+          <div className="flex items-center gap-3 mb-2 shrink-0">
             <div className="relative flex-1 group">
               <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-indigo-600 transition-colors" />
               <input 
@@ -914,6 +1097,62 @@ export default function AdminPOSPage() {
               </span>
               <span>Scanner Armed</span>
             </div>
+          </div>
+
+          {/* Quick Walk-in Services Ribbon */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 shrink-0 -mx-4 px-4 md:mx-0 md:px-0 custom-scrollbar">
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-md shrink-0 flex items-center gap-1 border border-amber-200 shadow-2xs">
+              <Zap className="w-3.5 h-3.5 fill-current text-amber-500" /> কুইক চার্জ:
+            </span>
+            <button 
+              type="button"
+              onClick={() => addQuickPresetService('Photocopy A4', 3, 'ফটোকপি A4')}
+              className="px-2.5 py-1 bg-white hover:bg-amber-50 hover:text-amber-900 text-slate-800 border border-slate-200 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:border-amber-400"
+            >
+              📄 ফটোকপি (৳৩)
+            </button>
+            <button 
+              type="button"
+              onClick={() => addQuickPresetService('A4 Black & White Print', 5, 'সাদাকালো প্রিন্ট A4')}
+              className="px-2.5 py-1 bg-white hover:bg-amber-50 hover:text-amber-900 text-slate-800 border border-slate-200 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:border-amber-400"
+            >
+              🖨️ সাদাকালো প্রিন্ট (৳৫)
+            </button>
+            <button 
+              type="button"
+              onClick={() => addQuickPresetService('A4 Color Print', 15, 'কালার প্রিন্ট A4')}
+              className="px-2.5 py-1 bg-white hover:bg-amber-50 hover:text-amber-900 text-slate-800 border border-slate-200 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:border-amber-400"
+            >
+              🎨 রঙিন প্রিন্ট (৳১৫)
+            </button>
+            <button 
+              type="button"
+              onClick={() => addQuickPresetService('Passport Photography', 100, 'পাসপোর্ট ছবি')}
+              className="px-2.5 py-1 bg-white hover:bg-amber-50 hover:text-amber-900 text-slate-800 border border-slate-200 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:border-amber-400"
+            >
+              📷 ছবি (৳১০০)
+            </button>
+            <button 
+              type="button"
+              onClick={() => addQuickPresetService('Online Form Fill-up', 50, 'অনলাইন আবেদন')}
+              className="px-2.5 py-1 bg-white hover:bg-amber-50 hover:text-amber-900 text-slate-800 border border-slate-200 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:border-amber-400"
+            >
+              🌐 অনলাইন আবেদন (৳৫০)
+            </button>
+            <button 
+              type="button"
+              onClick={() => addQuickPresetService('CV Writing', 300, 'সিভি মেকিং')}
+              className="px-2.5 py-1 bg-white hover:bg-amber-50 hover:text-amber-900 text-slate-800 border border-slate-200 rounded-lg text-xs font-bold transition-all shrink-0 shadow-2xs hover:border-amber-400"
+            >
+              📝 সিভি (৳৩০০)
+            </button>
+            <button 
+              type="button"
+              onClick={() => setIsCustomChargeModalOpen(true)}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs transition-all shrink-0 shadow-sm flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" /> + কাস্টম সেবা
+            </button>
           </div>
 
           {/* Categories */}
@@ -1613,6 +1852,20 @@ export default function AdminPOSPage() {
         isOpen={!!selectedProductForVariants}
         onClose={() => setSelectedProductForVariants(null)}
         onSelect={addToCart}
+      />
+
+      {/* Quick Custom Charge Modal */}
+      <QuickCustomChargeModal 
+        isOpen={isCustomChargeModalOpen}
+        onClose={() => setIsCustomChargeModalOpen(false)}
+        onAddCharge={handleAddCustomCharge}
+      />
+
+      {/* Service Job Delivery Handoff Modal */}
+      <ServiceJobHandoffModal 
+        isOpen={isServiceHandoffModalOpen}
+        onClose={() => setIsServiceHandoffModalOpen(false)}
+        onImportJob={handleImportServiceJob}
       />
     </>
   )

@@ -1,9 +1,10 @@
 "use client"
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import { api } from '../../../lib/api-client';
 import { 
   Printer, QrCode, Clock, CheckCircle2, AlertCircle, RefreshCw, 
-  FileText, Download, ArrowRight, User, Phone, Layers, Sparkles, X
+  FileText, Download, ArrowRight, User, Phone, Layers, Sparkles, X, Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -11,6 +12,7 @@ export default function AdminPrintQueuePage() {
   const [queue, setQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'ALL' | 'WAITING_IN_QUEUE' | 'PRINTING_NOW' | 'PRINTED_READY' | 'BILLED_COMPLETED'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [qrConfig, setQrConfig] = useState<any>(null);
 
@@ -43,6 +45,19 @@ export default function AdminPrintQueuePage() {
     fetchQrConfig();
   }, [activeTab]);
 
+  const filteredQueue = useMemo(() => {
+    return queue.filter(job => {
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase().trim()
+      return (
+        job.tokenNumber?.toLowerCase().includes(q) ||
+        job.customerPhone?.includes(q) ||
+        job.customerName?.toLowerCase().includes(q) ||
+        job.fileName?.toLowerCase().includes(q)
+      )
+    })
+  }, [queue, searchQuery])
+
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
       await api.patch(`/admin/print-queue/${id}/status`, { status: newStatus });
@@ -67,11 +82,17 @@ export default function AdminPrintQueuePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/pos"
+            className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+          >
+            <span>কাউন্টার POS</span>
+          </Link>
           <button
             onClick={() => setQrModalOpen(true)}
             className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all"
           >
-            <QrCode className="w-4 h-4 text-indigo-400" /> Desk QR Standee Poster
+            <QrCode className="w-4 h-4 text-indigo-400" /> Desk QR Standee
           </button>
           <button
             onClick={fetchQueue}
@@ -81,6 +102,26 @@ export default function AdminPrintQueuePage() {
             <RefreshCw className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      {/* Fast Search Input Bar */}
+      <div className="relative">
+        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input 
+          type="text" 
+          placeholder="টোকেন নম্বর (#PRT-xxx), কাস্টমার মোবাইল নম্বর বা ফাইল নাম দিয়ে খুঁজুন..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full h-11 pl-10 pr-14 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl text-sm font-medium text-slate-900 outline-none transition-all shadow-xs"
+        />
+        {searchQuery && (
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Filter Tabs */}
@@ -113,15 +154,17 @@ export default function AdminPrintQueuePage() {
             <div key={i} className="h-48 bg-white rounded-2xl border border-slate-100 animate-pulse"></div>
           ))}
         </div>
-      ) : queue.length === 0 ? (
+      ) : filteredQueue.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-3xl border border-slate-200/80">
           <Printer className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-30" />
-          <h3 className="font-bold text-slate-700">No print jobs in this category</h3>
-          <p className="text-xs text-slate-400 mt-1">Walk-in customer drops will automatically show up here.</p>
+          <h3 className="font-bold text-slate-700">No print jobs found</h3>
+          <p className="text-xs text-slate-400 mt-1">
+            {searchQuery ? 'Try clearing your search query.' : 'Walk-in customer drops will automatically show up here.'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {queue.map(job => (
+          {filteredQueue.map(job => (
             <div 
               key={job.id} 
               className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex flex-col justify-between"

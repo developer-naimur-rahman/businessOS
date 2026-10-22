@@ -21,6 +21,8 @@ export interface CreateSaleDto {
     variantId: string;
     quantity: string | number;
     discount?: string | number;
+    customUnitPrice?: number | string;
+    customName?: string;
   }>;
   payments?: Array<{
     method: PaymentMethod;
@@ -98,7 +100,9 @@ export class SalesService {
       if (!product.isActive) throw new BadRequestException(`Product ${product.name} is inactive.`);
       // Assuming variant has sellingPrice, but let's just use product's if variant doesn't have it (or variant overrides it)
       let unitPrice = (variant as any).posPrice ?? (variant as any).retailPrice ?? product.sellingPrice;
-      if (internalOverrides && internalOverrides[line.variantId] !== undefined) {
+      if (line.customUnitPrice !== undefined && line.customUnitPrice !== null && !isNaN(Number(line.customUnitPrice))) {
+        unitPrice = new Prisma.Decimal(line.customUnitPrice);
+      } else if (internalOverrides && internalOverrides[line.variantId] !== undefined) {
         unitPrice = new Prisma.Decimal(internalOverrides[line.variantId]);
       }
       const lineSubtotal = unitPrice.mul(quantity);
@@ -117,7 +121,7 @@ export class SalesService {
         discount,
         lineSubtotal,
         lineTotal,
-        productNameSnapshot: product.name,
+        productNameSnapshot: line.customName?.trim() || product.name,
         skuSnapshot: variant.sku,
       });
 
