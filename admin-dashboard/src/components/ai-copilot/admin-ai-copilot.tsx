@@ -83,15 +83,34 @@ export function AdminAiCopilot() {
         }
         setMessages((prev) => [...prev, copilotMsg])
       } else {
-        // Natural language Co-Pilot conversation
-        const res = await api.post("/admin/dropshipping/ai-copilot", { message: query })
+        // Natural language Co-Pilot conversation - query intelligent retail AI snapshot
+        let replyText = ""
+        let actionType: any = "NONE"
+        let actionData: any = null
+        let suggestions: string[] = []
+
+        try {
+          const res = await api.post("/admin/ai-copilot/ask", { query })
+          replyText = res.data?.answer || res.data?.reply || "আপনার কমান্ড প্রসেস করা হয়েছে।"
+          actionType = res.data?.actionType || "NONE"
+          actionData = res.data?.metricsSnapshot
+          suggestions = res.data?.suggestions || []
+        } catch {
+          // Fallback to dropshipping copilot
+          const fallbackRes = await api.post("/admin/dropshipping/ai-copilot", { message: query })
+          replyText = fallbackRes.data?.reply || "আপনার কমান্ড প্রসেস করা হয়েছে।"
+          actionType = fallbackRes.data?.actionType || "NONE"
+          actionData = fallbackRes.data?.actionData
+          suggestions = fallbackRes.data?.suggestions || []
+        }
+
         const copilotMsg: ChatMessage = {
           id: "copilot-" + Date.now(),
           sender: "copilot",
-          text: res.data?.reply || "আপনার কমান্ড প্রসেস করা হয়েছে।",
-          actionType: res.data?.actionType || "NONE",
-          actionData: res.data?.actionData,
-          suggestions: res.data?.suggestions || [],
+          text: replyText,
+          actionType,
+          actionData,
+          suggestions,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         }
         setMessages((prev) => [...prev, copilotMsg])
@@ -128,6 +147,14 @@ export function AdminAiCopilot() {
       router.push("/admin/dropshipping")
       setIsOpen(false)
       toast.info("Navigated to Dropshipping AI Research Corner")
+    } else if (actionType === "VIEW_SERVICE_APPLICATIONS" || actionType === "VIEW_PAYMENTS") {
+      router.push("/admin/service-jobs")
+      setIsOpen(false)
+      toast.info("Navigated to Service Jobs & Applications")
+    } else if (actionType === "VIEW_SCHEDULING") {
+      router.push("/admin/service-scheduling")
+      setIsOpen(false)
+      toast.info("Navigated to Service Scheduling & Appointments")
     }
   }
 
