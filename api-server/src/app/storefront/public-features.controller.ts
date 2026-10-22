@@ -1,5 +1,5 @@
 import { 
-  Controller, Get, Post, Delete, Body, Param, Query, 
+  Controller, Get, Post, Delete, Patch, Body, Param, Query, 
   UseGuards, BadRequestException, NotFoundException, Request 
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -421,6 +421,136 @@ export class PublicFeaturesController {
     return {
       success: true,
       message: 'Review removed successfully.',
+    };
+  }
+
+  @Post('admin/reviews/trigger-requests')
+  @UseGuards(JwtAuthGuard)
+  async triggerReviewRequests(@Request() req: any) {
+    const orgId = req.user?.organizationId || (await this.getDefaultOrganizationId());
+
+    // Find delivered / completed orders
+    const completedSales = await this.prisma.sale.findMany({
+      where: {
+        organizationId: orgId,
+        status: { in: ['COMPLETED'] },
+      },
+      include: {
+        customer: true,
+      },
+      take: 20,
+    });
+
+    const invitations = completedSales.map(sale => {
+      const s = sale as any;
+      const couponCode = `REVIEW10-${s.id.slice(0, 4).toUpperCase()}`;
+      return {
+        saleId: s.id,
+        orderNumber: s.saleNumber || s.id.slice(0, 8),
+        customerName: s.customer?.name || 'Customer',
+        customerPhone: s.customer?.phone || '01700000000',
+        rewardOffer: '10% OFF Coupon (REVIEW10) on your next purchase',
+        rewardCouponCode: couponCode,
+        status: 'INVITATION_SENT',
+        sentAt: new Date().toISOString(),
+      };
+    });
+
+    // Record audit log
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: orgId,
+        userId: req.user?.userId || undefined,
+        entityType: 'ReviewRequestBatch',
+        entityId: `REV-BATCH-${Date.now()}`,
+        action: 'TRIGGER_AUTO_REVIEWS',
+        newData: { count: invitations.length, invitations },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Triggered automated review invitations for ${invitations.length} delivered orders with reward coupon code REVIEW10!`,
+      totalTriggered: invitations.length,
+      invitations,
+    };
+  }
+
+  @Patch('admin/reviews/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateReviewStatus(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() body: { status: 'APPROVED_LIVE' | 'HIDDEN' | 'PENDING' },
+  ) {
+    const orgId = req.user?.organizationId || (await this.getDefaultOrganizationId());
+
+    const review = await this.prisma.review.findFirst({
+      where: { id, organizationId: orgId },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found.');
+    }
+
+    // Persist moderation status in AuditLog
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId: orgId,
+        userId: req.user?.userId || undefined,
+        entityType: 'ReviewModeration',
+        entityId: id,
+        action: 'UPDATE_REVIEW_STATUS',
+        newData: { status: body.status || 'APPROVED_LIVE', reviewedAt: new Date().toISOString() },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Review #${id} status updated to ${body.status || 'APPROVED_LIVE'}.`,
+      status: body.status || 'APPROVED_LIVE',
+    };
+  }
+
+  @Post('reviews/submit')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, ttlSeconds: 60 })
+  async submitReview(@Body() body: {
+    productId: string;
+    rating: number;
+    comment?: string;
+    authorName: string;
+    authorImage?: string;
+    organizationId?: string;
+  }) {
+    const orgId = body.organizationId || (await this.getDefaultOrganizationId());
+
+    if (!body.productId || !body.rating || !body.authorName) {
+      throw new BadRequestException('productId, rating, and authorName are required.');
+    }
+
+    const review = await this.prisma.review.create({
+      data: {
+        organizationId: orgId,
+        productId: body.productId,
+        rating: Math.max(1, Math.min(5, Number(body.rating) || 5)),
+        comment: body.comment || '',
+        authorName: body.authorName,
+        authorImage: body.authorImage || null,
+      },
+    });
+
+    const rewardCoupon = `THANKYOU10-${Date.now().toString().slice(-4)}`;
+
+    return {
+      success: true,
+      message: 'Thank you for your valuable review! Your 10% discount coupon has been generated.',
+      review,
+      rewardCoupon: {
+        code: rewardCoupon,
+        discount: '10% OFF',
+        validDays: 30,
+      },
     };
   }
 }

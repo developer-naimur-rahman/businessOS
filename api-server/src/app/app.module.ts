@@ -16,6 +16,13 @@ import { PurchasesModule } from './purchases/purchases.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { StorageModule } from './storage/storage.module';
 import { DropshippingModule } from './dropshipping/dropshipping.module';
+import { LogisticsModule } from './logistics/logistics.module';
+import { SocialCommerceModule } from './social-commerce/social-commerce.module';
+import { AutomationModule } from './automation/automation.module';
+import { SupplierLedgerModule } from './suppliers/supplier-ledger.module';
+import { LoyaltyModule } from './loyalty/loyalty.module';
+import { ReturnsModule } from './returns/returns.module';
+import { MarketingModule } from './marketing/marketing.module';
 
 @Module({
   imports: [
@@ -34,6 +41,13 @@ import { DropshippingModule } from './dropshipping/dropshipping.module';
     StorefrontModule, 
     StorageModule,
     DropshippingModule,
+    LogisticsModule,
+    SocialCommerceModule,
+    AutomationModule,
+    SupplierLedgerModule,
+    LoyaltyModule,
+    ReturnsModule,
+    MarketingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

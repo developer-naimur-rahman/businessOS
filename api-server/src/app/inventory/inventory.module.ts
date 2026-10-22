@@ -6,10 +6,11 @@ import { InventoryMovementsRepository } from './inventory-movements.repository';
 import { StockBalancesRepository } from './stock-balances.repository';
 import { InventoryService } from './inventory.service';
 import { InventoryController } from './inventory.controller';
+import { BarcodeStudioController } from './barcode-studio.controller';
 
 @Module({
   imports: [PrismaModule, BusinessCoreModule, OperationalStructureModule],
-  controllers: [InventoryController],
+  controllers: [InventoryController, BarcodeStudioController],
   providers: [
     InventoryMovementsRepository,
     StockBalancesRepository,

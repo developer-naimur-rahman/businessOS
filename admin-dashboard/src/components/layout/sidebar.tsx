@@ -8,7 +8,8 @@ import {
   Package, Boxes, Store, Factory, ArrowRightLeft,
   TerminalSquare, TrendingUp, X, GitBranch, Warehouse,
   ShoppingBag, Sliders, Truck, MessageSquare,
-  Receipt, CircleDollarSign, Sparkles
+  Receipt, CircleDollarSign, Sparkles, Bot, RotateCcw,
+  Building2, Barcode, Gift, Send, Star, ShieldAlert
 } from "lucide-react"
 
 interface SidebarProps {
@@ -29,6 +30,40 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       ]
     },
     {
+      label: "Logistics & Orders",
+      items: [
+        { name: "🚚 Courier Logistics", href: "/admin/logistics", icon: Truck },
+        { name: "💬 Social Commerce", href: "/admin/social-commerce", icon: MessageSquare },
+        { name: "🤖 Order Confirm Bot", href: "/admin/automation/order-bot", icon: Bot },
+        { name: "🔄 Returns & QC (RMA)", href: "/admin/returns", icon: RotateCcw },
+        { name: "Online Orders", href: "/admin/orders", icon: ShoppingCart },
+        { name: "Sales History", href: "/admin/sales", icon: ShoppingCart },
+        { name: "Customers", href: "/admin/customers", icon: Users },
+      ]
+    },
+    {
+      label: "Inventory & Suppliers",
+      items: [
+        { name: "📒 Supplier Ledger (AP)", href: "/admin/suppliers/ledger", icon: Building2 },
+        { name: "🏷️ Barcode Studio", href: "/admin/barcode-studio", icon: Barcode },
+        { name: "🚀 Dropshipping AI Hub", href: "/admin/dropshipping", icon: Sparkles },
+        { name: "Products", href: "/admin/products", icon: Package },
+        { name: "Services", href: "/admin/services", icon: Package },
+        { name: "Service Price List", href: "/admin/services/price-list", icon: Sliders },
+        { name: "Stock Levels", href: "/admin/inventory", icon: Boxes },
+        { name: "Purchases & PO", href: "/admin/purchases", icon: ShoppingBag },
+        { name: "Suppliers", href: "/admin/suppliers", icon: Factory },
+      ]
+    },
+    {
+      label: "Growth & Retention",
+      items: [
+        { name: "🎁 Loyalty & Rewards", href: "/admin/loyalty", icon: Gift },
+        { name: "📣 Marketing Campaigns", href: "/admin/marketing/campaigns", icon: Send },
+        { name: "⭐ Review Moderation", href: "/admin/reviews", icon: Star },
+      ]
+    },
+    {
       label: "Finance & Accounts",
       items: [
         { name: "Profit & Loss (P&L)", href: "/admin/finance/profit-loss", icon: TrendingUp },
@@ -38,35 +73,13 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       ]
     },
     {
-      label: "Sales & Orders",
+      label: "Governance & Platform",
       items: [
-        { name: "Online Orders", href: "/admin/orders", icon: Truck },
-        { name: "Sales History", href: "/admin/sales", icon: ShoppingCart },
-        { name: "Customers", href: "/admin/customers", icon: Users },
-        { name: "Purchases & PO", href: "/admin/purchases", icon: ShoppingBag },
-      ]
-    },
-    {
-      label: "Catalog & Sourcing",
-      items: [
-        { name: "🚀 Dropshipping AI Hub", href: "/admin/dropshipping", icon: Sparkles },
-        { name: "Products", href: "/admin/products", icon: Package },
-        { name: "Services", href: "/admin/services", icon: Package },
-        { name: "Service Price List", href: "/admin/services/price-list", icon: Sliders },
-        { name: "Store Categories", href: "/admin/categories", icon: Package },
-        { name: "Units", href: "/admin/units", icon: Package },
-        { name: "Stock Levels", href: "/admin/inventory", icon: Boxes },
-        { name: "Suppliers", href: "/admin/suppliers", icon: Factory },
-      ]
-    },
-    {
-      label: "Operations & Platform",
-      items: [
+        { name: "🔐 Staff Audit & RBAC", href: "/admin/security/audit-logs", icon: ShieldAlert },
         { name: "Staff & Users", href: "/admin/staff", icon: Users },
         { name: "Branches", href: "/admin/branches", icon: GitBranch },
         { name: "Warehouses", href: "/admin/warehouses", icon: Warehouse },
         { name: "Storefront CMS", href: "/admin/storefront", icon: Store },
-        { name: "Reviews Moderation", href: "/admin/reviews", icon: MessageSquare },
         { name: "Design Studio", href: "/admin/design-studio", icon: Store },
         { name: "Media Library", href: "/admin/media", icon: Store },
       ]
