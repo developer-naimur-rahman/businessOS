@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333';
   const authHeader = req.headers.get('authorization') || '';
 
   try {
-    const res = await fetch(`${backendUrl}/api/business-core/customers/${params.id}`, {
+    const res = await fetch(`${backendUrl}/api/business-core/customers/${id}`, {
       headers: {
         'Authorization': authHeader,
         'Content-Type': 'application/json',
@@ -21,7 +22,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 
   return NextResponse.json({
-    id: params.id,
+    id,
     name: 'Demo Customer',
     email: 'customer@demo.local',
     phone: '01700000000',
@@ -33,13 +34,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   });
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333';
   const authHeader = req.headers.get('authorization') || '';
   const body = await req.json();
 
   try {
-    const res = await fetch(`${backendUrl}/api/business-core/customers/${params.id}`, {
+    const res = await fetch(`${backendUrl}/api/business-core/customers/${id}`, {
       method: 'PUT',
       headers: {
         'Authorization': authHeader,
@@ -55,5 +57,5 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     // Fallback
   }
 
-  return NextResponse.json({ id: params.id, ...body });
+  return NextResponse.json({ id, ...body });
 }

@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { useCartStore } from "../../store/useCartStore"
 import { useWishlistStore } from "../../store/useWishlistStore"
 import { useCustomerAuthStore } from "../../store/useCustomerAuthStore"
+import CustomerAiAssistant from "../storefront/customer-ai-assistant"
 
 export default function StorefrontShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -461,6 +462,9 @@ export default function StorefrontShell({ children }: { children: React.ReactNod
           </div>
         </div>
       </footer>
+
+      {/* Storefront Customer AI Shopping Assistant */}
+      <CustomerAiAssistant />
 
       {/* Floating WhatsApp Live Chat Button */}
       <a

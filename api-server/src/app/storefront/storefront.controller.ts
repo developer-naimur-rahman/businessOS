@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { StorefrontService } from './storefront.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrganizationContextGuard } from '../common/guards/organization-context.guard';
 import { ProductCheckoutDto, ServiceCheckoutDto, ServiceQuoteDto, StorageUploadDto } from './storefront.dto';
+import { RateLimit, RateLimitGuard } from '../common/guards/rate-limit.guard';
 
 @Controller('storefront')
 export class StorefrontController {
@@ -28,6 +29,17 @@ export class StorefrontController {
   ) {
     const organizationId = await this.storefrontService.getDefaultOrganizationId();
     return this.storefrontService.search(organizationId, query, page ? Number(page) : 1, limit ? Number(limit) : 20);
+  }
+
+  @Post('ai-assistant')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 25, ttlSeconds: 60 })
+  async chatWithAssistant(@Body() body: { message: string }) {
+    if (!body?.message?.trim()) {
+      throw new BadRequestException('Message is required');
+    }
+    const organizationId = await this.storefrontService.getDefaultOrganizationId();
+    return this.storefrontService.customerAiAssistant(organizationId, body.message);
   }
 
   @Post('services/:id/quote')
