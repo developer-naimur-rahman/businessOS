@@ -4,17 +4,22 @@ export async function GET() {
   return NextResponse.json({
     totalMarketDueBdt: 4650,
     collectedThisMonthBdt: 12500,
-    overdueCustomersCount: 2,
+    overdueCustomersCount: 1,
     totalCustomersWithDue: 2,
     customers: [
       {
         id: '01fbf875-ad53-4b76-9649-5ed88c1fb043',
+        customerId: '01fbf875-ad53-4b76-9649-5ed88c1fb043',
         name: 'Local High School',
         phone: '0171974862',
         customerType: 'BUSINESS',
+        totalCreditBdt: 3500,
+        totalPaidBdt: 2050,
+        netDueBdt: 1450,
         dueAmount: 1450,
         creditLimit: 15000,
         daysOverdue: 14,
+        isOverdue: false,
         riskLevel: 'LOW',
         lastTransactionDate: new Date(Date.now() - 86400000 * 2).toISOString(),
         transactions: [
@@ -24,12 +29,17 @@ export async function GET() {
       },
       {
         id: '09886940-3514-4621-8041-ee39502d09d4',
+        customerId: '09886940-3514-4621-8041-ee39502d09d4',
         name: 'XYZ Small Business',
         phone: '0171677894',
         customerType: 'BUSINESS',
+        totalCreditBdt: 3200,
+        totalPaidBdt: 0,
+        netDueBdt: 3200,
         dueAmount: 3200,
         creditLimit: 10000,
         daysOverdue: 35,
+        isOverdue: true,
         riskLevel: 'MEDIUM',
         lastTransactionDate: new Date(Date.now() - 86400000 * 5).toISOString(),
         transactions: [

@@ -38,9 +38,29 @@ import {
   Download
 } from "lucide-react"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 export default function ServiceJobsPage() {
+  const router = useRouter()
   const [activeMainTab, setActiveMainTab] = useState<'PHYSICAL' | 'INTERNET_APPLICATIONS'>('INTERNET_APPLICATIONS')
+
+  const handleHandoffToPos = (job: any) => {
+    const payload = {
+      type: 'SERVICE_JOB',
+      id: job.id,
+      ref: job.ticketNumber || `#SJ-${job.id.slice(0, 6)}`,
+      title: `${job.serviceCategory?.replace(/_/g, ' ') || 'সার্ভিস ও মেরামত'} - ${job.deviceOrFileDetails || job.jobDescription || 'ডিভাইস'}`,
+      customerName: job.customerName || 'Customer',
+      customerPhone: job.customerPhone || '',
+      dueBdt: Number(job.dueAmountBdt || 0),
+      totalCost: Number(job.estimatedCostBdt || 0)
+    };
+    try {
+      sessionStorage.setItem('pending_pos_service_job', JSON.stringify(payload));
+    } catch {}
+    toast.success(`সার্ভিস জব #${payload.ref} POS এ পাঠানো হচ্ছে...`);
+    router.push(`/admin/pos?importJobId=${job.id}&ref=${encodeURIComponent(payload.ref)}`);
+  };
 
   // --- PHYSICAL JOBS STATE ---
   const [data, setData] = useState<any>({
@@ -751,14 +771,16 @@ export default function ServiceJobsPage() {
                       <div className="flex items-center gap-2 justify-end pt-1">
                         {/* POS Due Collection & Handoff button */}
                         {job.status !== 'DELIVERED' && (
-                          <Link
-                            href="/admin/pos"
-                            className="px-2.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold inline-flex items-center gap-1 border border-teal-200 transition-colors"
+                          <button
+                            type="button"
+                            onClick={() => handleHandoffToPos(job)}
+                            className="px-2.5 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 text-xs font-bold inline-flex items-center gap-1 border border-teal-200 transition-colors cursor-pointer shadow-xs"
                             title="কাউন্টার POS এ বিল পরিশোধ ও ডেলিভারি (F7)"
                           >
                             <DollarSign className="w-3.5 h-3.5 text-teal-600" /> POS ডেলিভারি (F7)
-                          </Link>
+                          </button>
                         )}
+
 
                         <button
                           onClick={() => { setSelectedJob(job); setShowPrintSlipModal(true); }}

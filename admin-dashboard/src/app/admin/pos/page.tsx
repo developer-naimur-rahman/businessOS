@@ -60,6 +60,11 @@ export default function AdminPOSPage() {
   const [isServiceHandoffModalOpen, setIsServiceHandoffModalOpen] = useState(false)
   const [linkedServiceJob, setLinkedServiceJob] = useState<any | null>(null)
 
+  // Warranty & Serial Tagging State for POS items
+  const [warrantyModalItem, setWarrantyModalItem] = useState<any | null>(null)
+  const [itemSerialInput, setItemSerialInput] = useState("")
+  const [itemWarrantyDaysInput, setItemWarrantyDaysInput] = useState("365")
+
   const searchInputRef = useRef<HTMLInputElement>(null)
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
 
@@ -503,6 +508,7 @@ export default function AdminPOSPage() {
       const price = overridePrice !== undefined ? Number(overridePrice) : Number(variant.posPrice || variant.retailPrice || product.sellingPrice || 0)
       const attrs = variant.attributes?.map((a: any) => a.attributeValue?.value).join(' / ')
       const name = overrideName || (attrs ? `${product.name} - ${attrs}` : product.name)
+      const defaultWarranty = product.warrantyMonths ? product.warrantyMonths * 30 : (product.warrantyDurationDays || (product.type === 'HARDWARE' || product.type === 'PHYSICAL' ? 365 : 0))
       
       return [...prev, { 
         variantId: variant.id, 
@@ -512,7 +518,9 @@ export default function AdminPOSPage() {
         sellingPrice: price, 
         quantity: 1,
         customUnitPrice: overridePrice,
-        customName: overrideName
+        customName: overrideName,
+        warrantyDurationDays: defaultWarranty,
+        serialNumber: ''
       }]
     })
   }
@@ -617,6 +625,66 @@ export default function AdminPOSPage() {
     }
   }
 
+  // Auto-import pending service job from Service Jobs (F7)
+  useEffect(() => {
+    try {
+      const pendingRaw = sessionStorage.getItem('pending_pos_service_job')
+      if (pendingRaw) {
+        const job = JSON.parse(pendingRaw)
+        if (job && job.ref) {
+          handleImportServiceJob(job)
+          sessionStorage.removeItem('pending_pos_service_job')
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [products])
+
+  const openWarrantyModal = (item: any) => {
+    setWarrantyModalItem(item)
+    setItemSerialInput(item.serialNumber || '')
+    setItemWarrantyDaysInput(item.warrantyDurationDays ? item.warrantyDurationDays.toString() : '365')
+  }
+
+  const saveWarrantyForItem = () => {
+    if (!warrantyModalItem) return
+    const key = warrantyModalItem._itemKey || warrantyModalItem.variantId
+    setCart(prev => prev.map(it => {
+      if ((it._itemKey || it.variantId) === key) {
+        return {
+          ...it,
+          serialNumber: itemSerialInput.trim(),
+          warrantyDurationDays: Number(itemWarrantyDaysInput) || 365
+        }
+      }
+      return it
+    }))
+    toast.success('ওয়ারেন্টি মেয়াদ ও সিরিয়াল নম্বর সফলভাবে যুক্ত হয়েছে!')
+    setWarrantyModalItem(null)
+  }
+
+  const autoRegisterWarranties = async (saleRecord: any, itemsToRegister: any[]) => {
+    try {
+      for (const it of itemsToRegister) {
+        if (it.serialNumber || (it.warrantyDurationDays && it.warrantyDurationDays > 0)) {
+          await api.post('/admin/warranty/register', {
+            serialNumber: it.serialNumber || `SN-${saleRecord.saleNumber || Date.now().toString().slice(-6)}-${it.sku}`,
+            productName: it.name,
+            sku: it.sku,
+            customerName: linkedServiceJob?.customerName || 'Walk-in Customer',
+            customerPhone: linkedServiceJob?.customerPhone || cashBakiPhone || splitCustomerPhone || '',
+            supplierName: 'POS Direct Counter',
+            warrantyDurationDays: it.warrantyDurationDays || 365,
+            invoiceNumber: saleRecord.saleNumber || saleRecord.id
+          }).catch(() => {})
+        }
+      }
+    } catch {
+      // Ignore background registration error
+    }
+  }
+
   const updateQuantity = (keyOrVariantId: string, delta: number) => {
     setCart(prev => prev.map(item => {
       const matchKey = item._itemKey || item.variantId
@@ -695,6 +763,7 @@ export default function AdminPOSPage() {
       }
       
       toast.success("Sale completed successfully")
+      autoRegisterWarranties(enrichedSale, cart)
       setCompletedSale(enrichedSale)
       setCart([])
       setCartDiscount(0)
@@ -834,6 +903,7 @@ export default function AdminPOSPage() {
           ? `নগদ বিক্রয় সফল! গ্রাহককে ফেরত দিন: ৳${(tendered - total).toLocaleString()}`
           : "নগদ বিক্রয় সফলভাবে সম্পন্ন হয়েছে!"
       )
+      autoRegisterWarranties(enrichedSale, cart)
       setCompletedSale(enrichedSale)
       setCart([])
       setCartDiscount(0)
@@ -955,6 +1025,7 @@ export default function AdminPOSPage() {
       }
 
       toast.success("Split payment sale processed successfully!")
+      autoRegisterWarranties(enrichedSale, cart)
       setCompletedSale(enrichedSale)
       setCart([])
       localStorage.removeItem('pos_active_cart')
@@ -1208,7 +1279,15 @@ export default function AdminPOSPage() {
                         <span className="font-bold text-xl tracking-tighter">{product.name.charAt(0).toUpperCase()}</span>
                       </div>
                       <h3 className="font-semibold text-slate-800 text-[12px] mb-1 line-clamp-2 leading-tight px-1">{product.name}</h3>
-                      <p className="text-indigo-600 font-black text-xs tracking-tight mt-auto">৳{Number(product.sellingPrice).toLocaleString()}</p>
+                      <div className="flex items-center justify-between w-full mt-auto px-1">
+                        <p className="text-indigo-600 font-black text-xs tracking-tight">৳{Number(product.sellingPrice).toLocaleString()}</p>
+                        {(product.warrantyMonths || product.type === 'HARDWARE' || product.type === 'PHYSICAL') && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-0.5" title="ওয়ারেন্টি যুক্ত পণ্য">
+                            <ShieldCheck className="w-2.5 h-2.5" />
+                            {product.warrantyMonths ? `${product.warrantyMonths}m` : '1y'}
+                          </span>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -1252,38 +1331,62 @@ export default function AdminPOSPage() {
               </div>
             ) : (
               <div className="space-y-2.5">
-                {cart.map(item => (
-                  <div key={item.variantId} className="bg-white border border-slate-100 rounded-xl p-2.5 flex gap-2.5 items-start group shadow-xs hover:border-indigo-100 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-slate-800 text-xs leading-tight mb-1 truncate">{item.name}</h4>
-                      <div className="flex items-center gap-2">
-                        <span className="text-indigo-600 font-bold text-xs">৳{Number(item.sellingPrice).toLocaleString()}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">({item.sku})</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <div className="flex items-center gap-1">
-                        <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden h-8 shadow-inner">
-                          <button onClick={() => updateQuantity(item.variantId, -1)} className="w-8 h-full flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors">
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="w-7 text-center text-xs font-bold text-slate-800 tabular-nums">{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.variantId, 1)} className="w-8 h-full flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors">
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
+                {cart.map(item => {
+                  const matchKey = item._itemKey || item.variantId;
+                  return (
+                    <div key={matchKey} className="bg-white border border-slate-100 rounded-xl p-2.5 flex gap-2.5 items-start group shadow-xs hover:border-indigo-100 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-slate-800 text-xs leading-tight mb-1 truncate">{item.name}</h4>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-indigo-600 font-bold text-xs">৳{Number(item.sellingPrice).toLocaleString()}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">({item.sku})</span>
                         </div>
-                        <button 
-                          onClick={() => removeFromCart(item.variantId)} 
-                          className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          title="Remove item"
+                        
+                        {/* Warranty & Serial Tagging */}
+                        <button
+                          type="button"
+                          onClick={() => openWarrantyModal(item)}
+                          className={`text-[10px] px-2 py-0.5 rounded-md font-bold flex items-center gap-1 transition-all ${
+                            item.serialNumber || (item.warrantyDurationDays && item.warrantyDurationDays > 0)
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+                          }`}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                          <span>
+                            {item.warrantyDurationDays ? `${item.warrantyDurationDays} দিন ওয়ারেন্টি` : '+ ওয়ারেন্টি / S/N'}
+                          </span>
+                          {item.serialNumber && (
+                            <span className="font-mono text-[9px] bg-white px-1 rounded text-slate-700 font-bold">
+                              SN: {item.serialNumber}
+                            </span>
+                          )}
                         </button>
                       </div>
+                      
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1">
+                          <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden h-8 shadow-inner">
+                            <button onClick={() => updateQuantity(matchKey, -1)} className="w-8 h-full flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors">
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="w-7 text-center text-xs font-bold text-slate-800 tabular-nums">{item.quantity}</span>
+                            <button onClick={() => updateQuantity(matchKey, 1)} className="w-8 h-full flex items-center justify-center hover:bg-slate-200 text-slate-600 transition-colors">
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <button 
+                            onClick={() => removeFromCart(matchKey)} 
+                            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Remove item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1875,6 +1978,92 @@ export default function AdminPOSPage() {
         onClose={() => setIsServiceHandoffModalOpen(false)}
         onImportJob={handleImportServiceJob}
       />
+
+      {/* Warranty & Serial Tagging Modal */}
+      {warrantyModalItem && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-150 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                  <ShieldCheck className="w-5 h-5" />
+                </span>
+                <h3 className="font-bold text-slate-900 text-sm">পণ্য ওয়ারেন্টি ও সিরিয়াল (S/N)</h3>
+              </div>
+              <button onClick={() => setWarrantyModalItem(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <p className="font-semibold text-slate-700 mb-0.5">{warrantyModalItem.name}</p>
+                <p className="text-[11px] text-slate-400 font-mono">SKU: {warrantyModalItem.sku}</p>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">সিরিয়াল নম্বর / IMEI (ঐচ্ছিক বা বারকোড স্ক্যান):</label>
+                <input
+                  type="text"
+                  value={itemSerialInput}
+                  onChange={(e) => setItemSerialInput(e.target.value)}
+                  placeholder="e.g. SN-L8050-88192"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">ওয়ারেন্টির মেয়াদ (দিন হিসেবে):</label>
+                <div className="grid grid-cols-4 gap-1.5 mb-2">
+                  {[
+                    { label: '১ মাস', days: 30 },
+                    { label: '৩ মাস', days: 90 },
+                    { label: '১ বছর', days: 365 },
+                    { label: '২ বছর', days: 730 }
+                  ].map((p) => (
+                    <button
+                      key={p.days}
+                      type="button"
+                      onClick={() => setItemWarrantyDaysInput(p.days.toString())}
+                      className={`py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                        itemWarrantyDaysInput === p.days.toString()
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  value={itemWarrantyDaysInput}
+                  onChange={(e) => setItemWarrantyDaysInput(e.target.value)}
+                  placeholder="365"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs focus:bg-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setWarrantyModalItem(null)}
+                className="flex-1 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                onClick={saveWarrantyForItem}
+                className="flex-1 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs"
+              >
+                সংরক্ষণ করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

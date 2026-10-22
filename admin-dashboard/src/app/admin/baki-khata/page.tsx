@@ -69,8 +69,9 @@ export default function BakiKhataPage() {
 
   const handleOpenStatement = async (cust: any) => {
     setSelectedCustomer(cust)
+    const cId = cust.customerId || cust.id
     try {
-      const res = await api.get(`/admin/baki-khata/customers/${cust.customerId}`)
+      const res = await api.get(`/admin/baki-khata/customers/${cId}`)
       setCustomerStatement(res.data)
       setShowStatementModal(true)
     } catch (err: any) {
@@ -80,11 +81,12 @@ export default function BakiKhataPage() {
 
   const handleOpenTaqada = async (cust: any) => {
     setSelectedCustomer(cust)
+    const cId = cust.customerId || cust.id
     try {
       const res = await api.post("/admin/baki-khata/send-reminder", {
-        customerId: cust.customerId,
+        customerId: cId,
         customerPhone: cust.phone,
-        dueAmountBdt: cust.netDueBdt,
+        dueAmountBdt: cust.netDueBdt ?? cust.dueAmount ?? 0,
         paymentBkashNumber: "01700000000",
       })
       setTaqadaData(res.data)
@@ -97,10 +99,11 @@ export default function BakiKhataPage() {
   const handleRecordNewDue = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedCustomer || !newDueAmount) return
+    const cId = selectedCustomer.customerId || selectedCustomer.id
     setSubmitting(true)
     try {
       await api.post("/admin/baki-khata/transaction", {
-        customerId: selectedCustomer.customerId,
+        customerId: cId,
         type: "NEW_BAKI_SALE",
         amount: Number(newDueAmount),
         notes: newDueNotes,
@@ -120,15 +123,17 @@ export default function BakiKhataPage() {
   const handleRecordCollection = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedCustomer || !collectAmount) return
+    const cId = selectedCustomer.customerId || selectedCustomer.id
     setSubmitting(true)
     try {
       await api.post("/admin/baki-khata/transaction", {
-        customerId: selectedCustomer.customerId,
+        customerId: cId,
         type: "DUE_COLLECTION",
         amount: Number(collectAmount),
         paymentMethod: collectMethod,
         notes: collectNotes,
       })
+
       toast.success("বকেয়া আদায় সফলভাবে জমা হয়েছে")
       setShowCollectModal(false)
       setCollectAmount("")
@@ -288,14 +293,15 @@ export default function BakiKhataPage() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-right font-medium text-slate-600 tabular-nums">
-                      ৳{Number(cust.totalCreditBdt).toLocaleString()}
+                      ৳{Number(cust.totalCreditBdt ?? cust.dueAmount ?? 0).toLocaleString()}
                     </td>
                     <td className="px-5 py-4 text-right font-medium text-emerald-600 tabular-nums">
-                      ৳{Number(cust.totalPaidBdt).toLocaleString()}
+                      ৳{Number(cust.totalPaidBdt ?? 0).toLocaleString()}
                     </td>
                     <td className="px-5 py-4 text-right font-black text-rose-600 text-base tabular-nums">
-                      ৳{Number(cust.netDueBdt).toLocaleString()}
+                      ৳{Number(cust.netDueBdt ?? cust.dueAmount ?? 0).toLocaleString()}
                     </td>
+
                     <td className="px-5 py-4 text-center">
                       {cust.netDueBdt === 0 ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">

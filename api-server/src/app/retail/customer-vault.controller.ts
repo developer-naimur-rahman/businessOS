@@ -287,4 +287,71 @@ export class AdminCustomerVaultController {
       req.user.id || req.user.sub
     );
   }
+
+  /**
+   * Phase 2.1: Extension Authorized Profile Retrieval
+   */
+  @Get(':phoneOrId/extension-profile')
+  @RequirePermissions('customers.view')
+  async getExtensionProfile(@Request() req: any, @Param('phoneOrId') phoneOrId: string) {
+    return this.vaultService.getExtensionProfile(req.user.organizationId, phoneOrId);
+  }
+
+  /**
+   * Phase 2.2: Extension Approved Bidirectional Vault Sync
+   */
+  @Post('extension-sync')
+  @RequirePermissions('customers.manage')
+  async syncExtensionUpdates(
+    @Request() req: any,
+    @Body() body: { customerIdOrPhone: string; sourceUrl: string; updates: any[] }
+  ) {
+    return this.vaultService.syncExtensionUpdates(
+      req.user.organizationId,
+      req.user.id || req.user.sub,
+      body.customerIdOrPhone,
+      body.sourceUrl,
+      body.updates
+    );
+  }
+
+  /**
+   * Phase 2.3: Deterministic & Heuristic Form Mapping API
+   */
+  @Post('map-form-fields')
+  @RequirePermissions('customers.view')
+  async mapFormFields(
+    @Body() body: { hostname: string; pageTitle?: string; detectedFields: any[] }
+  ) {
+    return this.vaultService.mapFormFields(body);
+  }
+
+  /**
+   * Phase 2.4: Secure Document Short-Lived Access
+   */
+  @Get(':phoneOrId/documents/:docId/access')
+  @RequirePermissions('customers.view')
+  async getDocumentAccess(
+    @Request() req: any,
+    @Param('phoneOrId') phoneOrId: string,
+    @Param('docId') docId: string
+  ) {
+    return this.vaultService.getDocumentAccess(req.user.organizationId, phoneOrId, docId);
+  }
+
+  /**
+   * Phase 2.5: Application Workflow Event Logging
+   */
+  @Post('extension-event')
+  @RequirePermissions('customers.view')
+  async logExtensionEvent(
+    @Request() req: any,
+    @Body() body: { customerId: string; targetDomain: string; targetUrl: string; eventType: string; details?: any }
+  ) {
+    return this.vaultService.logExtensionEvent(
+      req.user.organizationId,
+      req.user.id || req.user.sub,
+      body
+    );
+  }
 }

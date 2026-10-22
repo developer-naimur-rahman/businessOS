@@ -28,3 +28,37 @@ export async function GET(req: Request) {
   const data = demoStore.getDocumentOrders(category, status, search);
   return NextResponse.json(data);
 }
+
+export async function POST(req: Request) {
+  const authHeader = req.headers.get('authorization') || '';
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+
+  const backendUrl = getValidBackendUrl();
+  if (backendUrl && authHeader) {
+    try {
+      const res = await fetch(`${backendUrl}/api/admin/document-studio/orders`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(2000)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data, { status: res.status });
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const created = demoStore.createDocumentOrder(body);
+  return NextResponse.json(created, { status: 201 });
+}

@@ -167,6 +167,29 @@ export const CANONICAL_FIELD_MAP: Record<string, { canonicalKey: string; labelEn
   'employer_name': { canonicalKey: 'employer_name', labelEn: 'Employer / Organization', labelBn: 'প্রতিষ্ঠানের নাম', category: 'EMPLOYMENT', fieldType: 'TEXT' },
   'designation': { canonicalKey: 'designation', labelEn: 'Designation / Job Title', labelBn: 'পদবী', category: 'EMPLOYMENT', fieldType: 'TEXT' },
   'experience_years': { canonicalKey: 'experience_years', labelEn: 'Experience (Years)', labelBn: 'অভিজ্ঞতা (বছর)', category: 'EMPLOYMENT', fieldType: 'NUMBER' },
+  // Names & Identity
+  'applicant_name': { canonicalKey: 'nameEn', labelEn: "Applicant's Name", labelBn: 'আবেদনকারীর নাম', category: 'IDENTITY', fieldType: 'TEXT' },
+  'full_name': { canonicalKey: 'nameEn', labelEn: 'Full Name', labelBn: 'পূর্ণ নাম', category: 'IDENTITY', fieldType: 'TEXT' },
+  'name': { canonicalKey: 'nameEn', labelEn: 'Name', labelBn: 'নাম', category: 'IDENTITY', fieldType: 'TEXT' },
+  'father_name': { canonicalKey: 'fatherNameEn', labelEn: "Father's Name", labelBn: 'পিতার নাম', category: 'IDENTITY', fieldType: 'TEXT' },
+  'fathers_name': { canonicalKey: 'fatherNameEn', labelEn: "Father's Name", labelBn: 'পিতার নাম', category: 'IDENTITY', fieldType: 'TEXT' },
+  'mother_name': { canonicalKey: 'motherNameEn', labelEn: "Mother's Name", labelBn: 'মাতার নাম', category: 'IDENTITY', fieldType: 'TEXT' },
+  'mothers_name': { canonicalKey: 'motherNameEn', labelEn: "Mother's Name", labelBn: 'মাতার নাম', category: 'IDENTITY', fieldType: 'TEXT' },
+  'gender': { canonicalKey: 'gender', labelEn: 'Gender', labelBn: 'লিঙ্গ', category: 'IDENTITY', fieldType: 'SELECT' },
+  'sex': { canonicalKey: 'gender', labelEn: 'Gender', labelBn: 'লিঙ্গ', category: 'IDENTITY', fieldType: 'SELECT' },
+  'mobile': { canonicalKey: 'phone', labelEn: 'Mobile Number', labelBn: 'মোবাইল নম্বর', category: 'CONTACT', fieldType: 'TEXT' },
+  'mobile_no': { canonicalKey: 'phone', labelEn: 'Mobile Number', labelBn: 'মোবাইল নম্বর', category: 'CONTACT', fieldType: 'TEXT' },
+  'phone': { canonicalKey: 'phone', labelEn: 'Phone Number', labelBn: 'ফোন নম্বর', category: 'CONTACT', fieldType: 'TEXT' },
+  'phone_number': { canonicalKey: 'phone', labelEn: 'Phone Number', labelBn: 'ফোন নম্বর', category: 'CONTACT', fieldType: 'TEXT' },
+  'email': { canonicalKey: 'email', labelEn: 'Email Address', labelBn: 'ইমেইল', category: 'CONTACT', fieldType: 'TEXT' },
+  'email_address': { canonicalKey: 'email', labelEn: 'Email Address', labelBn: 'ইমেইল', category: 'CONTACT', fieldType: 'TEXT' },
+  'present_address': { canonicalKey: 'presentAddress', labelEn: 'Present Address', labelBn: 'বর্তমান ঠিকানা', category: 'IDENTITY', fieldType: 'TEXT' },
+  'permanent_address': { canonicalKey: 'permanentAddress', labelEn: 'Permanent Address', labelBn: 'স্থায়ী ঠিকানা', category: 'IDENTITY', fieldType: 'TEXT' },
+  'present_district': { canonicalKey: 'presentDistrict', labelEn: 'Present District', labelBn: 'বর্তমান জেলা', category: 'IDENTITY', fieldType: 'TEXT' },
+  'permanent_district': { canonicalKey: 'permanentDistrict', labelEn: 'Permanent District', labelBn: 'স্থায়ী জেলা', category: 'IDENTITY', fieldType: 'TEXT' },
+  'district': { canonicalKey: 'presentDistrict', labelEn: 'District', labelBn: 'জেলা', category: 'IDENTITY', fieldType: 'TEXT' },
+  'thana': { canonicalKey: 'presentUpazila', labelEn: 'Thana', labelBn: 'থানা', category: 'IDENTITY', fieldType: 'TEXT' },
+  'post_code': { canonicalKey: 'presentPostalCode', labelEn: 'Postal Code', labelBn: 'পোস্ট কোড', category: 'IDENTITY', fieldType: 'TEXT' },
   // Business & Tax
   'trade_license': { canonicalKey: 'trade_license_no', labelEn: 'Trade License Number', labelBn: 'ট্রেড লাইসেন্স নম্বর', category: 'BUSINESS', fieldType: 'TEXT' },
   'trade_license_no': { canonicalKey: 'trade_license_no', labelEn: 'Trade License Number', labelBn: 'ট্রেড লাইসেন্স নম্বর', category: 'BUSINESS', fieldType: 'TEXT' },
@@ -1155,5 +1178,505 @@ Respond strictly in JSON:
     });
 
     return profile;
+  }
+
+  /**
+   * Phase 2.1: Get Extension-Appropriate Customer Vault Profile
+   */
+  async getExtensionProfile(organizationId: string, phoneOrId: string) {
+    const profile = await this.getProfile(organizationId, phoneOrId);
+    if (!profile) {
+      throw new NotFoundException(`Customer vault profile '${phoneOrId}' not found.`);
+    }
+
+    const canonicalValues: Record<string, any> = {
+      nameEn: profile.nameEn || '',
+      nameBn: profile.nameBn || '',
+      fullNameEn: profile.nameEn || '',
+      fullNameBn: profile.nameBn || '',
+      applicantName: profile.nameEn || '',
+      fatherNameEn: profile.fatherNameEn || '',
+      fatherNameBn: profile.fatherNameBn || '',
+      motherNameEn: profile.motherNameEn || '',
+      motherNameBn: profile.motherNameBn || '',
+      dob: profile.dob || '',
+      gender: profile.gender || '',
+      nidNumber: profile.nidNumber || '',
+      birthRegNumber: profile.birthRegNumber || '',
+      phone: profile.phone || '',
+      email: profile.email || '',
+      presentAddress: profile.presentAddress || '',
+      presentDistrict: profile.presentStructuredAddress?.district || '',
+      presentUpazila: profile.presentStructuredAddress?.upazilaThana || '',
+      presentPostOffice: profile.presentStructuredAddress?.postOffice || '',
+      presentPostalCode: profile.presentStructuredAddress?.postalCode || '',
+      presentVillage: profile.presentStructuredAddress?.villageArea || '',
+      permanentAddress: profile.permanentAddress || '',
+      permanentDistrict: profile.permanentStructuredAddress?.district || '',
+      permanentUpazila: profile.permanentStructuredAddress?.upazilaThana || '',
+      permanentPostOffice: profile.permanentStructuredAddress?.postOffice || '',
+      permanentPostalCode: profile.permanentStructuredAddress?.postalCode || '',
+      permanentVillage: profile.permanentStructuredAddress?.villageArea || '',
+    };
+
+    for (const edu of profile.educationHistory || []) {
+      const deg = (edu.degree || '').toUpperCase();
+      if (deg === 'SSC' || deg === 'DAKHIL') {
+        canonicalValues['ssc_exam'] = edu.examTitle;
+        canonicalValues['ssc_board'] = edu.boardOrUniversity;
+        canonicalValues['ssc_roll'] = edu.rollNumber || '';
+        canonicalValues['ssc_reg'] = edu.regNumber || '';
+        canonicalValues['ssc_year'] = edu.passingYear;
+        canonicalValues['ssc_gpa'] = edu.resultGpa;
+        canonicalValues['ssc_group'] = edu.groupMajor || '';
+      } else if (deg === 'HSC' || deg === 'ALIM' || deg === 'DIPLOMA') {
+        canonicalValues['hsc_exam'] = edu.examTitle;
+        canonicalValues['hsc_board'] = edu.boardOrUniversity;
+        canonicalValues['hsc_roll'] = edu.rollNumber || '';
+        canonicalValues['hsc_reg'] = edu.regNumber || '';
+        canonicalValues['hsc_year'] = edu.passingYear;
+        canonicalValues['hsc_gpa'] = edu.resultGpa;
+        canonicalValues['hsc_group'] = edu.groupMajor || '';
+      } else if (deg === 'GRADUATION' || deg === 'HONOURS' || deg === 'BSC' || deg === 'BBA' || deg === 'BA') {
+        canonicalValues['grad_exam'] = edu.examTitle;
+        canonicalValues['grad_university'] = edu.boardOrUniversity;
+        canonicalValues['grad_year'] = edu.passingYear;
+        canonicalValues['grad_gpa'] = edu.resultGpa;
+        canonicalValues['grad_subject'] = edu.groupMajor || '';
+      }
+    }
+
+    for (const df of profile.dynamicFields || []) {
+      if (df.key && df.value !== undefined) {
+        canonicalValues[df.key] = df.value;
+      }
+    }
+
+    const safeDocuments = (profile.documents || []).map(d => ({
+      id: d.id,
+      docType: d.docType,
+      title: d.title,
+      mimeType: d.mimeType,
+      sizeBytes: d.sizeBytes,
+      isVerified: d.isVerified,
+      uploadedAt: d.uploadedAt,
+      hasFile: !!d.fileUrlOrBase64,
+    }));
+
+    return {
+      customerId: profile.customerId || profile.id,
+      vaultId: profile.id,
+      organizationId: profile.organizationId,
+      profile: {
+        nameEn: profile.nameEn,
+        nameBn: profile.nameBn,
+        phone: profile.phone,
+        email: profile.email,
+        dob: profile.dob,
+        gender: profile.gender,
+        nidNumber: profile.nidNumber,
+        birthRegNumber: profile.birthRegNumber,
+        photoUrl: profile.photoUrl,
+        signatureUrl: profile.signatureUrl,
+      },
+      addresses: {
+        present: profile.presentStructuredAddress || { text: profile.presentAddress },
+        permanent: profile.permanentStructuredAddress || { text: profile.permanentAddress },
+      },
+      educationHistory: profile.educationHistory || [],
+      documents: safeDocuments,
+      canonicalValues,
+      updatedAt: profile.updatedAt,
+    };
+  }
+
+  /**
+   * Phase 2.2: Approved Bidirectional Vault Sync
+   */
+  async syncExtensionUpdates(
+    organizationId: string,
+    userId: string,
+    customerIdOrPhone: string,
+    sourceUrl: string,
+    updates: Array<{
+      canonicalKey: string;
+      oldValue?: any;
+      newValue: any;
+      staffConfirmed?: boolean;
+      notes?: string;
+    }>
+  ) {
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      throw new BadRequestException('At least one update item is required.');
+    }
+
+    const profile = await this.getProfile(organizationId, customerIdOrPhone);
+    if (!profile) {
+      throw new NotFoundException(`Customer vault record '${customerIdOrPhone}' not found.`);
+    }
+
+    const ALLOWED_DIRECT_KEYS = new Set([
+      'nameEn', 'nameBn', 'fatherNameEn', 'fatherNameBn', 'motherNameEn', 'motherNameBn',
+      'spouseNameEn', 'spouseNameBn', 'dob', 'gender', 'nidNumber', 'birthRegNumber',
+      'email', 'phone', 'presentAddress', 'permanentAddress', 'religion', 'bloodGroup',
+      'maritalStatus'
+    ]);
+
+    const SENSITIVE_KEYS = new Set(['nidNumber', 'birthRegNumber', 'dob', 'passport_number']);
+
+    const appliedUpdates: any[] = [];
+    const conflicts: any[] = [];
+    const mutableProfile: any = { ...profile };
+
+    for (const item of updates) {
+      const { canonicalKey, oldValue, newValue, staffConfirmed, notes } = item;
+      if (!canonicalKey) continue;
+
+      let currentVal: any = undefined;
+      if (ALLOWED_DIRECT_KEYS.has(canonicalKey)) {
+        currentVal = mutableProfile[canonicalKey];
+      } else {
+        const df = (mutableProfile.dynamicFields || []).find((f: any) => f.key === canonicalKey);
+        currentVal = df ? df.value : undefined;
+      }
+
+      // Concurrency / Stale update check
+      if (oldValue !== undefined && currentVal !== undefined && oldValue !== currentVal && oldValue !== null && currentVal !== null) {
+        conflicts.push({
+          canonicalKey,
+          currentServerValue: currentVal,
+          expectedOldValue: oldValue,
+          proposedNewValue: newValue,
+          reason: 'Stale update: Server value was modified concurrently.',
+        });
+        continue;
+      }
+
+      // Sensitive field protection
+      if (SENSITIVE_KEYS.has(canonicalKey) && currentVal && currentVal !== newValue && !staffConfirmed) {
+        conflicts.push({
+          canonicalKey,
+          currentServerValue: currentVal,
+          proposedNewValue: newValue,
+          reason: 'Sensitive identity field requires explicit staff confirmation.',
+          requiresConfirmation: true,
+        });
+        continue;
+      }
+
+      if (ALLOWED_DIRECT_KEYS.has(canonicalKey)) {
+        mutableProfile[canonicalKey] = newValue;
+      } else {
+        if (!mutableProfile.dynamicFields) mutableProfile.dynamicFields = [];
+        const existingDfIdx = mutableProfile.dynamicFields.findIndex((f: any) => f.key === canonicalKey);
+        if (existingDfIdx >= 0) {
+          mutableProfile.dynamicFields[existingDfIdx].value = newValue;
+          mutableProfile.dynamicFields[existingDfIdx].updatedAt = new Date().toISOString();
+        } else {
+          mutableProfile.dynamicFields.push({
+            id: `df-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+            key: canonicalKey,
+            labelEn: canonicalKey,
+            labelBn: canonicalKey,
+            category: 'OTHER',
+            fieldType: 'TEXT',
+            value: newValue,
+            status: 'REVIEWED',
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      appliedUpdates.push({
+        canonicalKey,
+        oldValue: currentVal,
+        newValue,
+        staffConfirmed: !!staffConfirmed,
+        notes,
+      });
+    }
+
+    if (conflicts.length > 0 && appliedUpdates.length === 0) {
+      return {
+        success: false,
+        conflict: true,
+        conflicts,
+        message: 'One or more fields have concurrency conflicts or require confirmation.',
+      };
+    }
+
+    const saved = await this.upsertProfile(organizationId, userId, mutableProfile);
+
+    await this.prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId: userId || 'staff-extension',
+        action: 'EXTENSION_VAULT_SYNC',
+        entityType: 'CustomerVaultProfile',
+        entityId: saved.id,
+        newData: {
+          sourceUrl,
+          appliedUpdates,
+          conflicts,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+
+    return {
+      success: true,
+      updatedCount: appliedUpdates.length,
+      appliedUpdates,
+      conflicts,
+      vaultId: saved.id,
+      updatedAt: saved.updatedAt,
+    };
+  }
+
+  /**
+   * Phase 2.3: Deterministic & Heuristic Form Field Mapping API
+   */
+  async mapFormFields(dto: {
+    hostname: string;
+    pageTitle?: string;
+    detectedFields: Array<{
+      id: string;
+      name?: string;
+      label?: string;
+      placeholder?: string;
+      type?: string;
+      options?: string[];
+    }>;
+  }) {
+    const fields = (dto.detectedFields || []).slice(0, 150);
+    const mappings: any[] = [];
+    const unmapped: string[] = [];
+
+    const BANGLA_SYNONYMS: Record<string, string> = {
+      'আবেদনকারীর নাম (বাংলা)': 'nameBn',
+      'নাম (বাংলা)': 'nameBn',
+      'পিতার নাম (বাংলা)': 'fatherNameBn',
+      'মাতার নাম (বাংলা)': 'motherNameBn',
+      'আবেদনকারীর নাম (ইংরেজি)': 'nameEn',
+      'নাম (ইংরেজি)': 'nameEn',
+      'পিতার নাম (ইংরেজি)': 'fatherNameEn',
+      'মাতার নাম (ইংরেজি)': 'motherNameEn',
+      'আবেদনকারীর নাম': 'nameEn',
+      'নাম': 'nameEn',
+      'পূর্ণ নাম': 'nameEn',
+      'প্রার্থীর নাম': 'nameEn',
+      'পিতার নাম': 'fatherNameEn',
+      'পিতা': 'fatherNameEn',
+      'মাতার নাম': 'motherNameEn',
+      'মাতা': 'motherNameEn',
+
+      'জন্ম তারিখ': 'dob',
+      'জন্মতারিখ': 'dob',
+      'জাতীয় পরিচয়পত্র': 'nidNumber',
+      'এনআইডি': 'nidNumber',
+      'জন্ম নিবন্ধন': 'birthRegNumber',
+      'মোবাইল': 'phone',
+      'ফোন': 'phone',
+      'ইমেইল': 'email',
+      'বর্তমান ঠিকানা': 'presentAddress',
+      'স্থায়ী ঠিকানা': 'permanentAddress',
+      'জেলা': 'presentDistrict',
+      'উপজেলা': 'presentUpazila',
+      'পোস্ট কোড': 'presentPostalCode',
+      'রোল নম্বর': 'ssc_roll',
+      'রোল': 'ssc_roll',
+      'রেজিস্ট্রেশন নম্বর': 'ssc_reg',
+      'পাসের সন': 'ssc_year',
+      'পাসের বছর': 'ssc_year',
+      'জিপিএ': 'ssc_gpa',
+      'বোর্ড': 'ssc_board',
+    };
+
+    for (const f of fields) {
+      const rawText = `${f.label || ''} ${f.name || ''} ${f.placeholder || ''} ${f.id || ''}`.trim();
+      const norm = this.normalizeKey(f.label || f.name || f.id || '');
+
+      if (CANONICAL_FIELD_MAP[norm]) {
+        const item = CANONICAL_FIELD_MAP[norm];
+        mappings.push({
+          fieldId: f.id,
+          name: f.name,
+          canonicalKey: item.canonicalKey,
+          labelEn: item.labelEn,
+          labelBn: item.labelBn,
+          confidence: 1.0,
+          source: 'CANONICAL_FIELD_MAP',
+          category: item.category,
+          fieldType: item.fieldType,
+        });
+        continue;
+      }
+
+      const sortedSynonyms = Object.entries(BANGLA_SYNONYMS).sort((a, b) => b[0].length - a[0].length);
+      let matchedBanglaKey: string | null = null;
+      for (const [bnPhrase, canKey] of sortedSynonyms) {
+        if (rawText.includes(bnPhrase)) {
+          matchedBanglaKey = canKey;
+          break;
+        }
+      }
+
+      if (matchedBanglaKey) {
+        mappings.push({
+          fieldId: f.id,
+          name: f.name,
+          canonicalKey: matchedBanglaKey,
+          confidence: 0.95,
+          source: 'BANGLA_SEMANTIC_DICTIONARY',
+        });
+        continue;
+      }
+
+      let heuristicKey: string | null = null;
+      if (/applicant.*name|candidate.*name/i.test(rawText)) {
+        heuristicKey = /bn|bangla/i.test(rawText) ? 'nameBn' : 'nameEn';
+      } else if (/father/i.test(rawText)) {
+        heuristicKey = /bn|bangla/i.test(rawText) ? 'fatherNameBn' : 'fatherNameEn';
+      } else if (/mother/i.test(rawText)) {
+        heuristicKey = /bn|bangla/i.test(rawText) ? 'motherNameBn' : 'motherNameEn';
+      } else if (/birth.*date|date.*birth|dob/i.test(rawText)) {
+        heuristicKey = 'dob';
+      } else if (/nid|national.*id/i.test(rawText)) {
+        heuristicKey = 'nidNumber';
+      } else if (/birth.*reg|birth.*cert/i.test(rawText)) {
+        heuristicKey = 'birthRegNumber';
+      } else if (/mobile|phone|contact/i.test(rawText)) {
+        heuristicKey = 'phone';
+      } else if (/email/i.test(rawText)) {
+        heuristicKey = 'email';
+      } else if (/gender|sex/i.test(rawText)) {
+        heuristicKey = 'gender';
+      } else if (/present.*addr/i.test(rawText)) {
+        heuristicKey = 'presentAddress';
+      } else if (/perm.*addr/i.test(rawText)) {
+        heuristicKey = 'permanentAddress';
+      } else if (/(?:ssc|secondary).*roll/i.test(rawText)) {
+        heuristicKey = 'ssc_roll';
+      } else if (/(?:ssc|secondary).*reg/i.test(rawText)) {
+        heuristicKey = 'ssc_reg';
+      } else if (/(?:ssc|secondary).*year/i.test(rawText)) {
+        heuristicKey = 'ssc_year';
+      } else if (/(?:ssc|secondary).*gpa|result/i.test(rawText)) {
+        heuristicKey = 'ssc_gpa';
+      } else if (/(?:ssc|secondary).*board/i.test(rawText)) {
+        heuristicKey = 'ssc_board';
+      } else if (/(?:hsc|higher).*roll/i.test(rawText)) {
+        heuristicKey = 'hsc_roll';
+      } else if (/(?:hsc|higher).*reg/i.test(rawText)) {
+        heuristicKey = 'hsc_reg';
+      } else if (/(?:hsc|higher).*year/i.test(rawText)) {
+        heuristicKey = 'hsc_year';
+      } else if (/(?:hsc|higher).*board/i.test(rawText)) {
+        heuristicKey = 'hsc_board';
+      }
+
+      if (heuristicKey) {
+        mappings.push({
+          fieldId: f.id,
+          name: f.name,
+          canonicalKey: heuristicKey,
+          confidence: 0.85,
+          source: 'HEURISTIC_RULE_ENGINE',
+        });
+      } else {
+        unmapped.push(f.id);
+      }
+    }
+
+    return {
+      success: true,
+      hostname: dto.hostname,
+      totalDetected: fields.length,
+      mappedCount: mappings.length,
+      unmappedCount: unmapped.length,
+      mappings,
+      unmappedFields: unmapped,
+    };
+  }
+
+  /**
+   * Phase 2.4: Secure Short-Lived Document Access for Extension
+   */
+  async getDocumentAccess(organizationId: string, phoneOrId: string, docId: string) {
+    const profile = await this.getProfile(organizationId, phoneOrId);
+    if (!profile) {
+      throw new NotFoundException(`Customer vault profile '${phoneOrId}' not found.`);
+    }
+
+    const doc = (profile.documents || []).find(d => d.id === docId);
+    if (!doc) {
+      throw new NotFoundException(`Document '${docId}' not found in customer vault.`);
+    }
+
+    const dimensions = doc.docType === 'PHOTO'
+      ? { width: 300, height: 300, maxKb: 100 }
+      : doc.docType === 'SIGNATURE'
+      ? { width: 300, height: 80, maxKb: 60 }
+      : undefined;
+
+    return {
+      docId: doc.id,
+      docType: doc.docType,
+      title: doc.title,
+      mimeType: doc.mimeType || 'image/jpeg',
+      sizeBytes: doc.sizeBytes || 45000,
+      dimensions,
+      accessUrl: doc.fileUrlOrBase64,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    };
+  }
+
+  /**
+   * Phase 2.5: Application Workflow Event Logging
+   */
+  async logExtensionEvent(
+    organizationId: string,
+    userId: string,
+    payload: {
+      customerId: string;
+      targetDomain: string;
+      targetUrl: string;
+      eventType: string;
+      details?: any;
+    }
+  ) {
+    const { customerId, targetDomain, targetUrl, eventType, details = {} } = payload;
+    if (!customerId || !eventType) {
+      throw new BadRequestException('customerId and eventType are mandatory.');
+    }
+
+    const sanitizedDetails = { ...details };
+    delete sanitizedDetails.password;
+    delete sanitizedDetails.token;
+    delete sanitizedDetails.otp;
+    delete sanitizedDetails.secret;
+
+    const log = await this.prisma.auditLog.create({
+      data: {
+        organizationId,
+        userId: userId || 'staff-extension',
+        action: `EXTENSION_${eventType}`,
+        entityType: 'ExtensionWorkflowEvent',
+        entityId: customerId,
+        newData: {
+          targetDomain,
+          targetUrl,
+          eventType,
+          details: sanitizedDetails,
+          recordedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    return {
+      success: true,
+      eventId: log.id,
+      timestamp: log.createdAt,
+    };
   }
 }

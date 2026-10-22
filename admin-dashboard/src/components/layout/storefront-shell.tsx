@@ -226,12 +226,6 @@ export default function StorefrontShell({ children }: { children: React.ReactNod
             </Link>
             <nav className="flex items-center gap-7 font-medium text-sm text-slate-600">
               <Link 
-                href="/" 
-                className={`transition-colors py-1 ${pathname === '/' ? 'text-[#04BBFD] font-semibold border-b-2 border-[#04BBFD]' : 'hover:text-[#04BBFD]'}`}
-              >
-                Home
-              </Link>
-              <Link 
                 href="/products" 
                 className={`transition-colors py-1 ${pathname === '/products' ? 'text-[#04BBFD] font-semibold border-b-2 border-[#04BBFD]' : 'hover:text-[#04BBFD]'}`}
               >

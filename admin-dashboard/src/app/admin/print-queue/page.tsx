@@ -47,6 +47,13 @@ export default function AdminPrintQueuePage() {
 
   const filteredQueue = useMemo(() => {
     return queue.filter(job => {
+      // 1. Tab filter
+      if (activeTab === 'WAITING_IN_QUEUE' && job.status !== 'QUEUED' && job.status !== 'WAITING_IN_QUEUE') return false
+      if (activeTab === 'PRINTING_NOW' && job.status !== 'PRINTING' && job.status !== 'PRINTING_NOW') return false
+      if (activeTab === 'PRINTED_READY' && job.status !== 'READY_FOR_PICKUP' && job.status !== 'PRINTED_READY') return false
+      if (activeTab === 'BILLED_COMPLETED' && job.status !== 'BILLED_DELIVERED' && job.status !== 'BILLED_COMPLETED') return false
+
+      // 2. Search query filter
       if (!searchQuery.trim()) return true
       const q = searchQuery.toLowerCase().trim()
       return (
@@ -56,7 +63,7 @@ export default function AdminPrintQueuePage() {
         job.fileName?.toLowerCase().includes(q)
       )
     })
-  }, [queue, searchQuery])
+  }, [queue, searchQuery, activeTab])
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
@@ -164,112 +171,145 @@ export default function AdminPrintQueuePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredQueue.map(job => (
-            <div 
-              key={job.id} 
-              className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex flex-col justify-between"
-            >
-              <div>
-                {/* Header Bar */}
-                <div className="flex items-center justify-between mb-3">
-                  <span className="font-mono text-sm font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-lg">
-                    #{job.tokenNumber}
-                  </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    job.status === 'WAITING_IN_QUEUE' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                    job.status === 'PRINTING_NOW' ? 'bg-blue-50 text-blue-700 border border-blue-200 animate-pulse' :
-                    job.status === 'PRINTED_READY' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                    'bg-slate-100 text-slate-600'
-                  }`}>
-                    {job.status?.replace(/_/g, ' ')}
-                  </span>
-                </div>
+          {filteredQueue.map(job => {
+            const isQueued = job.status === 'QUEUED' || job.status === 'WAITING_IN_QUEUE';
+            const isPrinting = job.status === 'PRINTING' || job.status === 'PRINTING_NOW';
+            const isReady = job.status === 'READY_FOR_PICKUP' || job.status === 'PRINTED_READY';
+            const isBilled = job.status === 'BILLED_DELIVERED' || job.status === 'BILLED_COMPLETED';
 
-                {/* File info */}
-                <div className="flex items-start gap-2.5 mb-3">
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
-                    <FileText className="w-5 h-5 text-indigo-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-bold text-slate-900 truncate">{job.fileName}</h4>
-                    <p className="text-[11px] text-slate-500 font-semibold">
-                      {job.paperSize} • {job.colorMode === 'FULL_COLOR' ? 'Color' : 'B&W'} • {job.copies} Copies
-                    </p>
-                  </div>
-                </div>
-
-                {/* Customer Details */}
-                <div className="bg-slate-50 rounded-2xl p-3 space-y-1.5 text-xs text-slate-600 mb-3 border border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center text-slate-500 font-medium"><User className="w-3.5 h-3.5 mr-1" /> Customer:</span>
-                    <span className="font-bold text-slate-800">{job.customerName}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center text-slate-500 font-medium"><Phone className="w-3.5 h-3.5 mr-1" /> Phone:</span>
-                    <span className="font-mono text-slate-800">{job.customerPhone}</span>
-                  </div>
-                  {job.bindingOrLamination && job.bindingOrLamination !== 'NONE' && (
-                    <div className="flex items-center justify-between text-indigo-700 font-semibold">
-                      <span>Add-on:</span>
-                      <span>{job.bindingOrLamination.replace(/_/g, ' ')}</span>
-                    </div>
-                  )}
-                  {job.notes && (
-                    <p className="text-[11px] text-amber-700 italic pt-1 border-t border-slate-200/60">
-                      Note: "{job.notes}"
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Price & Action */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+            return (
+              <div 
+                key={job.id} 
+                className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs hover:border-indigo-300 transition-all flex flex-col justify-between"
+              >
                 <div>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase">Estimated Fee</span>
-                  <p className="text-lg font-black text-slate-900">৳{job.estimatedPriceBdt}</p>
+                  {/* Header Bar */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-mono text-sm font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-lg">
+                      #{job.tokenNumber}
+                    </span>
+                    
+                    {/* Interactive Status Selector */}
+                    <select
+                      value={isQueued ? 'QUEUED' : isPrinting ? 'PRINTING' : isReady ? 'READY_FOR_PICKUP' : 'BILLED_DELIVERED'}
+                      onChange={(e) => handleUpdateStatus(job.id, e.target.value)}
+                      className={`text-xs font-bold px-2 py-1 rounded-lg border cursor-pointer outline-none transition-all ${
+                        isQueued ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                        isPrinting ? 'bg-blue-50 text-blue-800 border-blue-300 animate-pulse' :
+                        isReady ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
+                        'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      <option value="QUEUED">⏳ Waiting in Queue</option>
+                      <option value="PRINTING">🖨️ Printing Now</option>
+                      <option value="READY_FOR_PICKUP">✅ Ready for Pickup</option>
+                      <option value="BILLED_DELIVERED">📦 Billed & Delivered</option>
+                    </select>
+                  </div>
+
+                  {/* File info */}
+                  <div className="flex items-start gap-2.5 mb-3">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-600">
+                      <FileText className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-slate-900 truncate">{job.fileName}</h4>
+                      <p className="text-[11px] text-slate-500 font-semibold">
+                        {job.paperSize} • {job.colorMode === 'FULL_COLOR' ? 'Color' : 'B&W'} • {job.copies} Copies
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Customer Details */}
+                  <div className="bg-slate-50 rounded-2xl p-3 space-y-1.5 text-xs text-slate-600 mb-3 border border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center text-slate-500 font-medium"><User className="w-3.5 h-3.5 mr-1" /> Customer:</span>
+                      <span className="font-bold text-slate-800">{job.customerName}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center text-slate-500 font-medium"><Phone className="w-3.5 h-3.5 mr-1" /> Phone:</span>
+                      <span className="font-mono text-slate-800">{job.customerPhone}</span>
+                    </div>
+                    {job.bindingOrLamination && job.bindingOrLamination !== 'NONE' && (
+                      <div className="flex items-center justify-between text-indigo-700 font-semibold">
+                        <span>Add-on:</span>
+                        <span>{job.bindingOrLamination.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
+                    {job.notes && (
+                      <p className="text-[11px] text-amber-700 italic pt-1 border-t border-slate-200/60">
+                        Note: "{job.notes}"
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex gap-1.5">
-                  {job.status === 'WAITING_IN_QUEUE' && (
-                    <button
-                      onClick={() => handleUpdateStatus(job.id, 'PRINTING_NOW')}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs"
-                    >
-                      Start Print
-                    </button>
-                  )}
-                  {job.status === 'PRINTING_NOW' && (
-                    <button
-                      onClick={() => handleUpdateStatus(job.id, 'PRINTED_READY')}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs"
-                    >
-                      Mark Ready
-                    </button>
-                  )}
-                  {job.status === 'PRINTED_READY' && (
-                    <button
-                      onClick={() => handleUpdateStatus(job.id, 'BILLED_COMPLETED')}
-                      className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs"
-                    >
-                      Bill & Collect
-                    </button>
-                  )}
-                  {job.fileUrlOrBase64 && (
-                    <a
-                      href={job.fileUrlOrBase64}
-                      download={job.fileName}
-                      className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
-                      title="Download attached file"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
-                  )}
+                {/* Price & Action */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase">Estimated Fee</span>
+                    <p className="text-lg font-black text-slate-900">৳{job.estimatedPriceBdt}</p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {/* Action Step Buttons */}
+                    {isQueued && (
+                      <button
+                        onClick={() => handleUpdateStatus(job.id, 'PRINTING')}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                      >
+                        Start Print
+                      </button>
+                    )}
+                    {isPrinting && (
+                      <button
+                        onClick={() => handleUpdateStatus(job.id, 'READY_FOR_PICKUP')}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                      >
+                        Mark Ready
+                      </button>
+                    )}
+                    {isReady && (
+                      <>
+                        <Link
+                          href={`/admin/pos?importPrintQueueId=${job.id}&token=${job.tokenNumber}&fee=${job.estimatedPriceBdt}&customer=${encodeURIComponent(job.customerName)}&phone=${job.customerPhone}`}
+                          className="px-2.5 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl text-xs font-bold transition-colors"
+                          title="কাউন্টার POS এ বিল করুন"
+                        >
+                          POS এ বিল
+                        </Link>
+                        <button
+                          onClick={() => handleUpdateStatus(job.id, 'BILLED_DELIVERED')}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                        >
+                          Bill & Collect
+                        </button>
+                      </>
+                    )}
+                    {isBilled && (
+                      <span className="text-xs font-bold text-slate-400 py-1.5 px-2">
+                        ✓ সম্পন্ন
+                      </span>
+                    )}
+
+                    {job.fileUrlOrBase64 && (
+                      <a
+                        href={job.fileUrlOrBase64}
+                        download={job.fileName}
+                        className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
+                        title="Download attached file"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
 
       {/* QR Standee Poster Modal */}
       {qrModalOpen && (

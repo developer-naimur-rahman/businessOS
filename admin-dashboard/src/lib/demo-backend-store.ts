@@ -126,6 +126,8 @@ declare global {
       settings: any;
       appointments: any[];
     };
+    customerVault: any[];
+    extensionEvents: any[];
   } | undefined;
 }
 
@@ -675,7 +677,131 @@ function initStore() {
           createdAt: new Date(Date.now() - 14400000).toISOString()
         }
       ]
-    }
+    },
+    customerVault: [
+      {
+        id: 'VAULT-123456',
+        customerId: 'cust-karim-004',
+        organizationId: 'f3281531-1153-4a8f-92b1-5f2b5f2efb60',
+        phone: '01812345678',
+        email: 'karim@prismex.local',
+        nameEn: 'MD KARIM RAHMAN',
+        nameBn: 'মোঃ করিম রহমান',
+        fatherNameEn: 'MD ABDUR RAHIM',
+        fatherNameBn: 'মোঃ আব্দুর রহিম',
+        motherNameEn: 'MST ROKEYA BEGUM',
+        motherNameBn: 'মোসাঃ রোকেয়া বেগম',
+        dob: '1998-04-15',
+        gender: 'MALE',
+        religion: 'ISLAM',
+        maritalStatus: 'SINGLE',
+        bloodGroup: 'B+',
+        nidNumber: '19982692019000124',
+        birthRegNumber: '19982692019123456',
+        presentAddress: 'House 14, Road 5, Sector 7, Uttara, Dhaka-1230',
+        permanentAddress: 'Village Baghiya, Post Kashimpur-1704, Gazipur Sadar, Gazipur',
+        presentStructuredAddress: {
+          villageArea: 'Sector 7, Road 5, House 14',
+          postOffice: 'Uttara',
+          postalCode: '1230',
+          upazilaThana: 'Uttara',
+          district: 'Dhaka',
+          division: 'Dhaka',
+          country: 'বাংলাদেশ'
+        },
+        permanentStructuredAddress: {
+          villageArea: 'Baghiya',
+          postOffice: 'Kashimpur',
+          postalCode: '1704',
+          upazilaThana: 'Gazipur Sadar',
+          district: 'Gazipur',
+          division: 'Dhaka',
+          country: 'বাংলাদেশ'
+        },
+        educationHistory: [
+          {
+            degree: 'SSC',
+            examTitle: 'Secondary School Certificate (SSC)',
+            boardOrUniversity: 'Dhaka Board',
+            institution: 'Uttara High School',
+            rollNumber: '142850',
+            regNumber: '1114892014',
+            passingYear: '2014',
+            resultGpa: '5.00',
+            groupMajor: 'Science'
+          },
+          {
+            degree: 'HSC',
+            examTitle: 'Higher Secondary Certificate (HSC)',
+            boardOrUniversity: 'Dhaka Board',
+            institution: 'Milestone College',
+            rollNumber: '502914',
+            regNumber: '1114892014',
+            passingYear: '2016',
+            resultGpa: '4.83',
+            groupMajor: 'Science'
+          },
+          {
+            degree: 'GRADUATION',
+            examTitle: 'Bachelor of Science in CSE',
+            boardOrUniversity: 'Dhaka University',
+            institution: 'Institute of Science and Technology',
+            rollNumber: '160408',
+            passingYear: '2021',
+            resultGpa: '3.78',
+            groupMajor: 'Computer Science & Engineering'
+          }
+        ],
+        documents: [
+          {
+            id: 'doc-photo-001',
+            docType: 'PHOTO',
+            title: 'Passport Size Color Photo (300x300)',
+            mimeType: 'image/jpeg',
+            sizeBytes: 42100,
+            uploadedAt: '2026-10-20T10:00:00Z',
+            isVerified: true,
+            fileUrlOrBase64: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&h=300&q=80'
+          },
+          {
+            id: 'doc-sig-001',
+            docType: 'SIGNATURE',
+            title: 'Customer Official Signature Crop (300x80)',
+            mimeType: 'image/png',
+            sizeBytes: 16500,
+            uploadedAt: '2026-10-20T10:05:00Z',
+            isVerified: true,
+            fileUrlOrBase64: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80"><text x="20" y="50" font-family="cursive" font-size="28" fill="black">Karim Rahman</text></svg>'
+          },
+          {
+            id: 'doc-nid-001',
+            docType: 'NID',
+            title: 'National ID Card Smart Scan',
+            mimeType: 'image/jpeg',
+            sizeBytes: 89000,
+            uploadedAt: '2026-10-20T10:10:00Z',
+            isVerified: true,
+            fileUrlOrBase64: '/sample-nid.jpg'
+          }
+        ],
+        dynamicFields: [
+          {
+            id: 'df-1',
+            key: 'passport_number',
+            labelEn: 'Passport Number',
+            labelBn: 'পাসপোর্ট নম্বর',
+            category: 'PASSPORT',
+            fieldType: 'TEXT',
+            value: 'A04928172',
+            status: 'VERIFIED',
+            updatedAt: '2026-10-20T10:00:00Z'
+          }
+        ],
+        createdAt: '2026-10-20T10:00:00Z',
+        updatedAt: '2026-10-20T10:00:00Z'
+      }
+    ],
+    extensionEvents: []
   };
 
   return globalThis.__businessOS_demo_store;
@@ -1152,6 +1278,24 @@ export const demoStore = {
     };
   },
 
+  createDocumentOrder(data: any) {
+    const newOrder = {
+      id: `doc-ord-${Date.now()}`,
+      orderNumber: `DOC-2026-${Math.floor(100 + Math.random() * 900)}`,
+      templateId: data.templateId || 'minimal-clean',
+      templateName: data.templateName || data.templateId || 'কাস্টম ডকুমেন্ট অর্ডার',
+      category: data.category || 'CV_RESUME',
+      customerName: data.customerName || 'Walk-in Customer',
+      customerPhone: data.customerPhone || '',
+      status: 'IN_PROGRESS',
+      priceBdt: Number(data.priceBdt || data.price || 200),
+      createdAt: new Date().toISOString()
+    };
+    this.store.documentStudio.orders.unshift(newOrder);
+    return newOrder;
+  },
+
+
   // --- SERVICE SCHEDULING ---
   getSchedulingSettings() {
     return this.store.serviceScheduling.settings;
@@ -1299,5 +1443,178 @@ export const demoStore = {
         horizon: "+7 Days Rolling Multi-Tier"
       }
     };
+  },
+
+  getCustomerVaultProfile(phoneOrId: string) {
+    const raw = (phoneOrId || '').trim();
+    const cleanDigits = raw.replace(/\D/g, '');
+    const found = this.store.customerVault.find((v: any) => {
+      const vDigits = (v.phone || '').replace(/\D/g, '');
+      return (
+        v.id === raw ||
+        v.customerId === raw ||
+        v.phone === raw ||
+        (cleanDigits.length >= 10 && (vDigits.endsWith(cleanDigits.slice(-10)) || cleanDigits.endsWith(vDigits.slice(-10))))
+      );
+    });
+
+    if (!found) return null;
+
+    return {
+      success: true,
+      data: {
+        vaultId: found.id,
+        customerId: found.customerId,
+        updatedAt: found.updatedAt || new Date().toISOString(),
+        version: found.version || 1,
+        profile: {
+          nameEn: found.nameEn,
+          nameBn: found.nameBn,
+          fatherNameEn: found.fatherNameEn,
+          fatherNameBn: found.fatherNameBn,
+          motherNameEn: found.motherNameEn,
+          motherNameBn: found.motherNameBn,
+          dob: found.dob,
+          gender: found.gender,
+          religion: found.religion,
+          maritalStatus: found.maritalStatus,
+          bloodGroup: found.bloodGroup,
+          phone: found.phone,
+          email: found.email,
+          nidNumber: found.nidNumber,
+          birthRegNumber: found.birthRegNumber,
+          passportNumber: found.passportNumber,
+          presentAddress: found.presentAddress,
+          permanentAddress: found.permanentAddress,
+          presentStructuredAddress: found.presentStructuredAddress,
+          permanentStructuredAddress: found.permanentStructuredAddress,
+        },
+        education: found.education || [],
+        documents: (found.documents || []).map((d: any) => ({
+          id: d.id,
+          docType: d.docType,
+          title: d.title,
+          originalName: d.originalName,
+          mimeType: d.mimeType,
+          fileSizeBytes: d.fileSizeBytes,
+          widthPx: d.widthPx,
+          heightPx: d.heightPx,
+          accessEndpoint: `/api/admin/customer-vault/${found.id}/documents/${d.id}/access`,
+          verified: d.verified ?? true,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        }))
+      }
+    };
+  },
+
+  syncCustomerVault(dto: any) {
+    const { customerId, expectedVersion, updates, staffConfirmed } = dto;
+    const found = this.store.customerVault.find((v: any) => v.id === customerId || v.customerId === customerId);
+    if (!found) {
+      return { status: 404, body: { message: `Customer Vault record not found for: ${customerId}` } };
+    }
+
+    if (expectedVersion !== undefined && found.version && found.version !== expectedVersion) {
+      return {
+        status: 409,
+        body: {
+          message: 'Stale update conflict detected. Vault record has been updated since last read.',
+          currentVersion: found.version,
+          expectedVersion
+        }
+      };
+    }
+
+    const sensitiveKeys = new Set(['nidNumber', 'dob', 'birthRegNumber', 'passportNumber', 'passport_number', 'sscRoll', 'hscRoll']);
+    for (const key of Object.keys(updates || {})) {
+      if (sensitiveKeys.has(key) && found[key] && found[key] !== updates[key] && !staffConfirmed) {
+        return {
+          status: 409,
+          body: {
+            message: `Update to sensitive field '${key}' requires explicit staff verification.`,
+            field: key,
+            currentValue: found[key],
+            proposedValue: updates[key],
+            requiresStaffConfirmation: true
+          }
+        };
+      }
+    }
+
+    Object.assign(found, updates);
+    found.version = (found.version || 1) + 1;
+    found.updatedAt = new Date().toISOString();
+
+    return {
+      status: 200,
+      body: {
+        success: true,
+        message: 'Customer vault synchronized successfully',
+        newVersion: found.version,
+        updatedFields: Object.keys(updates || {})
+      }
+    };
+  },
+
+  getDocumentAccess(phoneOrId: string, docId: string) {
+    const profileRes = this.getCustomerVaultProfile(phoneOrId);
+    if (!profileRes || !profileRes.data) {
+      return { status: 404, body: { message: 'Customer Vault record not found' } };
+    }
+
+    const raw = (phoneOrId || '').trim();
+    const cleanDigits = raw.replace(/\D/g, '');
+    const found = this.store.customerVault.find((v: any) => {
+      const vDigits = (v.phone || '').replace(/\D/g, '');
+      return (
+        v.id === raw ||
+        v.customerId === raw ||
+        v.phone === raw ||
+        (cleanDigits.length >= 10 && (vDigits.endsWith(cleanDigits.slice(-10)) || cleanDigits.endsWith(vDigits.slice(-10))))
+      );
+    });
+
+    const doc = (found?.documents || []).find((d: any) => d.id === docId);
+    if (!doc) {
+      return { status: 404, body: { message: `Document with ID ${docId} not found for this customer` } };
+    }
+
+    return {
+      status: 200,
+      body: {
+        success: true,
+        document: {
+          id: doc.id,
+          docType: doc.docType,
+          title: doc.title,
+          originalName: doc.originalName,
+          mimeType: doc.mimeType,
+          fileSizeBytes: doc.fileSizeBytes,
+          widthPx: doc.widthPx,
+          heightPx: doc.heightPx,
+          downloadUrl: doc.storageUrl || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&h=300&q=80`,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          compliance: {
+            isStandardPhotoCompliant: doc.docType === 'PHOTO' ? (doc.widthPx === 300 && doc.heightPx === 300 && doc.fileSizeBytes <= 100 * 1024) : undefined,
+            isStandardSignatureCompliant: doc.docType === 'SIGNATURE' ? (doc.widthPx === 300 && doc.heightPx === 80 && doc.fileSizeBytes <= 60 * 1024) : undefined
+          }
+        }
+      }
+    };
+  },
+
+  logExtensionEvent(dto: any) {
+    const event = {
+      id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      ...dto
+    };
+    if (!this.store.extensionEvents) {
+      this.store.extensionEvents = [];
+    }
+    this.store.extensionEvents.push(event);
+    return { success: true, eventId: event.id };
   }
 };
+
+

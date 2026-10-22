@@ -6,6 +6,7 @@ export async function GET(req: Request, props: { params: Promise<{ code: string 
 
   return NextResponse.json({
     found: true,
+    isUnderWarranty: true,
     serialNumber: code,
     productName: 'Genuine Hardware Component (Verified)',
     warrantyType: 'REPLACEMENT_OR_SERVICE',

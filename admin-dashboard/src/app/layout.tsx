@@ -18,7 +18,7 @@ export default function RootLayout({
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${inter.className} h-full antialiased`} suppressHydrationWarning>
         {children}
-        <Toaster richColors position="top-right" />
+        <Toaster richColors position="bottom-center" />
       </body>
     </html>
   );
