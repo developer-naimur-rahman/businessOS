@@ -13,6 +13,8 @@ export default function AdminSalesHistoryPage() {
   const [selectedSale, setSelectedSale] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [printMode, setPrintMode] = useState<'NONE' | 'RECEIPT' | 'A4'>('NONE')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
 
   useEffect(() => {
     if (printMode !== 'NONE') {
@@ -36,16 +38,25 @@ export default function AdminSalesHistoryPage() {
   useEffect(() => {
     async function fetchSales() {
       try {
-        const res = await api.get('/sales')
-        setSales(res.data)
+        setLoading(true)
+        const params: Record<string, string> = {}
+        if (search.trim()) params.search = search.trim()
+        if (statusFilter !== 'ALL') params.paymentStatus = statusFilter
+
+        const res = await api.get('/sales', { params })
+        const list = Array.isArray(res.data) ? res.data : (res.data?.items || [])
+        setSales(list)
       } catch (err) {
         console.error("Failed to load sales", err)
+        setSales([])
       } finally {
         setLoading(false)
       }
     }
     fetchSales()
-  }, [])
+  }, [search, statusFilter])
+
+  const salesList = Array.isArray(sales) ? sales : []
 
   return (
     <>
@@ -78,14 +89,26 @@ export default function AdminSalesHistoryPage() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
             type="text" 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search receipt number or customer..." 
             className="control-input pl-9 h-10 w-full"
           />
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <button className="control-button-secondary h-10 px-3 w-full md:w-auto">
-            <Filter className="w-4 h-4 mr-2 text-slate-500" /> Filter
-          </button>
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-500" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="control-input h-10 px-3 text-sm bg-white"
+            >
+              <option value="ALL">All Payment Statuses</option>
+              <option value="PAID">Paid</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -106,7 +129,7 @@ export default function AdminSalesHistoryPage() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Loading sales history...</td></tr>
-              ) : sales.length === 0 ? (
+              ) : salesList.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center">
                     <Receipt className="w-8 h-8 text-slate-300 mx-auto mb-3" />
@@ -115,7 +138,7 @@ export default function AdminSalesHistoryPage() {
                   </td>
                 </tr>
               ) : (
-                sales.map((sale: any) => (
+                salesList.map((sale: any) => (
                   <tr key={sale.id} className="table-row-refined group">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">

@@ -49,10 +49,10 @@ export default function DashboardPage() {
           })
         ])
 
-        const sales = Array.isArray(salesRes?.data) ? salesRes.data : []
-        const customers = Array.isArray(customersRes?.data) ? customersRes.data : []
-        const inventory = Array.isArray(inventoryRes?.data) ? inventoryRes.data : []
-        const orders = Array.isArray(ordersRes?.data) ? ordersRes.data : []
+        const sales = Array.isArray(salesRes?.data) ? salesRes.data : (salesRes?.data?.items || [])
+        const customers = Array.isArray(customersRes?.data) ? customersRes.data : (customersRes?.data?.items || [])
+        const inventory = Array.isArray(inventoryRes?.data) ? inventoryRes.data : (inventoryRes?.data?.items || [])
+        const orders = Array.isArray(ordersRes?.data) ? ordersRes.data : (ordersRes?.data?.items || [])
         
         let totalRevenue = 0
         sales.forEach((s: any) => { totalRevenue += Number(s.total || 0) })
