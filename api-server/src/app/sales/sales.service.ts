@@ -885,5 +885,109 @@ export class SalesService {
       return updated;
     });
   }
+
+  // --- POS Hold Orders & Customer Live Display ---
+  private static liveDisplayCache: Record<string, any> = {};
+
+  async holdCart(organizationId: string, userId: string | null, data: { cart: any[]; customerName?: string; note?: string; total: number }) {
+    const holdId = `HLD-${Date.now().toString().slice(-6)}`;
+    const heldData = {
+      holdId,
+      cart: data.cart || [],
+      customerName: data.customerName || 'Held Customer',
+      note: data.note || 'Parked Cart',
+      total: Number(data.total) || 0,
+      itemCount: data.cart?.length || 0,
+      heldAt: new Date().toISOString(),
+    };
+
+    const log = await this.salesRepo.recordAuditLog({
+      organizationId,
+      entityType: 'HeldCart',
+      entityId: holdId,
+      action: 'HOLD_CART',
+      oldData: null,
+      newData: heldData,
+      userId: userId || null,
+    });
+
+    return {
+      success: true,
+      id: log.id,
+      holdId,
+      heldData,
+    };
+  }
+
+  async getHeldCarts(organizationId: string) {
+    const logs = await this.prismaManager.client.auditLog.findMany({
+      where: {
+        organizationId,
+        entityType: 'HeldCart',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    return logs.map((l) => ({
+      id: l.id,
+      ...(l.newData as any),
+      createdAt: l.createdAt.toISOString(),
+    }));
+  }
+
+  async deleteHeldCart(organizationId: string, idOrHoldId: string) {
+    const log = await this.prismaManager.client.auditLog.findFirst({
+      where: {
+        organizationId,
+        entityType: 'HeldCart',
+        OR: [{ id: idOrHoldId }, { entityId: idOrHoldId }],
+      },
+    });
+
+    if (log) {
+      await this.prismaManager.client.auditLog.delete({
+        where: { id: log.id },
+      });
+    }
+
+    return { success: true, message: 'Held cart removed' };
+  }
+
+  async getLiveDisplayState(organizationId: string) {
+    if (SalesService.liveDisplayCache[organizationId]) {
+      return SalesService.liveDisplayCache[organizationId];
+    }
+
+    const config = await this.prismaManager.client.storefrontConfig.findUnique({
+      where: { organizationId },
+    });
+    const settings = (config?.globalSettings as any) || {};
+    return settings.posDisplayState || {
+      status: 'IDLE_PROMO',
+      items: [],
+      subtotal: 0,
+      discount: 0,
+      grandTotal: 0,
+      currency: 'BDT',
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async updateLiveDisplayState(organizationId: string, state: any) {
+    const payload = {
+      status: state.status || 'ACTIVE_BILLING',
+      items: state.items || [],
+      subtotal: Number(state.subtotal) || 0,
+      discount: Number(state.discount) || 0,
+      grandTotal: Number(state.grandTotal) || 0,
+      currency: 'BDT',
+      qrPaymentAmount: Number(state.qrPaymentAmount || state.grandTotal) || 0,
+      updatedAt: new Date().toISOString(),
+    };
+
+    SalesService.liveDisplayCache[organizationId] = payload;
+    return payload;
+  }
 }
 

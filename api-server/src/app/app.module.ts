@@ -23,6 +23,7 @@ import { SupplierLedgerModule } from './suppliers/supplier-ledger.module';
 import { LoyaltyModule } from './loyalty/loyalty.module';
 import { ReturnsModule } from './returns/returns.module';
 import { MarketingModule } from './marketing/marketing.module';
+import { RetailModule } from './retail/retail.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { MarketingModule } from './marketing/marketing.module';
     LoyaltyModule,
     ReturnsModule,
     MarketingModule,
+    RetailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

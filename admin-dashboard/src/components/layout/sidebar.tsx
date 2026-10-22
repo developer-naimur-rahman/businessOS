@@ -9,7 +9,8 @@ import {
   TerminalSquare, TrendingUp, X, GitBranch, Warehouse,
   ShoppingBag, Sliders, Truck, MessageSquare,
   Receipt, CircleDollarSign, Sparkles, Bot, RotateCcw,
-  Building2, Barcode, Gift, Send, Star, ShieldAlert
+  Building2, Barcode, Gift, Send, Star, ShieldAlert,
+  Monitor, BookOpen, Wrench, ShieldCheck, ClipboardList, Award
 } from "lucide-react"
 
 interface SidebarProps {
@@ -26,7 +27,23 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       items: [
         { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
         { name: "Analytics", href: "/admin/analytics", icon: TrendingUp },
-        { name: "Point of Sale", href: "/admin/pos", icon: TerminalSquare },
+      ]
+    },
+    {
+      label: "POS & Counter",
+      items: [
+        { name: "Terminal POS", href: "/admin/pos", icon: TerminalSquare },
+        { name: "🖥️ Customer Live Display", href: "/admin/pos/customer-display", icon: Monitor },
+        { name: "📒 Digital Baki Khata", href: "/admin/baki-khata", icon: BookOpen },
+      ]
+    },
+    {
+      label: "Shop & Studio Operations",
+      items: [
+        { name: "🛠️ Service & Print Jobs", href: "/admin/service-jobs", icon: Wrench },
+        { name: "🛡️ Serial & Warranty Desk", href: "/admin/warranty", icon: ShieldCheck },
+        { name: "📋 Bazaar & Wanted List", href: "/admin/sourcing-list", icon: ClipboardList },
+        { name: "🏆 Staff Commissions", href: "/admin/staff-commissions", icon: Award },
       ]
     },
     {

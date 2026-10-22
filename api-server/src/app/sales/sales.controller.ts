@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { SalesService, CreateSaleDto, AddSalePaymentDto } from './sales.service';
 import { QuerySalesDto, UpdateOrderStatusDto } from './dto/sales.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -96,6 +96,24 @@ export class SalesController {
       .catch(err => console.error("Failed to process finance outbox events:", err));
 
     return payment;
+  }
+
+  @Post('hold-orders')
+  @RequirePermissions('sales.create')
+  async holdCart(@Request() req, @Body() data: any) {
+    return this.salesService.holdCart(req.user.organizationId, req.user.id || null, data);
+  }
+
+  @Get('hold-orders')
+  @RequirePermissions('sales.view')
+  async getHeldCarts(@Request() req) {
+    return this.salesService.getHeldCarts(req.user.organizationId);
+  }
+
+  @Delete('hold-orders/:id')
+  @RequirePermissions('sales.create')
+  async deleteHeldCart(@Request() req, @Param('id') id: string) {
+    return this.salesService.deleteHeldCart(req.user.organizationId, id);
   }
 }
 
