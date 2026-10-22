@@ -16,7 +16,14 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333';
+    const isVercel = Boolean(process.env.VERCEL);
+    const remoteUrl = process.env.BACKEND_INTERNAL_URL;
+    const backendUrl = remoteUrl || (!isVercel ? (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333') : null);
+
+    if (!backendUrl) {
+      return [];
+    }
+
     return [
       {
         source: '/backend-api/:path*',
