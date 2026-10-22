@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { demoStore } from '../../../../lib/demo-backend-store';
+import { getValidBackendUrl } from '../../../../lib/utils';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -7,7 +8,7 @@ export async function GET(req: Request) {
   const search = searchParams.get('search') || undefined;
   const authHeader = req.headers.get('authorization') || '';
 
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  const backendUrl = getValidBackendUrl();
   if (backendUrl && authHeader) {
     try {
       const res = await fetch(`${backendUrl}/api/admin/service-jobs?${searchParams.toString()}`, {
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
           'Authorization': authHeader,
           'Content-Type': 'application/json'
         },
-        signal: AbortSignal.timeout(1500),
+        signal: AbortSignal.timeout(1000),
         cache: 'no-store'
       });
       if (res.ok) {
@@ -23,12 +24,25 @@ export async function GET(req: Request) {
         return NextResponse.json(data);
       }
     } catch {
-      // Fallback
+      // Fallback to local demo store
     }
   }
 
   const jobs = demoStore.getServiceJobs(status, search);
-  return NextResponse.json(jobs);
+  const totalJobs = jobs.length;
+  const activeJobs = jobs.filter((j: any) => ['RECEIVED', 'IN_PROGRESS', 'WAITING_FOR_PARTS', 'PENDING'].includes(j.status)).length;
+  const readyForDelivery = jobs.filter((j: any) => j.status === 'READY_FOR_DELIVERY').length;
+  const totalDuePendingBdt = jobs.reduce((acc: number, j: any) => acc + (j.status !== 'DELIVERED_PAID' ? Math.max(0, Number(j.estimatedCostBdt || 0) - Number(j.advancePaidBdt || 0)) : 0), 0);
+
+  return NextResponse.json({
+    metrics: {
+      totalJobs,
+      activeJobs,
+      readyForDelivery,
+      totalDuePendingBdt,
+    },
+    jobs,
+  });
 }
 
 export async function POST(req: Request) {
@@ -40,7 +54,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
   }
 
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  const backendUrl = getValidBackendUrl();
   if (backendUrl && authHeader) {
     try {
       const res = await fetch(`${backendUrl}/api/admin/service-jobs`, {
@@ -50,7 +64,7 @@ export async function POST(req: Request) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(2000)
+        signal: AbortSignal.timeout(1500)
       });
       if (res.ok) {
         const data = await res.json();

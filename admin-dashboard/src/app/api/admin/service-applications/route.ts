@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { demoStore } from '../../../../lib/demo-backend-store';
+import { getValidBackendUrl } from '../../../../lib/utils';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -7,7 +8,7 @@ export async function GET(req: Request) {
   const search = searchParams.get('search') || undefined;
   const authHeader = req.headers.get('authorization') || '';
 
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  const backendUrl = getValidBackendUrl();
   if (backendUrl && authHeader) {
     try {
       const res = await fetch(`${backendUrl}/api/admin/service-applications?${searchParams.toString()}`, {
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
           'Authorization': authHeader,
           'Content-Type': 'application/json'
         },
-        signal: AbortSignal.timeout(1500),
+        signal: AbortSignal.timeout(1000),
         cache: 'no-store'
       });
       if (res.ok) {

@@ -1,25 +1,29 @@
 import { NextResponse } from 'next/server';
+import { getValidBackendUrl } from '../../../../../lib/utils';
 
 export async function POST(req: Request) {
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333';
+  const backendUrl = getValidBackendUrl();
   const authHeader = req.headers.get('authorization') || '';
   const body = await req.json().catch(() => ({}));
 
-  try {
-    const res = await fetch(`${backendUrl}/api/admin/products/analyze-profit`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data);
+  if (backendUrl) {
+    try {
+      const res = await fetch(`${backendUrl}/api/admin/products/analyze-profit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(1000)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data);
+      }
+    } catch {
+      // Fallback calculation in serverless
     }
-  } catch {
-    // Fallback calculation in serverless
   }
 
   // Pure mathematical calculation fallback

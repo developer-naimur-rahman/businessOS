@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { demoStore } from '../../../../lib/demo-backend-store';
+import { getValidBackendUrl } from '../../../../lib/utils';
 
 export async function POST(req: Request) {
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  const backendUrl = getValidBackendUrl();
   let body: any = {};
   try {
     body = await req.json();

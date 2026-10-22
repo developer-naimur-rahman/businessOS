@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getValidBackendUrl } from '../../../../lib/utils'
 
 export async function POST(req: Request) {
   try {
@@ -9,29 +10,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Security PIN or code is required" }, { status: 400 })
     }
 
-    const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3333'
+    const backendUrl = getValidBackendUrl()
 
-    // 1. Forward to real NestJS backend API
-    try {
-      const backendRes = await fetch(`${backendUrl}/api/auth/pin-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin }),
-      })
+    // 1. Forward to real NestJS backend API if reachable
+    if (backendUrl) {
+      try {
+        const backendRes = await fetch(`${backendUrl}/api/auth/pin-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin }),
+          signal: AbortSignal.timeout(1000)
+        })
 
-      const data = await backendRes.json().catch(() => null)
-      if (backendRes.ok && data) {
-        return NextResponse.json(data, { status: 200 })
+        const data = await backendRes.json().catch(() => null)
+        if (backendRes.ok && data) {
+          return NextResponse.json(data, { status: 200 })
+        }
+
+        if (backendRes.status === 401 || backendRes.status === 400) {
+          return NextResponse.json(
+            { message: data?.message || "Invalid PIN or staff code" }, 
+            { status: backendRes.status }
+          )
+        }
+      } catch (backendErr) {
+        console.warn("Backend not reachable for /api/auth/pin-login, evaluating fallback", backendErr)
       }
-
-      if (backendRes.status === 401 || backendRes.status === 400) {
-        return NextResponse.json(
-          { message: data?.message || "Invalid PIN or staff code" }, 
-          { status: backendRes.status }
-        )
-      }
-    } catch (backendErr) {
-      console.warn("Backend not reachable for /api/auth/pin-login, evaluating fallback", backendErr)
     }
 
     // 2. Offline fallback

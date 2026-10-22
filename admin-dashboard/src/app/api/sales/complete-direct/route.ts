@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { demoStore } from '../../../../lib/demo-backend-store';
+import { getValidBackendUrl } from '../../../../lib/utils';
 
 export async function POST(req: Request) {
   let body: any = {};
@@ -9,7 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
   }
 
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  const backendUrl = getValidBackendUrl();
   const authHeader = req.headers.get('authorization') || '';
 
   if (backendUrl && authHeader) {

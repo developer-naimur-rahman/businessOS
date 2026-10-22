@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { DEFAULT_INTERNET_SERVICES } from '../../../../config/internet-services';
+import { getValidBackendUrl } from '../../../../lib/utils';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -7,12 +8,12 @@ export async function GET(req: Request) {
   const search = searchParams.get('search')?.toLowerCase().trim();
 
   // Try backend if available
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  const backendUrl = getValidBackendUrl();
   if (backendUrl) {
     try {
       const res = await fetch(`${backendUrl}/api/public/services?${searchParams.toString()}`, {
         headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(1500),
+        signal: AbortSignal.timeout(1000),
         cache: 'no-store'
       });
       if (res.ok) {

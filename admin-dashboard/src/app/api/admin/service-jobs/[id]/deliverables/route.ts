@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { demoStore } from '../../../../../../lib/demo-backend-store';
+import { getValidBackendUrl } from '../../../../../../lib/utils';
 
 export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -11,7 +12,7 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
     body = {};
   }
 
-  const backendUrl = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL;
+  const backendUrl = getValidBackendUrl();
   if (backendUrl && authHeader) {
     try {
       const res = await fetch(`${backendUrl}/api/admin/service-jobs/${params.id}/deliverables`, {

@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server'
 import { STATIC_CATALOG } from '../../../../config/static-catalog'
+import { getValidBackendUrl } from '../../../../lib/utils'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const authHeader = req.headers.get('authorization')
   const orgHeader = req.headers.get('x-organization-id')
 
-  // Attempt backend proxy if auth is available
-  if (authHeader) {
+  // Attempt backend proxy if auth is available and backend is reachable
+  const backendBase = getValidBackendUrl();
+  if (backendBase && authHeader) {
     try {
-      const backendUrl = `http://127.0.0.1:3333/api/business-core/products?${searchParams.toString()}`
+      const backendUrl = `${backendBase}/api/business-core/products?${searchParams.toString()}`
       const backendRes = await fetch(backendUrl, {
         headers: {
           'Authorization': authHeader,
           ...(orgHeader ? { 'x-organization-id': orgHeader } : {}),
           'Content-Type': 'application/json'
         },
+        signal: AbortSignal.timeout(1000),
         cache: 'no-store'
       })
 
