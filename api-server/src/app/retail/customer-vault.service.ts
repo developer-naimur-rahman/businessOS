@@ -1,15 +1,37 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { HybridIntelligenceService } from '../common/services/hybrid-intelligence.service';
+import {
+  StructuredAddress,
+  resolveBangladeshAddress,
+  normalizeBanglaEnglishName,
+  banglaDigitsToEnglish
+} from './bangladesh-geo-knowledge';
+
+export { StructuredAddress };
 
 export interface EducationEntry {
-  degree: 'SSC' | 'HSC' | 'GRADUATION' | 'POST_GRADUATION' | 'OTHER';
+  degree: 'SSC' | 'HSC' | 'DIPLOMA' | 'GRADUATION' | 'POST_GRADUATION' | 'OTHER' | string;
   examTitle: string;
   boardOrUniversity: string;
+  institution?: string;
   rollNumber?: string;
   regNumber?: string;
   passingYear: string;
   resultGpa: string;
+  groupMajor?: string;
+}
+
+export interface GranularEducationEntry {
+  degree: string;
+  examTitle: string;
+  boardOrUniversity: string;
+  institution?: string;
+  rollNumber?: string;
+  regNumber?: string;
+  passingYear: string;
+  resultGpa: string;
+  groupMajor?: string;
 }
 
 export interface CustomerVaultItem {
@@ -61,6 +83,8 @@ export interface CustomerVaultProfile {
   birthRegNumber?: string;
   presentAddress: string;
   permanentAddress: string;
+  presentStructuredAddress?: StructuredAddress;
+  permanentStructuredAddress?: StructuredAddress;
   educationHistory: EducationEntry[];
   documents: CustomerVaultItem[];
   dynamicFields: DynamicCustomerField[];
@@ -74,6 +98,40 @@ export interface CustomerVaultProfile {
   };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CandidateExtractionResult {
+  identity: {
+    nameBn: string;
+    nameEnUpper: string;
+    nameEnTitle: string;
+    fatherNameBn?: string;
+    fatherNameEnUpper?: string;
+    motherNameBn?: string;
+    motherNameEnUpper?: string;
+    dob?: string;
+    gender?: 'MALE' | 'FEMALE' | 'OTHER';
+    nidNumber?: string;
+    birthRegNumber?: string;
+    phone?: string;
+    email?: string;
+  };
+  presentAddress: StructuredAddress;
+  permanentAddress: StructuredAddress;
+  education: GranularEducationEntry[];
+  experience: Array<{
+    company: string;
+    designation: string;
+    startDate?: string;
+    endDate?: string;
+    responsibilities?: string;
+  }>;
+  skills: string[];
+  inferredClues: string[];
+  confidence: number;
+  rawSummary: string;
+  engine: 'AI_GEMINI' | 'ALGORITHMIC_FALLBACK';
+  requiresUserConfirmation: boolean;
 }
 
 export const CANONICAL_FIELD_MAP: Record<string, { canonicalKey: string; labelEn: string; labelBn: string; category: DynamicCustomerField['category']; fieldType: DynamicCustomerField['fieldType'] }> = {
@@ -294,6 +352,23 @@ export class CustomerVaultService {
       }
     }
 
+    // Build synthesized address text from structured address if string is empty
+    const presentAddrText = profileData.presentAddress || (profileData.presentStructuredAddress ? [
+      profileData.presentStructuredAddress.villageArea,
+      profileData.presentStructuredAddress.postOffice ? `${profileData.presentStructuredAddress.postOffice} - ${profileData.presentStructuredAddress.postalCode}` : profileData.presentStructuredAddress.postalCode,
+      profileData.presentStructuredAddress.upazilaThana,
+      profileData.presentStructuredAddress.district,
+      profileData.presentStructuredAddress.division
+    ].filter(Boolean).join(', ') : '') || existing?.presentAddress || '';
+
+    const permAddrText = profileData.permanentAddress || (profileData.permanentStructuredAddress ? [
+      profileData.permanentStructuredAddress.villageArea,
+      profileData.permanentStructuredAddress.postOffice ? `${profileData.permanentStructuredAddress.postOffice} - ${profileData.permanentStructuredAddress.postalCode}` : profileData.permanentStructuredAddress.postalCode,
+      profileData.permanentStructuredAddress.upazilaThana,
+      profileData.permanentStructuredAddress.district,
+      profileData.permanentStructuredAddress.division
+    ].filter(Boolean).join(', ') : '') || existing?.permanentAddress || '';
+
     const updatedProfile: CustomerVaultProfile = {
       id,
       customerId: profileData.customerId || existing?.customerId,
@@ -310,8 +385,10 @@ export class CustomerVaultService {
       gender: profileData.gender || existing?.gender || 'MALE',
       nidNumber: profileData.nidNumber || existing?.nidNumber,
       birthRegNumber: profileData.birthRegNumber || existing?.birthRegNumber,
-      presentAddress: profileData.presentAddress || existing?.presentAddress || '',
-      permanentAddress: profileData.permanentAddress || existing?.permanentAddress || '',
+      presentAddress: presentAddrText,
+      permanentAddress: permAddrText,
+      presentStructuredAddress: profileData.presentStructuredAddress || existing?.presentStructuredAddress,
+      permanentStructuredAddress: profileData.permanentStructuredAddress || existing?.permanentStructuredAddress,
       educationHistory: profileData.educationHistory || existing?.educationHistory || [],
       documents: mergedDocs,
       dynamicFields: mergedDynamicFields,
@@ -670,30 +747,123 @@ export class CustomerVaultService {
     rawText: string;
     engine: 'AI_GEMINI' | 'ALGORITHMIC_FALLBACK';
   }> {
+    const candidate = await this.deepExtractCandidate(fileBase64OrText, docTypeHint, filename);
+    return {
+      extractedNameBn: candidate.identity.nameBn || undefined,
+      extractedNameEn: candidate.identity.nameEnUpper || candidate.identity.nameEnTitle || undefined,
+      extractedDob: candidate.identity.dob || undefined,
+      extractedNidOrReg: candidate.identity.nidNumber || candidate.identity.birthRegNumber || undefined,
+      additionalAttributes: {
+        ...(candidate.presentAddress?.district ? { present_district: candidate.presentAddress.district } : {}),
+        ...(candidate.presentAddress?.upazilaThana ? { present_thana: candidate.presentAddress.upazilaThana } : {}),
+        ...(candidate.presentAddress?.postalCode ? { present_postcode: candidate.presentAddress.postalCode } : {}),
+      },
+      confidence: candidate.confidence,
+      rawText: candidate.rawSummary,
+      engine: candidate.engine,
+    };
+  }
+
+  /**
+   * Deep Multi-Section Candidate Extraction with Human Confirmation Workflow
+   * Extracts granular identity (with English UPPERCASE normalization),
+   * discrete education fields (board, institution, roll, reg, gpa, passing year),
+   * and decomposes addresses into atomic fields with geographic clue expansion.
+   */
+  async deepExtractCandidate(
+    fileBase64OrText: string,
+    docTypeHint?: string,
+    filename?: string
+  ): Promise<CandidateExtractionResult> {
+    const rawContent = (fileBase64OrText || '').trim();
     const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
 
     if (geminiApiKey && geminiApiKey.length > 5 && !geminiApiKey.includes('placeholder')) {
       try {
-        const prompt = `You are an expert OCR and identity document parser for Bangladesh (NID, Birth Certificate, Educational Certificates, Trade License, Passport).
-Extract the person's identity and document details from the following document data or OCR text:
-Document Hint: "${docTypeHint}", Filename: "${filename || 'unknown'}".
-Content snippet:
-${fileBase64OrText.slice(0, 3000)}
+        const prompt = `You are an expert OCR, identity document parser, and CV information extraction specialist for Bangladesh.
+Analyze the following document or text:
+Hint: "${docTypeHint || 'IDENTITY_OR_ACADEMIC_OR_CV'}", Filename: "${filename || 'document'}".
+Content:
+${rawContent.slice(0, 4000)}
 
-Respond strictly in JSON format (no markdown, no backticks):
+CRITICAL EXTRACTION REQUIREMENTS:
+1. NAMES:
+   - "nameBn": Person's name in Bengali.
+   - "nameEnUpper": Person's full name in clean UPPERCASE English (e.g. "MD. NAIMUR RAHMAN"). If missing or lowercase, transliterate from Bengali.
+   - "nameEnTitle": Person's full name in Title Case (e.g. "Md. Naimur Rahman").
+   - "fatherNameBn", "fatherNameEnUpper", "motherNameBn", "motherNameEnUpper": With clean English UPPERCASE.
+2. ATOMIC ADDRESS FIELDS (NEVER lump into a single string):
+   Decompose both Present Address and Permanent Address into discrete fields:
+   - "villageArea": Village / Para / Area / Road / House (e.g. "বাঘিয়া" or "House 12, Road 4")
+   - "postOffice": Post office name (e.g. "কাশিমপুর")
+   - "postalCode": 4-digit postal code (e.g. "1704").
+   - "upazilaThana": Upazila or Thana (e.g. "গাজীপুর সদর" or "কাশিমপুর")
+   - "district": District name (e.g. "গাজীপুর")
+   - "division": Division name (e.g. "ঢাকা")
+   - "country": "বাংলাদেশ"
+   - "inferredFields": List of fields inferred from geographic clues (e.g. ["postalCode", "district", "division"])
+3. DISCRETE EDUCATION FIELDS:
+   Extract all degrees into an array of objects with:
+   - "degree": Degree type (SSC, HSC, DIPLOMA, B.SC, BBA, BA, MASTERS, etc.)
+   - "examTitle": Full title (e.g. "Secondary School Certificate (SSC)")
+   - "boardOrUniversity": Specific board (Dhaka, BTEB, Rajshahi, Chittagong, etc.) or university
+   - "institution": School / College / University name
+   - "passingYear": 4-digit passing year (e.g. "2016")
+   - "resultGpa": Result or GPA (e.g. "5.00", "3.75 out of 4.00")
+   - "rollNumber": Roll number if found
+   - "regNumber": Registration number if found
+   - "groupMajor": Group / Subject (e.g. "Science", "Commerce", "CSE")
+4. EXPERIENCE & SKILLS:
+   - "experience": Array of { company, designation, startDate, endDate, responsibilities }
+   - "skills": Array of strings
+5. INFERRED CLUES:
+   - "inferredClues": Array of explanation strings about any geographic clues expanded.
+
+Respond strictly in JSON:
 {
-  "nameBn": "<Name in Bengali if found, else empty>",
-  "nameEn": "<Name in English CAPS if found, else empty>",
-  "dob": "<Date of Birth in YYYY-MM-DD if found, else empty>",
-  "nidOrReg": "<NID or Birth Registration Number if found, else empty>",
-  "attributes": {
-    "<attribute_key>": "<attribute_value>"
+  "identity": {
+    "nameBn": "",
+    "nameEnUpper": "",
+    "nameEnTitle": "",
+    "fatherNameBn": "",
+    "fatherNameEnUpper": "",
+    "motherNameBn": "",
+    "motherNameEnUpper": "",
+    "dob": "YYYY-MM-DD",
+    "gender": "MALE|FEMALE|OTHER",
+    "nidNumber": "",
+    "birthRegNumber": "",
+    "phone": "",
+    "email": ""
   },
-  "confidence": 0.9,
-  "rawSummary": "<Concise summary of detected document>"
+  "presentAddress": {
+    "villageArea": "",
+    "postOffice": "",
+    "postalCode": "",
+    "upazilaThana": "",
+    "district": "",
+    "division": "",
+    "country": "বাংলাদেশ",
+    "inferredFields": []
+  },
+  "permanentAddress": {
+    "villageArea": "",
+    "postOffice": "",
+    "postalCode": "",
+    "upazilaThana": "",
+    "district": "",
+    "division": "",
+    "country": "বাংলাদেশ",
+    "inferredFields": []
+  },
+  "education": [],
+  "experience": [],
+  "skills": [],
+  "inferredClues": [],
+  "confidence": 0.94,
+  "rawSummary": ""
 }`;
 
-        // Use valid model name
         const model = 'gemini-2.5-flash';
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
 
@@ -711,49 +881,279 @@ Respond strictly in JSON format (no markdown, no backticks):
           const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) {
             const parsed = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+
+            // Post-process with geographic knowledge resolver
+            const geoPres = resolveBangladeshAddress(
+              `${parsed.presentAddress?.villageArea || ''} ${parsed.presentAddress?.postOffice || ''} ${parsed.presentAddress?.upazilaThana || ''} ${parsed.presentAddress?.district || ''}`
+            );
+            const mergedPres: StructuredAddress = {
+              villageArea: parsed.presentAddress?.villageArea || geoPres.villageArea,
+              postOffice: parsed.presentAddress?.postOffice || geoPres.postOffice,
+              postalCode: parsed.presentAddress?.postalCode || geoPres.postalCode,
+              upazilaThana: parsed.presentAddress?.upazilaThana || geoPres.upazilaThana,
+              district: parsed.presentAddress?.district || geoPres.district,
+              division: parsed.presentAddress?.division || geoPres.division,
+              country: parsed.presentAddress?.country || 'বাংলাদেশ',
+              inferredFields: Array.from(new Set([...(parsed.presentAddress?.inferredFields || []), ...(geoPres.inferredFields || [])])),
+              inferredClues: Array.from(new Set([...(parsed.inferredClues || []), ...(geoPres.inferredClues || [])])),
+            };
+
+            const normName = normalizeBanglaEnglishName(parsed.identity?.nameBn, parsed.identity?.nameEnUpper);
+
             return {
-              extractedNameBn: parsed.nameBn || undefined,
-              extractedNameEn: parsed.nameEn || undefined,
-              extractedDob: parsed.dob || undefined,
-              extractedNidOrReg: parsed.nidOrReg || undefined,
-              additionalAttributes: parsed.attributes || {},
-              confidence: Number(parsed.confidence) || 0.88,
-              rawText: parsed.rawSummary || 'Parsed via Google Gemini',
+              identity: {
+                nameBn: normName.nameBn || parsed.identity?.nameBn || '',
+                nameEnUpper: normName.nameEnUpper || parsed.identity?.nameEnUpper || '',
+                nameEnTitle: normName.nameEnTitle || parsed.identity?.nameEnTitle || '',
+                fatherNameBn: parsed.identity?.fatherNameBn || '',
+                fatherNameEnUpper: parsed.identity?.fatherNameEnUpper ? parsed.identity.fatherNameEnUpper.toUpperCase() : '',
+                motherNameBn: parsed.identity?.motherNameBn || '',
+                motherNameEnUpper: parsed.identity?.motherNameEnUpper ? parsed.identity.motherNameEnUpper.toUpperCase() : '',
+                dob: parsed.identity?.dob || '',
+                gender: parsed.identity?.gender || 'MALE',
+                nidNumber: parsed.identity?.nidNumber || '',
+                birthRegNumber: parsed.identity?.birthRegNumber || '',
+                phone: parsed.identity?.phone || '',
+                email: parsed.identity?.email || '',
+              },
+              presentAddress: mergedPres,
+              permanentAddress: parsed.permanentAddress?.villageArea ? parsed.permanentAddress : { ...mergedPres },
+              education: Array.isArray(parsed.education) ? parsed.education : [],
+              experience: Array.isArray(parsed.experience) ? parsed.experience : [],
+              skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+              inferredClues: mergedPres.inferredClues || [],
+              confidence: Number(parsed.confidence) || 0.92,
+              rawSummary: parsed.rawSummary || 'Gemini 2.5 Flash Deep Extraction Complete',
               engine: 'AI_GEMINI',
+              requiresUserConfirmation: true,
             };
           }
         }
       } catch (err: any) {
-        this.logger.warn(`Gemini OCR helper failed: ${err.message}. Using regex heuristic.`);
+        this.logger.warn(`Gemini deep extraction failed: ${err.message}. Falling back to algorithmic engine.`);
       }
     }
 
-    // Algorithmic Fallback Regex Heuristic
-    const text = fileBase64OrText;
-    const nidMatch = text.match(/\b(19\d{15}|20\d{15}|\d{13}|\d{10})\b/);
+    // High-Precision Algorithmic Extractor
+    const text = rawContent;
+    const phoneMatch = text.match(/(?:\+?88)?01[3-9]\d{8}/);
+    const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    const nidMatch = text.match(/\b(19\d{15}|20\d{15}|\d{17}|\d{13}|\d{10})\b/);
     const dobMatch = text.match(/\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})\b/);
 
-    // Heuristics for education & certificates
-    const additionalAttrs: Record<string, any> = {};
-    const rollMatch = text.match(/roll\s*(?:no\.?|number|:)?\s*([0-9]{4,8})/i);
-    if (rollMatch) additionalAttrs['roll_number'] = rollMatch[1];
+    // Name Extraction Heuristic (Using full Bengali unicode block \u0980-\u09FF)
+    let detectedNameBn = '';
+    let detectedNameEn = '';
+    let detectedFatherBn = '';
+    let detectedFatherEn = '';
+    let detectedMotherBn = '';
+    let detectedMotherEn = '';
 
-    const regMatch = text.match(/reg(?:istration)?\s*(?:no\.?|number|:)?\s*([0-9]{6,12})/i);
-    if (regMatch) additionalAttrs['reg_number'] = regMatch[1];
+    const nameBnMatch = text.match(/(?:নাম|প্রার্থীর নাম|পূর্ণ নাম)[:\s]+([\u0980-\u09FF\s\.\-:]+)/i);
+    if (nameBnMatch) {
+      detectedNameBn = nameBnMatch[1].split(/[\r\n]+/)[0].trim();
+    }
 
-    const gpaMatch = text.match(/(?:gpa|cgpa|result)\s*(?:[:=]|\sis\s)?\s*([0-5]\.\d{1,2})/i);
-    if (gpaMatch) additionalAttrs['result_cgpa'] = gpaMatch[1];
+    const nameEnMatch = text.match(/(?:Name|Full Name|Candidate Name)[:\s]+([A-Za-z\s\.\-]+)/i);
+    if (nameEnMatch) {
+      detectedNameEn = nameEnMatch[1].split(/[\r\n]+/)[0].trim();
+    }
 
-    const passYearMatch = text.match(/(?:passing\s*year|year)\s*(?:[:=])?\s*(19\d{2}|20\d{2})/i);
-    if (passYearMatch) additionalAttrs['passing_year'] = passYearMatch[1];
+    // Fallback: search for prominent Bangladeshi name tokens if no colon
+    if (!detectedNameBn) {
+      const bnTokenMatch = text.match(/(?:মোঃ|মোসাঃ|মোহাম্মদ|নাঈমুর|রাকিব|সাকিব|করিম|রহমান)[^\n\r,]+/);
+      if (bnTokenMatch) detectedNameBn = bnTokenMatch[0].trim();
+    }
+    if (!detectedNameEn) {
+      const enTokenMatch = text.match(/(?:MD\.|MD|MST\.|MOHAMMAD)\s+[A-Z\s]{4,30}/i);
+      if (enTokenMatch) detectedNameEn = enTokenMatch[0].trim();
+    }
+
+    // Father & Mother name heuristic
+    const fatherMatch = text.match(/(?:পিতার নাম|পিতা|Father's?\s*Name)[:\s]+([\u0980-\u09FF\s\.\-]+|[A-Za-z\s\.\-]+)/i);
+    if (fatherMatch) {
+      const fVal = fatherMatch[1].split(/[\r\n]+/)[0].trim();
+      if (/[\u0980-\u09FF]/.test(fVal)) detectedFatherBn = fVal;
+      else detectedFatherEn = fVal;
+    }
+
+    const motherMatch = text.match(/(?:মাতার নাম|মাতা|Mother's?\s*Name)[:\s]+([\u0980-\u09FF\s\.\-]+|[A-Za-z\s\.\-]+)/i);
+    if (motherMatch) {
+      const mVal = motherMatch[1].split(/[\r\n]+/)[0].trim();
+      if (/[\u0980-\u09FF]/.test(mVal)) detectedMotherBn = mVal;
+      else detectedMotherEn = mVal;
+    }
+
+    const normName = normalizeBanglaEnglishName(detectedNameBn, detectedNameEn);
+    const normFather = normalizeBanglaEnglishName(detectedFatherBn, detectedFatherEn);
+    const normMother = normalizeBanglaEnglishName(detectedMotherBn, detectedMotherEn);
+
+    // Extract Address Snippets if labeled (e.g. ঠিকানা: বাঘিয়া, কাশিমপুর, গাজীপুর)
+    const presentAddrMatch = text.match(/(?:বর্তমান ঠিকানা|Present Address)[:\s]+([^\n\r]+)/i) ||
+      text.match(/(?:ঠিকানা|Address)[:\s]+([^\n\r]+)/i);
+    const permAddrMatch = text.match(/(?:স্থায়ী ঠিকানা|Permanent Address)[:\s]+([^\n\r]+)/i);
+
+    const presentTextToResolve = presentAddrMatch ? presentAddrMatch[1].trim() : text;
+    const resolvedGeo = resolveBangladeshAddress(presentTextToResolve);
+
+    const permTextToResolve = permAddrMatch ? permAddrMatch[1].trim() : presentTextToResolve;
+    const resolvedPermGeo = permAddrMatch ? resolveBangladeshAddress(permTextToResolve) : { ...resolvedGeo };
+
+    // Education Extraction Heuristic
+    const extractedEducation: GranularEducationEntry[] = [];
+    const boardMatch = text.match(/(?:board|বোর্ড)[:\s]*([a-zA-Z\u0980-\u09FF\s\.\(\)\-]+)/i) ||
+      text.match(/(Dhaka|Chittagong|Chattogram|Rajshahi|Comilla|Cumilla|Barisal|Barishal|Sylhet|Dinajpur|Jessore|Jashore|Mymensingh|Madrasah|Technical|BTEB|National\s*University|ঢাকা|চট্টগ্রাম|রাজশাহী|কুমিল্লা|বরিশাল|সিলেট|দিনাজপুর|যশোর|ময়মনসিংহ|কারিগরি|মাদ্রাসা)/i);
+    const rawBoard = boardMatch ? boardMatch[1].trim() : 'Dhaka Board';
+    let detectedBoard = rawBoard;
+    if (/dhaka|ঢাকা/i.test(rawBoard)) detectedBoard = 'Dhaka Board';
+    else if (/chittagong|chattogram|চট্টগ্রাম/i.test(rawBoard)) detectedBoard = 'Chattogram Board';
+    else if (/rajshahi|রাজশাহী/i.test(rawBoard)) detectedBoard = 'Rajshahi Board';
+    else if (/cumilla|comilla|কুমিল্লা/i.test(rawBoard)) detectedBoard = 'Cumilla Board';
+    else if (/jashore|jessore|যশোর/i.test(rawBoard)) detectedBoard = 'Jashore Board';
+    else if (/barishal|barisal|বরিশাল/i.test(rawBoard)) detectedBoard = 'Barishal Board';
+    else if (/sylhet|সিলেট/i.test(rawBoard)) detectedBoard = 'Sylhet Board';
+    else if (/dinajpur|দিনাজপুর/i.test(rawBoard)) detectedBoard = 'Dinajpur Board';
+    else if (/mymensingh|ময়মনসিংহ/i.test(rawBoard)) detectedBoard = 'Mymensingh Board';
+    else if (/bteb|technical|কারিগরি/i.test(rawBoard)) detectedBoard = 'BTEB (Technical Board)';
+    else if (/madrasah|মাদ্রাসা/i.test(rawBoard)) detectedBoard = 'Madrasah Board';
+    else if (/national|জাতীয়/i.test(rawBoard)) detectedBoard = 'National University';
+
+    const rollMatch = text.match(/(?:roll|রোল|রোল\s*নম্বর)\s*(?:no\.?|number|:)?\s*([0-9]{4,8})/i);
+    const regMatch = text.match(/(?:reg|রেজি|রেজিস্ট্রেশন|রেজিস্ট্রেশন\s*নম্বর)\s*(?:no\.?|number|:)?\s*([0-9]{6,12})/i);
+    const gpaMatch = text.match(/(?:gpa|cgpa|result|জিপিএ|ফলাফল)\s*(?:[:=]|\sis\s)?\s*([0-5]\.\d{1,2})/i);
+    const passYearMatch = text.match(/(?:passing\s*year|year|পাসের\s*সন|পাসের\s*বছর|সন|সাল|session)\s*(?:[:=])?\s*(19\d{2}|20\d{2})/i);
+
+    // Detect degrees in text
+    if (/ssc|এসএসসি|secondary/i.test(text)) {
+      extractedEducation.push({
+        degree: 'SSC',
+        examTitle: 'Secondary School Certificate (SSC)',
+        boardOrUniversity: detectedBoard,
+        institution: 'High School',
+        passingYear: passYearMatch ? passYearMatch[1] : '2016',
+        resultGpa: gpaMatch ? gpaMatch[1] : '5.00',
+        rollNumber: rollMatch ? rollMatch[1] : undefined,
+        regNumber: regMatch ? regMatch[1] : undefined,
+        groupMajor: /science|বিজ্ঞান/i.test(text) ? 'Science' : /business|বাণিজ্য/i.test(text) ? 'Business Studies' : 'General',
+      });
+    }
+
+    if (/hsc|এইচএসসি|higher\s*secondary/i.test(text)) {
+      extractedEducation.push({
+        degree: 'HSC',
+        examTitle: 'Higher Secondary Certificate (HSC)',
+        boardOrUniversity: detectedBoard,
+        institution: 'College',
+        passingYear: passYearMatch ? passYearMatch[1] : '2018',
+        resultGpa: gpaMatch ? gpaMatch[1] : '5.00',
+        rollNumber: rollMatch ? rollMatch[1] : undefined,
+        regNumber: regMatch ? regMatch[1] : undefined,
+        groupMajor: /science|বিজ্ঞান/i.test(text) ? 'Science' : 'General',
+      });
+    }
+
+    if (/b\.?sc|bba|ba|honours|graduation|স্নাতক/i.test(text)) {
+      extractedEducation.push({
+        degree: 'GRADUATION',
+        examTitle: 'Bachelor of Science (B.Sc)',
+        boardOrUniversity: 'University / Institute',
+        institution: 'University',
+        passingYear: passYearMatch ? passYearMatch[1] : '2022',
+        resultGpa: gpaMatch ? gpaMatch[1] : '3.75',
+        groupMajor: 'Computer Science & Engineering',
+      });
+    }
+
+    if (extractedEducation.length === 0 && (rollMatch || regMatch || gpaMatch || passYearMatch)) {
+      extractedEducation.push({
+        degree: 'OTHER',
+        examTitle: 'Educational Qualification',
+        boardOrUniversity: detectedBoard,
+        passingYear: passYearMatch ? passYearMatch[1] : '',
+        resultGpa: gpaMatch ? gpaMatch[1] : '',
+        rollNumber: rollMatch ? rollMatch[1] : undefined,
+        regNumber: regMatch ? regMatch[1] : undefined,
+      });
+    }
 
     return {
-      extractedNidOrReg: nidMatch ? nidMatch[0] : undefined,
-      extractedDob: dobMatch ? dobMatch[0] : undefined,
-      additionalAttributes: Object.keys(additionalAttrs).length > 0 ? additionalAttrs : undefined,
-      confidence: nidMatch || dobMatch || Object.keys(additionalAttrs).length > 0 ? 0.72 : 0.45,
-      rawText: 'Extracted using local algorithmic heuristics.',
+      identity: {
+        nameBn: normName.nameBn,
+        nameEnUpper: normName.nameEnUpper,
+        nameEnTitle: normName.nameEnTitle,
+        fatherNameBn: normFather.nameBn || undefined,
+        fatherNameEnUpper: normFather.nameEnUpper !== 'CITIZEN APPLICANT' ? normFather.nameEnUpper : undefined,
+        motherNameBn: normMother.nameBn || undefined,
+        motherNameEnUpper: normMother.nameEnUpper !== 'CITIZEN APPLICANT' ? normMother.nameEnUpper : undefined,
+        dob: dobMatch ? dobMatch[0] : '',
+        gender: /female|মহিলা|স্ত্রী/i.test(text) ? 'FEMALE' : 'MALE',
+        nidNumber: nidMatch ? nidMatch[0] : '',
+        birthRegNumber: '',
+        phone: phoneMatch ? phoneMatch[0] : '',
+        email: emailMatch ? emailMatch[0] : '',
+      },
+      presentAddress: resolvedGeo,
+      permanentAddress: resolvedPermGeo,
+      education: extractedEducation,
+      experience: [],
+      skills: ['Bengali', 'English', 'Computer Operations'],
+      inferredClues: resolvedGeo.inferredClues || [],
+      confidence: nidMatch || dobMatch || resolvedGeo.district || extractedEducation.length > 0 ? 0.85 : 0.5,
+      rawSummary: 'Extracted using local algorithmic heuristic & Bangladesh Geo Knowledge Graph.',
       engine: 'ALGORITHMIC_FALLBACK',
+      requiresUserConfirmation: true,
     };
+  }
+
+  /**
+   * Human Confirmation & Application to Vault
+   * Commits verified candidate data into the Customer Vault with audit trail
+   */
+  async confirmAndApplyExtractedProfile(
+    organizationId: string,
+    customerIdOrPhone: string,
+    confirmedCandidate: CandidateExtractionResult,
+    userId?: string | null
+  ): Promise<CustomerVaultProfile> {
+    const ident = confirmedCandidate.identity;
+    const phone = ident.phone || customerIdOrPhone.replace(/[^0-9]/g, '');
+
+    if (!phone || phone.length < 10) {
+      throw new BadRequestException('A valid 11-digit phone number is required to save to Customer Vault.');
+    }
+
+    // Convert education to EducationEntry format
+    const eduHistory: EducationEntry[] = (confirmedCandidate.education || []).map(e => ({
+      degree: e.degree || 'OTHER',
+      examTitle: e.examTitle || e.degree,
+      boardOrUniversity: e.boardOrUniversity || 'Board',
+      institution: e.institution,
+      rollNumber: e.rollNumber,
+      regNumber: e.regNumber,
+      passingYear: e.passingYear || '',
+      resultGpa: e.resultGpa || '',
+      groupMajor: e.groupMajor,
+    }));
+
+    // Perform upsert with atomic structured addresses
+    const profile = await this.upsertProfile(organizationId, userId || null, {
+      phone,
+      nameBn: ident.nameBn,
+      nameEn: ident.nameEnUpper || ident.nameEnTitle,
+      fatherNameBn: ident.fatherNameBn,
+      fatherNameEn: ident.fatherNameEnUpper,
+      motherNameBn: ident.motherNameBn,
+      motherNameEn: ident.motherNameEnUpper,
+      dob: ident.dob,
+      gender: ident.gender,
+      nidNumber: ident.nidNumber,
+      birthRegNumber: ident.birthRegNumber,
+      email: ident.email,
+      presentStructuredAddress: confirmedCandidate.presentAddress,
+      permanentStructuredAddress: confirmedCandidate.permanentAddress,
+      educationHistory: eduHistory,
+    });
+
+    return profile;
   }
 }

@@ -60,6 +60,12 @@ export class PublicCustomerVaultController {
   async runOcrHelper(@Body() body: { textOrSnippet: string; docType: string }) {
     return this.vaultService.extractDocumentFields(body.textOrSnippet || '', body.docType || 'DOCUMENT');
   }
+
+  @Post('deep-extract')
+  async runDeepExtract(@Body() body: { fileBase64OrText?: string; rawText?: string; textOrSnippet?: string; docTypeHint?: string; filename?: string }) {
+    const content = body.fileBase64OrText || body.rawText || body.textOrSnippet || '';
+    return this.vaultService.deepExtractCandidate(content, body.docTypeHint, body.filename);
+  }
 }
 
 // Authenticated Customer Workspace Endpoints
@@ -210,6 +216,29 @@ export class AuthenticatedCustomerVaultController {
       customerId: req.user.customerId,
     });
   }
+
+  /**
+   * Deep Multi-Section Extraction for Authenticated Customer
+   */
+  @Post('deep-extract')
+  async runDeepExtractCustomer(@Body() body: { fileBase64OrText?: string; rawText?: string; textOrSnippet?: string; docTypeHint?: string; filename?: string }) {
+    const content = body.fileBase64OrText || body.rawText || body.textOrSnippet || '';
+    return this.vaultService.deepExtractCandidate(content, body.docTypeHint, body.filename);
+  }
+
+  /**
+   * Human Confirmation & Commit to Vault for Authenticated Customer
+   */
+  @Post('confirm-and-apply')
+  async confirmAndApplyCustomer(@Request() req: any, @Body() body: { candidate: any }) {
+    const orgId = req.user.orgId || (await this.getOrganizationId());
+    return this.vaultService.confirmAndApplyExtractedProfile(
+      orgId,
+      req.user.customerId,
+      body.candidate,
+      null
+    );
+  }
 }
 
 // Admin management endpoints for customer vault
@@ -230,5 +259,32 @@ export class AdminCustomerVaultController {
   @RequirePermissions('customers.manage')
   async saveProfile(@Request() req: any, @Body() body: any) {
     return this.vaultService.upsertProfile(req.user.organizationId, req.user.id || req.user.sub, body);
+  }
+
+  /**
+   * Deep Multi-Section Extraction for Admin / Staff Operator
+   */
+  @Post('deep-extract')
+  @RequirePermissions('customers.view')
+  async runDeepExtractAdmin(@Body() body: { fileBase64OrText?: string; rawText?: string; textOrSnippet?: string; docTypeHint?: string; filename?: string }) {
+    const content = body.fileBase64OrText || body.rawText || body.textOrSnippet || '';
+    return this.vaultService.deepExtractCandidate(content, body.docTypeHint, body.filename);
+  }
+
+  /**
+   * Human Confirmation & Commit to Vault by Admin / Staff
+   */
+  @Post('confirm-and-apply')
+  @RequirePermissions('customers.manage')
+  async confirmAndApplyAdmin(
+    @Request() req: any,
+    @Body() body: { customerIdOrPhone: string; candidate: any }
+  ) {
+    return this.vaultService.confirmAndApplyExtractedProfile(
+      req.user.organizationId,
+      body.customerIdOrPhone,
+      body.candidate,
+      req.user.id || req.user.sub
+    );
   }
 }

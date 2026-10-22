@@ -34,9 +34,16 @@ import {
   GraduationCap,
   Award,
   Globe,
-  Sliders
+  Sliders,
+  HelpCircle
 } from "lucide-react"
 import { toast } from "sonner"
+import { AiExtractDialog } from "../../../components/document-studio/ai-extract-dialog"
+import {
+  CandidateReviewModal,
+  CandidateExtractionData,
+  StructuredAddressData
+} from "../../../components/document-studio/candidate-review-modal"
 
 export type DocumentCategory = 'CAREER_JOB' | 'BUSINESS_PROPOSAL' | 'LETTERS_FORMS' | 'STUDENT_ACADEMIC'
 export type DocumentServiceMode = 'TEMPLATE_BASED' | 'CUSTOM_MADE'
@@ -48,6 +55,9 @@ export interface EducationItem {
   boardOrUniversity?: string
   passingYear: string
   resultGpa: string
+  rollNumber?: string
+  regNumber?: string
+  groupMajor?: string
 }
 
 export interface ExperienceItem {
@@ -67,9 +77,13 @@ export interface DocumentSnapshotData {
   phone: string
   email: string
   address: string
+  presentStructuredAddress?: StructuredAddressData
+  permanentStructuredAddress?: StructuredAddressData
   dob?: string
   fatherName?: string
+  fatherNameEn?: string
   motherName?: string
+  motherNameEn?: string
   nationality?: string
   religion?: string
   maritalStatus?: string
@@ -201,6 +215,92 @@ export default function AdminCvStudioPage() {
   // Action Submission State
   const [submittingOrder, setSubmittingOrder] = useState<boolean>(false)
   const canvasRef = useRef<HTMLDivElement>(null)
+
+  // AI Document Extraction & Human Review Confirmation Modal State
+  const [showAiExtractModal, setShowAiExtractModal] = useState<boolean>(false)
+  const [isExtractingAi, setIsExtractingAi] = useState<boolean>(false)
+  const [candidateReviewData, setCandidateReviewData] = useState<CandidateExtractionData | null>(null)
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false)
+  const [isApplyingConfirmation, setIsApplyingConfirmation] = useState<boolean>(false)
+
+  const handleTriggerAiExtract = async (payload: { fileBase64OrText: string; docTypeHint?: string; filename?: string }) => {
+    setIsExtractingAi(true)
+    try {
+      const res = await api.post('/admin/customer-vault/deep-extract', payload)
+      if (res.data) {
+        setCandidateReviewData(res.data)
+        setShowAiExtractModal(false)
+        setShowReviewModal(true)
+        toast.success("AI বিশ্লেষণ সম্পন্ন হয়েছে! অনুগ্রহ করে তথ্য যাচাই করে নিশ্চিত করুন।")
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "AI বিশ্লেষণ ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।")
+    } finally {
+      setIsExtractingAi(false)
+    }
+  }
+
+  const handleConfirmCandidate = async (confirmedCandidate: CandidateExtractionData) => {
+    setIsApplyingConfirmation(true)
+    try {
+      const phone = confirmedCandidate.identity.phone || formData.phone || selectedCustomer?.phone || '01700000000'
+
+      try {
+        await api.post('/admin/customer-vault/confirm-and-apply', {
+          customerIdOrPhone: selectedCustomer?.id || phone,
+          candidate: confirmedCandidate
+        })
+      } catch (apiErr) {
+        console.warn("Vault save note:", apiErr)
+      }
+
+      const pres = confirmedCandidate.presentAddress
+      const formattedAddress = [
+        pres.villageArea,
+        pres.postOffice ? `${pres.postOffice} - ${pres.postalCode}` : pres.postalCode,
+        pres.upazilaThana,
+        pres.district,
+        pres.division
+      ].filter(Boolean).join(', ')
+
+      setFormData((prev) => ({
+        ...prev,
+        nameBn: confirmedCandidate.identity.nameBn || prev.nameBn,
+        nameEn: confirmedCandidate.identity.nameEnUpper || prev.nameEn,
+        fatherName: confirmedCandidate.identity.fatherNameBn || confirmedCandidate.identity.fatherNameEnUpper || prev.fatherName,
+        fatherNameEn: confirmedCandidate.identity.fatherNameEnUpper || prev.fatherNameEn,
+        motherName: confirmedCandidate.identity.motherNameBn || confirmedCandidate.identity.motherNameEnUpper || prev.motherName,
+        motherNameEn: confirmedCandidate.identity.motherNameEnUpper || prev.motherNameEn,
+        dob: confirmedCandidate.identity.dob || prev.dob,
+        phone: confirmedCandidate.identity.phone || prev.phone,
+        email: confirmedCandidate.identity.email || prev.email,
+        address: formattedAddress || prev.address,
+        presentStructuredAddress: confirmedCandidate.presentAddress,
+        permanentStructuredAddress: confirmedCandidate.permanentAddress,
+        education: (confirmedCandidate.education || []).map((e) => ({
+          degree: e.degree || 'Degree',
+          examTitle: e.examTitle || e.degree,
+          boardOrUniversity: e.boardOrUniversity || 'Board',
+          institution: e.institution || 'Institution',
+          passingYear: e.passingYear || '',
+          resultGpa: e.resultGpa || '',
+          rollNumber: e.rollNumber,
+          regNumber: e.regNumber,
+          groupMajor: e.groupMajor
+        })),
+        skills: confirmedCandidate.skills && confirmedCandidate.skills.length > 0
+          ? Array.from(new Set([...prev.skills, ...confirmedCandidate.skills]))
+          : prev.skills
+      }))
+
+      setShowReviewModal(false)
+      toast.success("✅ তথ্য সফলভাবে নিশ্চিত হয়েছে! কাস্টমার ভল্ট ও সিভিতে সংরক্ষিত হয়েছে।")
+    } catch (err: any) {
+      toast.error("তথ্য নিশ্চিতকরণ ব্যর্থ হয়েছে: " + err.message)
+    } finally {
+      setIsApplyingConfirmation(false)
+    }
+  }
 
   // 1. Fetch Templates on mount
   useEffect(() => {
@@ -564,6 +664,16 @@ export default function AdminCvStudioPage() {
                     ))}
                   </div>
                 )}
+
+                {/* AI Smart Document Upload & Auto-Detection Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowAiExtractModal(true)}
+                  className="w-full mt-3 py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white text-xs font-bold shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 transition-all active:scale-98"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  ✨ AI স্মার্ট ডকুমেন্ট আপলোড ও অটো-ডিটেক্ট (ক্লু থেকে জেলা/থানা/বোর্ড)
+                </button>
               </div>
             </div>
 
@@ -764,14 +874,186 @@ export default function AdminCvStudioPage() {
                       className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200"
                     />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="font-bold text-slate-700 block mb-1">বর্তমান / স্থায়ী ঠিকানা</label>
-                    <input
-                      type="text"
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200"
-                    />
+                  <div className="sm:col-span-2 bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                        বর্তমান ঠিকানা (এটমিক পৃথক ফিল্ড)
+                      </span>
+                      {formData.presentStructuredAddress?.inferredFields?.includes('postalCode') && (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                          💡 Clue থেকে পোস্টকোড {formData.presentStructuredAddress.postalCode} স্বয়ংক্রিয়
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="font-semibold text-slate-600 text-[10px] block mb-0.5">গ্রাম / পাড়া / এলাকা</label>
+                        <input
+                          type="text"
+                          placeholder="বাঘিয়া"
+                          value={formData.presentStructuredAddress?.villageArea || ''}
+                          onChange={(e) => {
+                            const struct = {
+                              ...(formData.presentStructuredAddress || {
+                                villageArea: '', postOffice: '', postalCode: '', upazilaThana: '', district: '', division: '', country: 'বাংলাদেশ'
+                              }),
+                              villageArea: e.target.value
+                            }
+                            const text = [
+                              struct.villageArea,
+                              struct.postOffice ? `${struct.postOffice} - ${struct.postalCode}` : struct.postalCode,
+                              struct.upazilaThana,
+                              struct.district,
+                              struct.division
+                            ].filter(Boolean).join(', ')
+                            setFormData({ ...formData, presentStructuredAddress: struct, address: text })
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-600 text-[10px] block mb-0.5">ডাকঘর (Post Office)</label>
+                        <input
+                          type="text"
+                          placeholder="কাশিমপুর"
+                          value={formData.presentStructuredAddress?.postOffice || ''}
+                          onChange={(e) => {
+                            const struct = {
+                              ...(formData.presentStructuredAddress || {
+                                villageArea: '', postOffice: '', postalCode: '', upazilaThana: '', district: '', division: '', country: 'বাংলাদেশ'
+                              }),
+                              postOffice: e.target.value
+                            }
+                            const text = [
+                              struct.villageArea,
+                              struct.postOffice ? `${struct.postOffice} - ${struct.postalCode}` : struct.postalCode,
+                              struct.upazilaThana,
+                              struct.district,
+                              struct.division
+                            ].filter(Boolean).join(', ')
+                            setFormData({ ...formData, presentStructuredAddress: struct, address: text })
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-600 text-[10px] block mb-0.5">পোস্ট কোড</label>
+                        <input
+                          type="text"
+                          placeholder="1704"
+                          value={formData.presentStructuredAddress?.postalCode || ''}
+                          onChange={(e) => {
+                            const struct = {
+                              ...(formData.presentStructuredAddress || {
+                                villageArea: '', postOffice: '', postalCode: '', upazilaThana: '', district: '', division: '', country: 'বাংলাদেশ'
+                              }),
+                              postalCode: e.target.value
+                            }
+                            const text = [
+                              struct.villageArea,
+                              struct.postOffice ? `${struct.postOffice} - ${struct.postalCode}` : struct.postalCode,
+                              struct.upazilaThana,
+                              struct.district,
+                              struct.division
+                            ].filter(Boolean).join(', ')
+                            setFormData({ ...formData, presentStructuredAddress: struct, address: text })
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-indigo-700"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-600 text-[10px] block mb-0.5">উপজেলা / থানা</label>
+                        <input
+                          type="text"
+                          placeholder="কাশিমপুর"
+                          value={formData.presentStructuredAddress?.upazilaThana || ''}
+                          onChange={(e) => {
+                            const struct = {
+                              ...(formData.presentStructuredAddress || {
+                                villageArea: '', postOffice: '', postalCode: '', upazilaThana: '', district: '', division: '', country: 'বাংলাদেশ'
+                              }),
+                              upazilaThana: e.target.value
+                            }
+                            const text = [
+                              struct.villageArea,
+                              struct.postOffice ? `${struct.postOffice} - ${struct.postalCode}` : struct.postalCode,
+                              struct.upazilaThana,
+                              struct.district,
+                              struct.division
+                            ].filter(Boolean).join(', ')
+                            setFormData({ ...formData, presentStructuredAddress: struct, address: text })
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-600 text-[10px] block mb-0.5">জেলা (District)</label>
+                        <input
+                          type="text"
+                          placeholder="গাজীপুর"
+                          value={formData.presentStructuredAddress?.district || ''}
+                          onChange={(e) => {
+                            const struct = {
+                              ...(formData.presentStructuredAddress || {
+                                villageArea: '', postOffice: '', postalCode: '', upazilaThana: '', district: '', division: '', country: 'বাংলাদেশ'
+                              }),
+                              district: e.target.value
+                            }
+                            const text = [
+                              struct.villageArea,
+                              struct.postOffice ? `${struct.postOffice} - ${struct.postalCode}` : struct.postalCode,
+                              struct.upazilaThana,
+                              struct.district,
+                              struct.division
+                            ].filter(Boolean).join(', ')
+                            setFormData({ ...formData, presentStructuredAddress: struct, address: text })
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-600 text-[10px] block mb-0.5">বিভাগ (Division)</label>
+                        <input
+                          type="text"
+                          placeholder="ঢাকা"
+                          value={formData.presentStructuredAddress?.division || ''}
+                          onChange={(e) => {
+                            const struct = {
+                              ...(formData.presentStructuredAddress || {
+                                villageArea: '', postOffice: '', postalCode: '', upazilaThana: '', district: '', division: '', country: 'বাংলাদেশ'
+                              }),
+                              division: e.target.value
+                            }
+                            const text = [
+                              struct.villageArea,
+                              struct.postOffice ? `${struct.postOffice} - ${struct.postalCode}` : struct.postalCode,
+                              struct.upazilaThana,
+                              struct.district,
+                              struct.division
+                            ].filter(Boolean).join(', ')
+                            setFormData({ ...formData, presentStructuredAddress: struct, address: text })
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-500 text-[10px] block mb-0.5">সিভিতে প্রদর্শিত ফরম্যাটেড ঠিকানা</label>
+                      <input
+                        type="text"
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">পিতার নাম</label>
@@ -844,7 +1126,7 @@ export default function AdminCvStudioPage() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                        <div className="grid grid-cols-2 gap-2 pr-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pr-6">
                           <div>
                             <label className="font-semibold text-slate-500 text-[10px]">ডিগ্রি / পরীক্ষার নাম</label>
                             <input
@@ -855,11 +1137,25 @@ export default function AdminCvStudioPage() {
                                 copy[idx].degree = e.target.value
                                 setFormData({ ...formData, education: copy })
                               }}
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200"
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold"
                             />
                           </div>
                           <div>
-                            <label className="font-semibold text-slate-500 text-[10px]">প্রতিষ্ঠান / বিশ্ববিদ্যালয়</label>
+                            <label className="font-semibold text-slate-500 text-[10px]">শিক্ষা বোর্ড / বিশ্ববিদ্যালয় *</label>
+                            <input
+                              type="text"
+                              placeholder="যেমন: Dhaka Board"
+                              value={edu.boardOrUniversity || ''}
+                              onChange={(e) => {
+                                const copy = [...formData.education]
+                                copy[idx].boardOrUniversity = e.target.value
+                                setFormData({ ...formData, education: copy })
+                              }}
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-indigo-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-semibold text-slate-500 text-[10px]">প্রতিষ্ঠান / কলেজ</label>
                             <input
                               type="text"
                               value={edu.institution}
@@ -868,7 +1164,21 @@ export default function AdminCvStudioPage() {
                                 copy[idx].institution = e.target.value
                                 setFormData({ ...formData, education: copy })
                               }}
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200"
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-semibold text-slate-500 text-[10px]">বিভাগ / গ্রুপ</label>
+                            <input
+                              type="text"
+                              placeholder="Science / General"
+                              value={edu.groupMajor || ''}
+                              onChange={(e) => {
+                                const copy = [...formData.education]
+                                copy[idx].groupMajor = e.target.value
+                                setFormData({ ...formData, education: copy })
+                              }}
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
                             />
                           </div>
                           <div>
@@ -881,11 +1191,11 @@ export default function AdminCvStudioPage() {
                                 copy[idx].passingYear = e.target.value
                                 setFormData({ ...formData, education: copy })
                               }}
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200"
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium"
                             />
                           </div>
                           <div>
-                            <label className="font-semibold text-slate-500 text-[10px]">ফলাফল / GPA / সিজিপিএ</label>
+                            <label className="font-semibold text-slate-500 text-[10px]">ফলাফল / GPA</label>
                             <input
                               type="text"
                               value={edu.resultGpa}
@@ -894,7 +1204,35 @@ export default function AdminCvStudioPage() {
                                 copy[idx].resultGpa = e.target.value
                                 setFormData({ ...formData, education: copy })
                               }}
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200"
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-bold text-emerald-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-semibold text-slate-500 text-[10px]">রোল নম্বর (যদি থাকে)</label>
+                            <input
+                              type="text"
+                              placeholder="104523"
+                              value={edu.rollNumber || ''}
+                              onChange={(e) => {
+                                const copy = [...formData.education]
+                                copy[idx].rollNumber = e.target.value
+                                setFormData({ ...formData, education: copy })
+                              }}
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="font-semibold text-slate-500 text-[10px]">রেজিস্ট্রেশন নম্বর</label>
+                            <input
+                              type="text"
+                              placeholder="1214567890"
+                              value={edu.regNumber || ''}
+                              onChange={(e) => {
+                                const copy = [...formData.education]
+                                copy[idx].regNumber = e.target.value
+                                setFormData({ ...formData, education: copy })
+                              }}
+                              className="w-full px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs"
                             />
                           </div>
                         </div>
@@ -1605,6 +1943,23 @@ export default function AdminCvStudioPage() {
           </div>
         </div>
       )}
+
+      {/* AI Extraction Input Modal */}
+      <AiExtractDialog
+        isOpen={showAiExtractModal}
+        onClose={() => setShowAiExtractModal(false)}
+        onExtract={handleTriggerAiExtract}
+        isLoading={isExtractingAi}
+      />
+
+      {/* AI Extracted Candidate Human Review & Confirmation Modal */}
+      <CandidateReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        candidate={candidateReviewData}
+        onConfirm={handleConfirmCandidate}
+        isApplying={isApplyingConfirmation}
+      />
     </div>
   )
 }

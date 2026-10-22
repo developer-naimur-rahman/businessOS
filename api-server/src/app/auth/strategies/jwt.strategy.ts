@@ -42,14 +42,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const isAdmin = 
       user.email === 'naimur582582@gmail.com' || 
       user.email === 'admin@demo.local' || 
-      user.email.startsWith('admin@') ||
+      Boolean(user.email?.startsWith('admin@')) ||
       roleIds.some(r => {
         const lower = r.toLowerCase();
         return lower === 'admin' || lower.includes('admin') || lower === 'superadmin' || lower === 'owner';
       });
 
     const isManager = 
-      user.email.startsWith('manager@') ||
+      Boolean(user.email?.startsWith('manager@')) ||
       roleIds.some(r => r.toLowerCase().includes('manager'));
 
     const effectivePermissions = isAdmin ? ['*'] : [...permissions];

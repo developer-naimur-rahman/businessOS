@@ -10,6 +10,12 @@ import {
   Sliders, Copy, ExternalLink, AlertCircle, BookmarkCheck
 } from "lucide-react"
 import { toast } from "sonner"
+import { AiExtractDialog } from "../../../components/document-studio/ai-extract-dialog"
+import {
+  CandidateReviewModal,
+  CandidateExtractionData,
+  StructuredAddressData
+} from "../../../components/document-studio/candidate-review-modal"
 
 export type CVLanguage = "BN" | "EN" | "BILINGUAL"
 export type CVTemplateId = "minimal-clean" | "corporate-modern" | "bangla-academic" | "ats-friendly"
@@ -20,6 +26,9 @@ export interface CVEducation {
   boardOrUniversity?: string
   passingYear: string
   resultGpa: string
+  rollNumber?: string
+  regNumber?: string
+  groupMajor?: string
 }
 
 export interface CVExperience {
@@ -39,6 +48,8 @@ export interface CVData {
   phone: string
   email: string
   address: string
+  presentStructuredAddress?: StructuredAddressData
+  permanentStructuredAddress?: StructuredAddressData
   dob?: string
   fatherName?: string
   motherName?: string
@@ -136,6 +147,92 @@ export default function CVStudioPage() {
   const [printPaper, setPrintPaper] = useState<"A4" | "PHOTO_4R">("A4")
   const [isOrderingPrint, setIsOrderingPrint] = useState(false)
   const [isPurchasingPdf, setIsPurchasingPdf] = useState(false)
+
+  // AI Document Extraction & Human Review Confirmation Modal State
+  const [showAiExtractModal, setShowAiExtractModal] = useState<boolean>(false)
+  const [isExtractingAi, setIsExtractingAi] = useState<boolean>(false)
+  const [candidateReviewData, setCandidateReviewData] = useState<CandidateExtractionData | null>(null)
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false)
+  const [isApplyingConfirmation, setIsApplyingConfirmation] = useState<boolean>(false)
+
+  const handleTriggerAiExtract = async (payload: { fileBase64OrText: string; docTypeHint?: string; filename?: string }) => {
+    setIsExtractingAi(true)
+    try {
+      const endpoint = isAuthenticated ? '/customer/vault/deep-extract' : '/public/customer-vault/deep-extract'
+      const res = await api.post(endpoint, payload)
+      if (res.data) {
+        setCandidateReviewData(res.data)
+        setShowAiExtractModal(false)
+        setShowReviewModal(true)
+        toast.success("AI বিশ্লেষণ সম্পন্ন হয়েছে! অনুগ্রহ করে তথ্য যাচাই করে নিশ্চিত করুন।")
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "AI বিশ্লেষণ ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।")
+    } finally {
+      setIsExtractingAi(false)
+    }
+  }
+
+  const handleConfirmCandidate = async (confirmedCandidate: CandidateExtractionData) => {
+    setIsApplyingConfirmation(true)
+    try {
+      if (isAuthenticated) {
+        try {
+          await api.post('/customer/vault/confirm-and-apply', { candidate: confirmedCandidate })
+        } catch (apiErr) {
+          console.warn("Vault save note:", apiErr)
+        }
+      }
+
+      const pres = confirmedCandidate.presentAddress
+      const formattedAddress = [
+        pres.villageArea,
+        pres.postOffice ? `${pres.postOffice} - ${pres.postalCode}` : pres.postalCode,
+        pres.upazilaThana,
+        pres.district,
+        pres.division
+      ].filter(Boolean).join(', ')
+
+      const updatedCv: CVData = {
+        ...data,
+        nameBn: confirmedCandidate.identity.nameBn || data.nameBn,
+        nameEn: confirmedCandidate.identity.nameEnUpper || data.nameEn,
+        fatherName: confirmedCandidate.identity.fatherNameBn || confirmedCandidate.identity.fatherNameEnUpper || data.fatherName,
+        motherName: confirmedCandidate.identity.motherNameBn || confirmedCandidate.identity.motherNameEnUpper || data.motherName,
+        dob: confirmedCandidate.identity.dob || data.dob,
+        phone: confirmedCandidate.identity.phone || data.phone,
+        email: confirmedCandidate.identity.email || data.email,
+        address: formattedAddress || data.address,
+        presentStructuredAddress: confirmedCandidate.presentAddress,
+        permanentStructuredAddress: confirmedCandidate.permanentAddress,
+        education: (confirmedCandidate.education || []).map((e) => ({
+          degree: e.degree || 'Degree',
+          institution: e.institution || e.boardOrUniversity || 'Institution',
+          boardOrUniversity: e.boardOrUniversity || 'Board',
+          passingYear: e.passingYear || '',
+          resultGpa: e.resultGpa || '',
+          rollNumber: e.rollNumber,
+          regNumber: e.regNumber,
+          groupMajor: e.groupMajor
+        })),
+        skills: confirmedCandidate.skills && confirmedCandidate.skills.length > 0
+          ? Array.from(new Set([...data.skills, ...confirmedCandidate.skills]))
+          : data.skills
+      }
+
+      setData(updatedCv)
+      try {
+        localStorage.setItem("businessos_cv_draft", JSON.stringify(updatedCv))
+      } catch {}
+
+      setShowReviewModal(false)
+      toast.success("✅ তথ্য সফলভাবে নিশ্চিত হয়েছে! আপনার সিভিতে সংরক্ষিত হয়েছে।")
+    } catch (err: any) {
+      toast.error("তথ্য নিশ্চিতকরণ ব্যর্থ হয়েছে: " + err.message)
+    } finally {
+      setIsApplyingConfirmation(false)
+    }
+  }
 
   const printAreaRef = useRef<HTMLDivElement>(null)
 
@@ -308,6 +405,14 @@ export default function CVStudioPage() {
 
           {/* Quick Action Buttons */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAiExtractModal(true)}
+              className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 rounded-xl text-xs font-black transition-all shadow-md shadow-cyan-500/20 flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              ✨ AI স্মার্ট ডকুমেন্ট ডিটেক্ট
+            </button>
+
             <button
               onClick={handleLoadFromVault}
               disabled={isLoadingVault}
@@ -1278,6 +1383,23 @@ export default function CVStudioPage() {
           </div>
         </div>
       )}
+
+      {/* AI Extraction Input Modal */}
+      <AiExtractDialog
+        isOpen={showAiExtractModal}
+        onClose={() => setShowAiExtractModal(false)}
+        onExtract={handleTriggerAiExtract}
+        isLoading={isExtractingAi}
+      />
+
+      {/* AI Extracted Candidate Human Review & Confirmation Modal */}
+      <CandidateReviewModal
+        isOpen={showReviewModal}
+        onClose={() => setShowReviewModal(false)}
+        candidate={candidateReviewData}
+        onConfirm={handleConfirmCandidate}
+        isApplying={isApplyingConfirmation}
+      />
     </div>
   )
 }
